@@ -349,6 +349,9 @@ model Notification {
   user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   job        Job                @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
+  // SEC-003 / FR-027: at most one delivery record per (userId, jobId).
+  // Duplicate deliveries are rejected at the DB, not just checked in app code.
+  @@unique([userId, jobId])
   @@index([userId, channel, status])
 }
 
