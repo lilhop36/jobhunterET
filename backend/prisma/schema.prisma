@@ -1,0 +1,406 @@
+// JobHunter — Prisma schema (SRS v2.2 §25)
+// Run: npm run prisma:generate && npm run prisma:migrate
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum EmploymentType {
+  FULL_TIME
+  CONTRACT
+  PART_TIME
+  INTERNSHIP
+}
+
+enum ExperienceLevel {
+  INTERN
+  ENTRY
+  MID
+  SENIOR
+  LEAD
+}
+
+enum LocationClass {
+  ETHIOPIA_LOCAL
+  ETHIOPIA_REMOTE
+  INTERNATIONAL_REMOTE
+  INTERNATIONAL_ONSITE
+  INTERNATIONAL_HYBRID
+}
+
+enum Workplace {
+  ONSITE
+  REMOTE
+  HYBRID
+}
+
+enum JobStatus {
+  ACTIVE
+  EXPIRED
+  REMOVED
+}
+
+enum NotificationChannel {
+  TELEGRAM
+  WEB
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  UNREAD_WEB
+  READ
+}
+
+enum ApplicationStage {
+  DISCOVERED
+  SAVED
+  APPLIED
+  ASSESSMENT
+  INTERVIEW
+  OFFER
+  REJECTED
+  WITHDRAWN
+}
+
+enum SourceStatus {
+  ACTIVE
+  ERROR
+  DISABLED
+}
+
+enum SourceTier {
+  ETHIOPIA
+  REMOTE
+  INTERNATIONAL
+}
+
+enum SourceType {
+  API
+  RSS
+  JSON
+  HTML
+  COMPANY_CAREER_PAGE
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  passwordHash String
+  role        Role     @default(USER)
+  locale      String   @default("en")
+  notificationsPaused Boolean @default(false)
+  digestEnabled Boolean @default(true) // FR-028 / FR-026: daily digest on/off
+  matchThreshold Int @default(70)
+  pausedUntil DateTime?
+  createdAt   DateTime @default(now())
+
+  profile        CandidateProfile?
+  cvFiles        CvFile[]
+  telegramLink   TelegramLink?
+  skills         CandidateSkill[]
+  targetRoles    TargetRole[]
+  locations      LocationPreference[]
+  matches        JobMatch[]
+  savedJobs      SavedJob[]
+  applications   Application[]
+  notifications  Notification[]
+  searches       SearchProfile[]
+  digests        Digest[]
+}
+
+model CandidateProfile {
+  id          String @id @default(cuid())
+  userId      String @unique
+  title       String?
+  summary     String?
+  years       Int     @default(0)
+  remote      Boolean @default(false)
+  minSalary   Int     @default(0)
+  excludeOnsite Boolean @default(false)
+  employmentTypes String[] @default([])
+  onboardDone Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CvFile {
+  id           String   @id @default(cuid())
+  userId       String
+  filePath     String
+  originalName String
+  sizeBytes    Int
+  uploadedAt   DateTime @default(now())
+  active       Boolean  @default(true)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model TelegramLink {
+  id       String   @id @default(cuid())
+  userId   String   @unique
+  chatId   String   @unique
+  linkedAt DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Skill {
+  id    String @id @default(cuid())
+  name  String @unique
+  users CandidateSkill[]
+  jobs  JobSkill[]
+}
+
+model CandidateSkill {
+  id       String @id @default(cuid())
+  userId  String
+  skillId String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill   Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillId])
+}
+
+model TargetRole {
+  id       String  @id @default(cuid())
+  userId   String
+  role     String
+  priority Priority
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model LocationPreference {
+  id     String @id @default(cuid())
+  userId String
+  region String
+  tier   Priority
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, region])
+}
+
+model JobSource {
+  id                    String      @id @default(cuid())
+  name                  String
+  type                  SourceType
+  baseUrl               String
+  status                SourceStatus @default(ACTIVE)
+  priorityTier          SourceTier
+  collectionFrequency   String      @default("30 min")
+  lastSuccessfulRun     DateTime?
+  lastFailedRun         DateTime?
+  lastError             String?
+  createdAt             DateTime    @default(now())
+  jobs                  Job[]
+  runs                  SourceRun[]
+}
+
+model SourceRun {
+  id           String   @id @default(cuid())
+  sourceId     String
+  startedAt    DateTime @default(now())
+  finishedAt   DateTime?
+  status       String
+  jobsFetched  Int      @default(0)
+  jobsCreated  Int      @default(0)
+  duplicates   Int      @default(0)
+  errors       Int      @default(0)
+  errorMessage String?
+  source       JobSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+}
+
+model Job {
+  id              String        @id @default(cuid())
+  title           String
+  description     String?
+  company         String
+  location        String
+  workPlace       Workplace     @default(ONSITE)
+  locationClass   LocationClass
+  employmentType  EmploymentType
+  experienceLevel ExperienceLevel
+  salary          Int?
+  currency        String        @default("USD")
+  url             String
+  sourceId        String
+  sourceJobId     String?
+  postedDate      DateTime
+  deadline        DateTime?
+  firstSeenAt     DateTime      @default(now())
+  lastSeenAt      DateTime      @default(now())
+  missedCycles    Int           @default(0)
+  status          JobStatus     @default(ACTIVE)
+  statusChangedAt DateTime?
+  parseConfidence Int           @default(85)
+  archivedAt      DateTime?
+  fingerprint     String?
+  rawData         Json?
+  country         String?
+  createdAt       DateTime      @default(now())
+
+  source     JobSource    @relation(fields: [sourceId], references: [id])
+  skills     JobSkill[]
+  matches    JobMatch[]
+  savedBy    SavedJob[]
+  apps       Application[]
+  notifications Notification[]
+
+  @@unique([sourceId, sourceJobId])
+  @@index([status])
+  @@index([firstSeenAt])
+}
+
+model JobSkill {
+  id     String @id @default(cuid())
+  jobId  String
+  skillId String
+  job    Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  skill  Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, skillId])
+}
+
+model JobMatch {
+  id              String   @id @default(cuid())
+  userId          String
+  jobId           String
+  score           Int
+  roleScore       Float
+  skillScore      Float
+  experienceScore Float
+  locationScore   Float
+  employmentScore Float
+  freshnessScore  Float
+  salaryScore     Float
+  matchedSkills   String[]
+  relatedSkills   String[]
+  missingSkills   String[]
+  reasons         String[]
+  summary         String?
+  matcherVersion  String   @default("v2.2-rules")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@index([userId])
+}
+
+model SavedJob {
+  id        String   @id @default(cuid())
+  userId    String
+  jobId     String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+}
+
+model Application {
+  id         String          @id @default(cuid())
+  userId     String
+  jobId      String
+  stage      ApplicationStage @default(APPLIED)
+  stageSince DateTime        @default(now())
+  followUp   DateTime?
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job        Job             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@index([userId])
+}
+
+model Notification {
+  id         String             @id @default(cuid())
+  userId     String
+  jobId      String
+  channel    NotificationChannel
+  status     NotificationStatus  @default(UNREAD_WEB)
+  score      Int
+  summary    String?
+  createdAt  DateTime           @default(now())
+  sentAt     DateTime?
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job        Job                @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([userId, channel, status])
+}
+
+model SearchProfile {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  q         String?
+  tier      String   @default("ALL")
+  remote    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Digest {
+  id            String   @id @default(cuid())
+  userId        String
+  createdAt     DateTime @default(now())
+  jobsCollected Int
+  newJobs       Int
+  strongMatches Int
+  topMatches    Json
+  searches      Json // [{ name, hits }] — saved-search hit counts (FR-033 auto-executed)
+  deliveredTo   String   @default("WEB") // TELEGRAM | WEB
+  status        String   @default("SENT") // SENT | NO_CONTENT | FAILED
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model MatchCycle {
+  id                String   @id @default(cuid())
+  startedAt         DateTime @default(now())
+  finishedAt        DateTime?
+  jobsEvaluated     Int
+  usersProcessed    Int
+  matchesCreated    Int
+  aboveThreshold    Int
+  notificationsSent  Int      @default(0)
+  notificationsFailed Int     @default(0)
+  toInbox           Int      @default(0)
+  errors            Int      @default(0)
+  actionsTaken      Int      @default(0)
+}
+
+model SystemLog {
+  id    String   @id @default(cuid())
+  tag   String
+  msg   String
+  at    DateTime @default(now())
+
+  @@index([at])
+}

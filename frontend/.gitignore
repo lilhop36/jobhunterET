@@ -1,0 +1,7 @@
+node_modules/
+.next/
+out/
+
+# Playwright (e2e)
+test-results/
+playwright-report/
