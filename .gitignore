@@ -1,0 +1,9 @@
+# Freebuff/agent runtime state — DB files, logs, QA tokens (u*.token contain JWTs)
+.freebuff/
+
+# Build artifacts
+*.tsbuildinfo
+
+# OS junk
+.DS_Store
+Thumbs.db
