@@ -80,3 +80,33 @@ describe('TelegramService — link codes (FR-003b)', () => {
     expect(prisma2.savedJob.upsert).not.toHaveBeenCalled();
   });
 });
+
+describe('TelegramService.buildMatchText — SEC-002 HTML escaping', () => {
+  const svc = new TelegramService({} as any); // buildMatchText touches no DB state
+
+  it('escapes source-controlled fields for Telegram HTML parse mode', () => {
+    const text = svc.buildMatchText({
+      score: 92,
+      summary: 'Matches <b>your</b> profile & more',
+      matchedSkills: ['Node.js', '<script>alert(1)</script>'],
+      missingSkills: ['AWS & Azure'],
+      job: {
+        title: 'Junior <b>Backend</b> Developer & Co',
+        company: 'ACME <i>Inc</i>',
+        location: 'Addis Ababa & Remote',
+        workPlace: 'ONSITE',
+        employmentType: 'FULL_TIME',
+        url: 'https://example.com/job?a=1&b=2',
+      },
+    });
+
+    expect(text).toContain('Junior &lt;b&gt;Backend&lt;/b&gt; Developer &amp; Co');
+    expect(text).toContain('ACME &lt;i&gt;Inc&lt;/i&gt;');
+    expect(text).toContain('Addis Ababa &amp; Remote');
+    expect(text).toContain('Matches &lt;b&gt;your&lt;/b&gt; profile &amp; more');
+    expect(text).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(text).toContain('AWS &amp; Azure');
+    expect(text).toContain('https://example.com/job?a=1&amp;b=2');
+    expect(text).not.toContain('<b>');
+  });
+});

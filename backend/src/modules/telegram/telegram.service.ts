@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
+import { escHtml } from '../../common/utils/escape-html';
 
 interface LinkCode {
   userId: string;
@@ -163,18 +164,19 @@ export class TelegramService {
   }): string {
     const band =
       match.score >= 90 ? 'Excellent' : match.score >= 80 ? 'Strong' : match.score >= 70 ? 'Good' : 'Possible';
+    // SEC-002: every source-controlled field is escaped for Telegram HTML mode.
     const lines = [
       `🔥 NEW JOB MATCH — ${band} (${match.score}%)`,
       ``,
-      match.job.title,
-      `Company: ${match.job.company}`,
-      `Location: ${match.job.location} · ${match.job.workPlace} · ${match.job.employmentType}`,
+      escHtml(match.job.title),
+      `Company: ${escHtml(match.job.company)}`,
+      `Location: ${escHtml(match.job.location)} · ${escHtml(match.job.workPlace)} · ${escHtml(match.job.employmentType)}`,
       ``,
-      `💡 Why: ${match.summary || 'High compatibility with your profile.'}`,
+      `💡 Why: ${escHtml(match.summary || 'High compatibility with your profile.')}`,
     ];
-    if (match.matchedSkills.length) lines.push(``, `✓ ${match.matchedSkills.join('  ✓ ')}`);
-    if (match.missingSkills.length) lines.push(`Missing: ${match.missingSkills.join(', ')}`);
-    lines.push(``, `Apply: ${match.job.url}`);
+    if (match.matchedSkills.length) lines.push(``, `✓ ${match.matchedSkills.map(escHtml).join('  ✓ ')}`);
+    if (match.missingSkills.length) lines.push(`Missing: ${match.missingSkills.map(escHtml).join(', ')}`);
+    lines.push(``, `Apply: ${escHtml(match.job.url)}`);
     return lines.join('\n');
   }
 
@@ -283,7 +285,9 @@ export class TelegramService {
       take: 10,
     });
     if (!saved.length) return this.sendMessage(String(chatId), 'You have no saved jobs yet.');
-    const lines = saved.map((s, i) => `${i + 1}. ${s.job.title} — ${s.job.company}\n   ${s.job.url}`);
+    const lines = saved.map(
+      (s, i) => `${i + 1}. ${escHtml(s.job.title)} — ${escHtml(s.job.company)}\n   ${escHtml(s.job.url)}`,
+    );
     return this.sendMessage(String(chatId), `🔖 Saved jobs (latest ${saved.length})\n\n${lines.join('\n')}`);
   }
 

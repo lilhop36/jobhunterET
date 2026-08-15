@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { NotificationsService } from './notifications.service';
 
 describe('NotificationsService — FR-024/FR-025/FR-027', () => {
@@ -87,5 +88,49 @@ describe('NotificationsService — FR-024/FR-025/FR-027', () => {
 
     expect(r).toBe('SKIPPED');
     expect(telegram.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('SEC-003: concurrent calls for the same (userId, jobId) deliver exactly once', async () => {
+    const { svc, prisma, telegram } = mk();
+    prisma.user.findUnique.mockResolvedValue(base.user);
+    prisma.job.findUnique
+      .mockResolvedValueOnce({ status: 'ACTIVE' }) // A: status gate
+      .mockResolvedValueOnce(base.job) // A: full job payload
+      .mockResolvedValueOnce({ status: 'ACTIVE' }); // B: status gate
+    prisma.jobMatch.findUnique.mockResolvedValue(base.match);
+    prisma.notification.findFirst
+      .mockResolvedValueOnce(null) // A: no row yet (race window)
+      .mockResolvedValueOnce({ id: 'n1' }); // B: A already recorded it
+    telegram.sendMessage.mockResolvedValue('SENT');
+    prisma.notification.create.mockResolvedValue({});
+
+    const results = await Promise.all([
+      svc.notifyForMatch('u1', 'j1', 92, 'Matches your profile'),
+      svc.notifyForMatch('u1', 'j1', 92, 'Matches your profile'),
+    ]);
+
+    expect(results.sort()).toEqual(['SENT', 'SKIPPED']);
+    expect(telegram.sendMessage).toHaveBeenCalledTimes(1);
+    expect(prisma.notification.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('SEC-003: a unique-constraint race on insert (P2002) is treated as already-notified', async () => {
+    const { svc, prisma, telegram } = mk();
+    prisma.user.findUnique.mockResolvedValue(base.user);
+    prisma.job.findUnique
+      .mockResolvedValueOnce({ status: 'ACTIVE' })
+      .mockResolvedValueOnce(base.job);
+    prisma.jobMatch.findUnique.mockResolvedValue(base.match);
+    telegram.sendMessage.mockResolvedValue('SENT');
+    prisma.notification.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed on the fields: (`userId`,`jobId`)', {
+        code: 'P2002',
+        clientVersion: '5.20.0',
+      }),
+    );
+
+    const r = await svc.notifyForMatch('u1', 'j1', 92, 'Matches your profile');
+
+    expect(r).toBe('SKIPPED');
   });
 });

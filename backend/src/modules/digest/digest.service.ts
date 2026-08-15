@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { escHtml } from '../../common/utils/escape-html';
 
 const WINDOW_MS = 24 * 60 * 60 * 1000; // FR-028: daily report window
 
@@ -194,13 +196,21 @@ export class DigestService {
     userId: string,
     m: { jobId: string; score: number; summary: string | null },
   ) {
+    // SEC-003 / FR-027: any existing row for the pair (any status) means it was
+    // already delivered; the unique (userId, jobId) constraint backs this up.
     const existing = await this.prisma.notification.findFirst({
-      where: { userId, jobId: m.jobId, status: { in: ['SENT', 'UNREAD_WEB'] } },
+      where: { userId, jobId: m.jobId },
     });
     if (existing) return;
-    await this.prisma.notification.create({
-      data: { userId, jobId: m.jobId, channel: 'WEB', status: 'UNREAD_WEB', score: m.score, summary: m.summary },
-    });
+    try {
+      await this.prisma.notification.create({
+        data: { userId, jobId: m.jobId, channel: 'WEB', status: 'UNREAD_WEB', score: m.score, summary: m.summary },
+      });
+    } catch (e) {
+      // Race lost to another producer — the pair is already recorded.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return;
+      throw e;
+    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -208,7 +218,6 @@ export class DigestService {
   /* ------------------------------------------------------------------ */
 
   private buildDigestText(report: DigestReport): string {
-    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const appUrl = process.env.APP_URL || 'https://app.jobhunter.et';
     const lines = [
       `📅 JobHunter daily digest — ${new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
@@ -217,12 +226,12 @@ export class DigestService {
     ];
     if (report.searches.length) {
       lines.push(``, `Saved searches:`);
-      for (const s of report.searches) lines.push(`• ${esc(s.name)} → ${s.hits} new hit${s.hits === 1 ? '' : 's'}`);
+      for (const s of report.searches) lines.push(`• ${escHtml(s.name)} → ${s.hits} new hit${s.hits === 1 ? '' : 's'}`);
     }
     if (report.topMatches.length) {
       lines.push(``, `Top matches:`);
       report.topMatches.forEach((m, i) => {
-        lines.push(`${i + 1}. ${esc(m.title)} — ${esc(m.company)} · ${m.score}%`);
+        lines.push(`${i + 1}. ${escHtml(m.title)} — ${escHtml(m.company)} · ${m.score}%`);
       });
     }
     lines.push(``, `Full report: ${appUrl}/dashboard`);
