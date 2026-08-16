@@ -1,7 +1,7 @@
 /* Arbeitnow adapter — free JSON API, no key (SRS §9.2, remote tier). */
 
 import { Injectable } from '@nestjs/common';
-import { JobSourceAdapter, RawJob, deriveExperience, mapEmployment } from './job-source.adapter';
+import { JobSourceAdapter, RawJob, deriveExperience, mapEmployment, FETCH_TIMEOUT_MS } from './job-source.adapter';
 
 interface ArbeitnowJob {
   slug: string;
@@ -24,7 +24,7 @@ export class ArbeitnowAdapter implements JobSourceAdapter {
 
   async fetchJobs(options?: { since?: Date }): Promise<RawJob[]> {
     const since = options?.since ?? new Date(Date.now() - 7 * 86_400_000);
-    const res = await fetch(`${API}?limit=20`);
+    const res = await fetch(`${API}?limit=20`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`Arbeitnow responded ${res.status}`);
     const body = (await res.json()) as { data?: ArbeitnowJob[] };
     const jobs = (body.data ?? []).filter((j) => {

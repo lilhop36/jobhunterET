@@ -178,7 +178,7 @@ describe('SourcesService.collect — validation, dedup counting, isolation (FR-0
     expect(run.jobsCreated).toBe(1);
   });
 
-  it('isolates a failing source without blocking other sources or matching (FR-036)', async () => {
+  it('records a transient failure but keeps the source ACTIVE for retry (SEC-006)', async () => {
     const { service, prisma, reliefweb, matching } = createService();
     prisma.jobSource.findUnique.mockResolvedValue({ id: 'reliefweb', name: 'ReliefWeb', status: 'ACTIVE' });
     reliefweb.fetchJobs.mockRejectedValue(new Error('ETIMEDOUT'));
@@ -186,9 +186,11 @@ describe('SourcesService.collect — validation, dedup counting, isolation (FR-0
     const result = await service.collect('reliefweb');
 
     expect(result.status).toBe('FAIL');
-    expect(prisma.jobSource.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'ERROR', lastError: 'ETIMEDOUT' }) }),
-    );
+    // No permanent ERROR park — the counter increments and the status is untouched.
+    const update = prisma.jobSource.update.mock.calls[0][0];
+    expect(update.data.consecutiveFailures).toEqual({ increment: 1 });
+    expect(update.data.lastError).toBe('ETIMEDOUT');
+    expect(update.data.status).toBeUndefined();
     expect(prisma.sourceRun.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'FAIL', errors: 1 }) }),
     );
@@ -203,11 +205,54 @@ describe('SourcesService.collect — validation, dedup counting, isolation (FR-0
 
     expect(result.status).toBe('FAIL');
     expect(prisma.job.create).not.toHaveBeenCalled();
-    expect(prisma.jobSource.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'ERROR' }) }),
-    );
+    const update = prisma.jobSource.update.mock.calls[0][0];
+    expect(update.data.consecutiveFailures).toEqual({ increment: 1 });
+    expect(update.data.status).toBeUndefined();
     expect(prisma.sourceRun.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'FAIL', errors: 1 }) }),
     );
+  });
+
+  it('skips collection while the source is in backoff after repeated failures (SEC-006)', async () => {
+    const { service, prisma, reliefweb } = createService();
+    // 5 consecutive failures → 2^(5-3) = 4h backoff; only 1 min has elapsed.
+    prisma.jobSource.findUnique.mockResolvedValue({
+      id: 'reliefweb',
+      name: 'ReliefWeb',
+      status: 'ACTIVE',
+      consecutiveFailures: 5,
+      lastFailedRun: new Date(Date.now() - 60_000),
+    });
+
+    const result = await service.collect('reliefweb');
+
+    expect(result.status).toBe('SKIPPED');
+    expect(reliefweb.fetchJobs).not.toHaveBeenCalled();
+  });
+
+  it('retries once the backoff window has elapsed and resets the failure streak on success (SEC-006)', async () => {
+    const { service, prisma, reliefweb, matching } = createService();
+    // Same failure count, but the last failure was 25h ago (> 4h backoff).
+    prisma.jobSource.findUnique.mockResolvedValue({
+      id: 'reliefweb',
+      name: 'ReliefWeb',
+      status: 'ACTIVE',
+      consecutiveFailures: 5,
+      lastFailedRun: new Date(Date.now() - 25 * 60 * 60 * 1000),
+    });
+    reliefweb.fetchJobs.mockResolvedValue([rawJob()]);
+    prisma.job.findUnique.mockResolvedValue(null);
+    prisma.job.create.mockResolvedValue({ id: 'j-new' });
+    prisma.job.findMany.mockResolvedValue([]);
+
+    const result = await service.collect('reliefweb');
+
+    expect(result.status).toBe('OK');
+    expect(reliefweb.fetchJobs).toHaveBeenCalled();
+    const successUpdate = prisma.jobSource.update.mock.calls.find(
+      (c: any[]) => c[0]?.data?.consecutiveFailures === 0,
+    );
+    expect(successUpdate).toBeDefined();
+    expect(matching.matchUnmatchedJobs).toHaveBeenCalled();
   });
 });

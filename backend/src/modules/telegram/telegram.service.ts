@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import { escHtml } from '../../common/utils/escape-html';
+import { RateLimiter } from '../../common/utils/rate-limiter';
 
 interface LinkCode {
   userId: string;
@@ -34,6 +35,8 @@ export class TelegramService {
   private lastGlobalAt = 0; // FR-024b.1: global 25 msg/s across all users
   private lastChatAt = new Map<string, number>(); // FR-024b.2: 1.2s min between messages per chat
   private updateOffset = 0;
+  /** SEC-005: per-chat attempt budget for the bot's /start code exchange. */
+  private readonly startLimiter = new RateLimiter(Number(process.env.LINK_CODE_RATE_MAX ?? 10), 10 * 60_000);
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -90,16 +93,22 @@ export class TelegramService {
   /* Delivery (FR-024b)                                                  */
   /* ------------------------------------------------------------------ */
 
+  /**
+   * SEC-005: atomic slot reservation. Each caller reserves the next future slot
+   * (`now + interval`) without awaiting between read and write, so concurrent
+   * sends get strictly increasing slots — no burst past the global cap and no
+   * per-chat flood, regardless of how many producers fire at once.
+   */
   private async throttle(chatId: string) {
-    const globalMin = 1000 / this.globalRate; // e.g. 40ms at 25 msg/s
     const now = Date.now();
-    const gWait = this.lastGlobalAt + globalMin - now;
-    if (gWait > 0) await sleep(gWait);
+    const globalMin = 1000 / this.globalRate; // e.g. 40ms at 25 msg/s
+    const gSlot = Math.max(this.lastGlobalAt, now) + globalMin;
+    this.lastGlobalAt = gSlot;
     const last = this.lastChatAt.get(chatId) ?? 0;
-    const cWait = last + this.perChatInterval - Date.now();
-    if (cWait > 0) await sleep(cWait);
-    this.lastGlobalAt = Date.now();
-    this.lastChatAt.set(chatId, Date.now());
+    const cSlot = Math.max(last, now) + this.perChatInterval;
+    this.lastChatAt.set(chatId, cSlot);
+    const wait = Math.max(gSlot, cSlot) - now;
+    if (wait > 0) await sleep(wait);
   }
 
   /** POST to the Bot API, honoring retry_after backoff on 429 (FR-024b.3). */
@@ -110,6 +119,8 @@ export class TelegramService {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
+        // SEC-007: a hung Bot API must not stall sends (which hold the dedup lock).
+        signal: AbortSignal.timeout(15_000),
       });
       if (res.status === 429) {
         const retryAfter = ((await res.json().catch(() => ({}))) as any)?.parameters?.retry_after;
@@ -243,6 +254,11 @@ export class TelegramService {
     const parts = text.split(/\s+/);
     const code = parts[1];
     if (code) {
+      // SEC-005: bound brute-force attempts against the 6-char codes per chat.
+      if (!this.startLimiter.consume(String(chatId))) {
+        await this.sendMessage(String(chatId), '⏳ Too many attempts — generate a new code from the web app and try again later.');
+        return;
+      }
       const claimed = this.consumeCode(code);
       if (claimed) {
         await this.prisma.telegramLink.upsert({

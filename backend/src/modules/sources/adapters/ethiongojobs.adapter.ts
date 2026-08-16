@@ -3,7 +3,7 @@
  * deadline are extracted from the post body with simple pattern matching. */
 
 import { Injectable } from '@nestjs/common';
-import { JobSourceAdapter, RawJob, deriveExperience } from './job-source.adapter';
+import { JobSourceAdapter, RawJob, deriveExperience, FETCH_TIMEOUT_MS } from './job-source.adapter';
 
 interface WpPost {
   id: number;
@@ -21,7 +21,9 @@ export class EthioNgoJobsAdapter implements JobSourceAdapter {
 
   async fetchJobs(options?: { since?: Date }): Promise<RawJob[]> {
     const since = options?.since ?? new Date(Date.now() - 30 * 86_400_000);
-    const res = await fetch(`${API}?per_page=20&_fields=id,link,date,title,content`);
+    const res = await fetch(`${API}?per_page=20&_fields=id,link,date,title,content`, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
     if (!res.ok) throw new Error(`EthioNGOJobs responded ${res.status}`);
     const posts = (await res.json()) as WpPost[];
     return posts

@@ -11,6 +11,8 @@ import { EthioNgoJobsAdapter } from './adapters/ethiongojobs.adapter';
 import { GeezJobsAdapter } from './adapters/geezjobs.adapter';
 import { EthiojobsAdapter } from './adapters/ethiojobs.adapter';
 
+const BACKOFF_THRESHOLD = Math.max(1, Number(process.env.SOURCE_BACKOFF_THRESHOLD ?? 3));
+
 @Injectable()
 export class SourcesService {
   private readonly logger = new Logger(SourcesService.name);
@@ -65,11 +67,32 @@ export class SourcesService {
     }
   }
 
+  /**
+   * SEC-006: exponential backoff after repeated failures — failures are counted,
+   * never treated as a permanent state. Once `consecutiveFailures` reaches the
+   * threshold, attempts are skipped until the backoff window (doubling per
+   * failure, capped) has elapsed; a successful run resets the counter.
+   */
+  private backoffMs(failures: number): number {
+    const excess = Math.max(0, failures - BACKOFF_THRESHOLD);
+    return Math.min(2 ** excess, 24) * 60 * 60 * 1000; // 1h → 2h → 4h → … cap 24h
+  }
+
   /** FR-009/010: connect → fetch → validate → normalize → dedupe → store, then reconcile ghosts (FR-015). */
   async collect(id: string) {
     const source = await this.prisma.jobSource.findUnique({ where: { id } });
     if (!source) throw new NotFoundException('Source not found');
     if (source.status !== 'ACTIVE') throw new BadRequestException('Source is not ACTIVE');
+
+    // SEC-006: skip this cycle while the source is in backoff (scheduler keeps
+    // polling, so a recovered source resumes automatically on the next window).
+    const failures = source.consecutiveFailures ?? 0;
+    if (failures >= BACKOFF_THRESHOLD && source.lastFailedRun) {
+      const waitedMs = Date.now() - source.lastFailedRun.getTime();
+      if (waitedMs < this.backoffMs(failures)) {
+        return { status: 'SKIPPED', reason: `backoff after ${failures} consecutive failures` };
+      }
+    }
 
     const startedAt = new Date();
     const adapter = this.adapters[source.id];
@@ -81,17 +104,19 @@ export class SourcesService {
       if (!adapter) throw new Error('No adapter registered for this source — add one in SourcesService (FR-008)');
       raw = await adapter.fetchJobs({ since: new Date(Date.now() - 14 * 86_400_000) });
     } catch (err: any) {
-      /* FR-036: a failing source is isolated — it never blocks other sources or matching. */
+      /* FR-036 + SEC-006: the failure is isolated (never blocks other sources or
+       * matching) and transient — the source stays ACTIVE so the next scheduled
+       * cycle can retry it. The counter drives backoff, not a permanent ERROR. */
       const message = String(err?.message ?? err).slice(0, 500);
       await this.prisma.jobSource.update({
         where: { id },
-        data: { status: 'ERROR', lastFailedRun: new Date(), lastError: message },
+        data: { consecutiveFailures: { increment: 1 }, lastFailedRun: new Date(), lastError: message },
       });
       await this.prisma.sourceRun.create({
         data: { sourceId: id, startedAt, finishedAt: new Date(), status: 'FAIL', jobsFetched: 0, errors: 1, errorMessage: message },
       });
-      this.logger.warn(`[COLLECTOR] ${source.name} failed (isolated): ${message}`);
-      return { status: 'FAIL', message: 'Source failed (isolated). See SourceRun for details.' };
+      this.logger.warn(`[COLLECTOR] ${source.name} failed (transient, will retry): ${message}`);
+      return { status: 'FAIL', message: 'Source failed (transient — will retry on the next cycle).' };
     }
 
     /* FR-013: invalid postings never enter the primary table. */
@@ -111,9 +136,10 @@ export class SourcesService {
     /* FR-015: jobs absent from the latest fetch accrue missedCycles; >= 3 → REMOVED. */
     await this.reconcileGhosts(id, seenIds);
 
+    // SEC-006: a successful run clears the failure streak so backoff restarts fresh.
     await this.prisma.jobSource.update({
       where: { id },
-      data: { status: 'ACTIVE', lastSuccessfulRun: new Date(), lastError: null },
+      data: { status: 'ACTIVE', consecutiveFailures: 0, lastSuccessfulRun: new Date(), lastError: null },
     });
     await this.prisma.sourceRun.create({
       data: { sourceId: id, startedAt, finishedAt: new Date(), status: 'OK', jobsFetched: valid.length, jobsCreated: created, duplicates, errors: invalid },
