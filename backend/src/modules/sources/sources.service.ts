@@ -2,7 +2,6 @@ import { Injectable, NotFoundException, BadRequestException, ConflictException, 
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MatchingService } from '../matching/matching.service';
-import { NotificationsService } from '../notifications/notifications.service';
 import { normalizeSkill } from '../matching/matching-engine';
 import { JobSourceAdapter, RawJob } from './adapters/job-source.adapter';
 import { ReliefWebAdapter } from './adapters/reliefweb.adapter';
@@ -20,7 +19,6 @@ export class SourcesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly matching: MatchingService,
-    private readonly notifications: NotificationsService,
     reliefweb: ReliefWebAdapter,
     remotive: RemotiveAdapter,
     arbeitnow: ArbeitnowAdapter,
@@ -122,7 +120,13 @@ export class SourcesService {
     });
     this.logger.log(`[COLLECTOR] Source: ${source.name} — Retrieved: ${valid.length} (created ${created}, dupes ${duplicates})`);
 
-    const delivered = await this.matchAndNotify();
+    // FR-018: score the newly created jobs against every user's profile once
+    // (incremental pass — no full re-score of the pool on every cycle).
+    let delivered = 0;
+    if (created > 0) {
+      const outcome = await this.matching.matchUnmatchedJobs();
+      delivered = outcome.sent + outcome.toInbox;
+    }
     return { status: 'OK', jobsFetched: valid.length, jobsCreated: created, duplicates, delivered };
   }
 
@@ -204,25 +208,6 @@ export class SourcesService {
       });
       this.logger.log(`[GHOST] Marked ${doomed.length} job(s) REMOVED (missedCycles >= 3)`);
     }
-  }
-
-  /** Recalculate matches for every user and deliver notifications for qualifying matches. */
-  private async matchAndNotify(): Promise<number> {
-    const users = await this.prisma.user.findMany();
-    let delivered = 0;
-    for (const u of users) {
-      await this.matching.recalculate(u.id);
-      const threshold = u.matchThreshold ?? 70;
-      const matches = await this.prisma.jobMatch.findMany({
-        where: { userId: u.id, score: { gte: threshold } },
-        select: { jobId: true, score: true, summary: true },
-      });
-      for (const m of matches) {
-        const r = await this.notifications.notifyForMatch(u.id, m.jobId, m.score, m.summary || '');
-        if (r !== 'SKIPPED') delivered++;
-      }
-    }
-    return delivered;
   }
 
 }

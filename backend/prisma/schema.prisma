@@ -254,6 +254,9 @@ model Job {
   missedCycles    Int           @default(0)
   status          JobStatus     @default(ACTIVE)
   statusChangedAt DateTime?
+  // FR-018: set when the incremental matcher last scored this job for all users
+  // (NULL = new/unmatched, picked up by the next incremental pass).
+  matchedAt       DateTime?
   parseConfidence Int           @default(85)
   archivedAt      DateTime?
   fingerprint     String?
@@ -271,6 +274,7 @@ model Job {
   @@unique([sourceId, sourceJobId])
   @@index([status])
   @@index([firstSeenAt])
+  @@index([status, matchedAt])
 }
 
 model JobSkill {
