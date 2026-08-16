@@ -7,7 +7,7 @@
  * the health dashboard then reflects the real integration state. */
 
 import { Injectable } from '@nestjs/common';
-import { JobSourceAdapter, RawJob, deriveExperience, mapEmployment } from './job-source.adapter';
+import { JobSourceAdapter, RawJob, deriveExperience, mapEmployment, FETCH_TIMEOUT_MS } from './job-source.adapter';
 
 interface EjJob {
   id?: string | number;
@@ -34,6 +34,7 @@ export class EthiojobsAdapter implements JobSourceAdapter {
         referer: 'https://ethiojobs.net/',
         accept: 'application/json',
       },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
       throw new Error(`Ethiojobs API responded ${res.status} (client-side data endpoint is not public)`);

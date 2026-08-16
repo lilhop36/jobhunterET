@@ -3,6 +3,7 @@ import { Interval } from '@nestjs/schedule';
 import { LifecycleService } from './lifecycle.service';
 import { SourcesService } from '../sources/sources.service';
 import { DigestService } from '../digest/digest.service';
+import { createExclusive } from '../../common/utils/exclusive';
 
 /** FR-034a: sweep interval in ms — reads EXPIRATION_SWEEP_INTERVAL (default 6h). */
 function sweepIntervalMs(): number {
@@ -61,6 +62,9 @@ function collectIntervalMs(): number {
 @Injectable()
 export class LifecycleTasks {
   private readonly logger = new Logger(LifecycleTasks.name);
+  // BUG-003: skip a tick when the previous run is still in flight, so a slow
+  // cycle (hung fetch, backlog of jobs) can never stack concurrent runs.
+  private readonly runExclusive = createExclusive();
 
   constructor(
     private readonly lifecycle: LifecycleService,
@@ -70,50 +74,60 @@ export class LifecycleTasks {
 
   @Interval(sweepIntervalMs()) // FR-034a: configurable via EXPIRATION_SWEEP_INTERVAL (default 6h)
   async sweep() {
-    try {
-      await this.lifecycle.sweepExpired();
-    } catch (e) {
-      this.logger.error('Expiration sweep failed', e);
-    }
+    await this.runExclusive('sweep', async () => {
+      try {
+        await this.lifecycle.sweepExpired();
+      } catch (e) {
+        this.logger.error('Expiration sweep failed', e);
+      }
+    });
   }
 
   @Interval(retentionIntervalMs()) // FR-037b: nightly retention archiver (RETENTION_INTERVAL, default 24h)
   async retain() {
-    try {
-      await this.lifecycle.retentionArchive();
-    } catch (e) {
-      this.logger.error('Retention archive failed', e);
-    }
+    await this.runExclusive('retain', async () => {
+      try {
+        await this.lifecycle.retentionArchive();
+      } catch (e) {
+        this.logger.error('Retention archive failed', e);
+      }
+    });
   }
 
   @Interval(matchCycleIntervalMs()) // FR-018/FR-037a: per-user match cycle (MATCH_CYCLE_INTERVAL, default 10 min)
   async cycle() {
-    try {
-      await this.lifecycle.ghostDetect();
-      await this.lifecycle.runMatchCycle();
-    } catch (e) {
-      this.logger.error('Match cycle failed', e);
-    }
+    await this.runExclusive('cycle', async () => {
+      try {
+        await this.lifecycle.ghostDetect();
+        await this.lifecycle.runMatchCycle();
+      } catch (e) {
+        this.logger.error('Match cycle failed', e);
+      }
+    });
   }
 
   @Interval(collectIntervalMs()) // FR-035: scheduled collection (JOB_COLLECTION_INTERVAL, default 30 min)
   async collect() {
-    try {
-      const sources = await this.sources.listActive();
-      for (const s of sources) {
-        await this.sources.collect(s.id);
+    await this.runExclusive('collect', async () => {
+      try {
+        const sources = await this.sources.listActive();
+        for (const s of sources) {
+          await this.sources.collect(s.id);
+        }
+      } catch (e) {
+        this.logger.error('Scheduled collection failed', e);
       }
-    } catch (e) {
-      this.logger.error('Scheduled collection failed', e);
-    }
+    });
   }
 
   @Interval(digestIntervalMs()) // FR-028: daily digest (configurable via DIGEST_INTERVAL, default 24h)
   async digest() {
-    try {
-      await this.digests.runAll();
-    } catch (e) {
-      this.logger.error('Daily digest failed', e);
-    }
+    await this.runExclusive('digest', async () => {
+      try {
+        await this.digests.runAll();
+      } catch (e) {
+        this.logger.error('Daily digest failed', e);
+      }
+    });
   }
 }

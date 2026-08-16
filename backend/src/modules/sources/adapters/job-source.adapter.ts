@@ -31,6 +31,9 @@ export interface JobSourceAdapter {
   fetchJobs(options?: { since?: Date }): Promise<RawJob[]>;
 }
 
+/** SEC-007: hard cap on every upstream fetch — a hung source can't stall the scheduler. */
+export const FETCH_TIMEOUT_MS = 30_000;
+
 /** Derive an experience level from a job title when the source doesn't provide one. */
 export function deriveExperience(title: string): ExperienceLevel {
   const t = title.toLowerCase();

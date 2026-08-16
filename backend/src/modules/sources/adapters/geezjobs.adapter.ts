@@ -7,7 +7,7 @@
  * bypass, no auth circumvention). */
 
 import { Injectable } from '@nestjs/common';
-import { JobSourceAdapter, RawJob, deriveExperience } from './job-source.adapter';
+import { JobSourceAdapter, RawJob, deriveExperience, FETCH_TIMEOUT_MS } from './job-source.adapter';
 
 const HOME = 'https://geezjobs.com/';
 const MAX_JOBS = 12;
@@ -20,6 +20,7 @@ export class GeezJobsAdapter implements JobSourceAdapter {
   async fetchJobs(): Promise<RawJob[]> {
     const res = await fetch(HOME, {
       headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) JobHunter/1.0' },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`GeezJobs responded ${res.status}`);
     const html = await res.text();
@@ -31,6 +32,7 @@ export class GeezJobsAdapter implements JobSourceAdapter {
       try {
         const page = await fetch(`https://geezjobs.com/job-detail/${slug}`, {
           headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) JobHunter/1.0' },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
         if (!page.ok) continue;
         const j = this.parseJob(slug, await page.text());

@@ -211,6 +211,8 @@ model JobSource {
   lastSuccessfulRun     DateTime?
   lastFailedRun         DateTime?
   lastError             String?
+  // SEC-006: consecutive collect failures drive the retry backoff (never a permanent ERROR park).
+  consecutiveFailures   Int         @default(0)
   createdAt             DateTime    @default(now())
   jobs                  Job[]
   runs                  SourceRun[]

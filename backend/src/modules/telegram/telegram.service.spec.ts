@@ -81,6 +81,36 @@ describe('TelegramService — link codes (FR-003b)', () => {
   });
 });
 
+describe('TelegramService.throttle — SEC-005 atomic slot reservation', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('serializes concurrent sends so they respect the global rate cap (no burst)', async () => {
+    const svc = new TelegramService({} as any);
+    (svc as any).botToken = 'test-token';
+    (svc as any).globalRate = 20; // 50 ms minimum gap
+    (svc as any).perChatInterval = 0; // isolate the global cap
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue({ ok: true, json: async () => ({ ok: true, result: {} }) } as any);
+
+    const start = Date.now();
+    const results = await Promise.all([
+      svc.sendMessage('1', 'a'),
+      svc.sendMessage('1', 'b'),
+      svc.sendMessage('1', 'c'),
+    ]);
+    const elapsed = Date.now() - start;
+
+    // 3 sends at 20 msg/s need 2 × 50 ms of spacing. A non-atomic limiter would
+    // finish all three near-instantly; the reservation must serialize them.
+    expect(results).toEqual(['SENT', 'SENT', 'SENT']);
+    expect(elapsed).toBeGreaterThanOrEqual(90);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe('TelegramService.buildMatchText — SEC-002 HTML escaping', () => {
   const svc = new TelegramService({} as any); // buildMatchText touches no DB state
 

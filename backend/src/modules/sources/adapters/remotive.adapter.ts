@@ -1,7 +1,7 @@
 /* Remotive adapter — free JSON API, no key (SRS §9.2, remote tier). */
 
 import { Injectable } from '@nestjs/common';
-import { JobSourceAdapter, RawJob, deriveExperience, mapEmployment } from './job-source.adapter';
+import { JobSourceAdapter, RawJob, deriveExperience, mapEmployment, FETCH_TIMEOUT_MS } from './job-source.adapter';
 
 interface RemotiveJob {
   id: number;
@@ -25,7 +25,7 @@ export class RemotiveAdapter implements JobSourceAdapter {
   async fetchJobs(options?: { since?: Date }): Promise<RawJob[]> {
     const since = options?.since ?? new Date(Date.now() - 7 * 86_400_000);
     const url = `${API}?limit=100`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`Remotive responded ${res.status}`);
     const body = (await res.json()) as { jobs?: RemotiveJob[] };
     const jobs = (body.jobs ?? []).filter((j) => {
