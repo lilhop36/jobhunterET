@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MatchingService } from '../matching/matching.service';
-import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class LifecycleService {
@@ -11,7 +10,6 @@ export class LifecycleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly matching: MatchingService,
-    private readonly notifications: NotificationsService,
   ) {}
 
   /** FR-034a: mark past-deadline ACTIVE jobs EXPIRED. */
@@ -58,47 +56,25 @@ export class LifecycleService {
     return candidates.length;
   }
 
-  /** FR-018/037a: run a match cycle across all users and record a MatchCycle. */
+  /** FR-018/037a: incremental match cycle — scores only unmatched ACTIVE jobs and records a MatchCycle. */
   async runMatchCycle(): Promise<void> {
     const start = Date.now();
-    const users = await this.prisma.user.findMany();
-    let evaluated = 0;
-    let created = 0;
-    let above = 0;
-    let sent = 0;
-    let toInbox = 0;
-
-    for (const u of users) {
-      const c = await this.matching.recalculate(u.id);
-      created += c;
-      const threshold = u.matchThreshold ?? 70;
-      const matches = await this.prisma.jobMatch.findMany({
-        where: { userId: u.id },
-        select: { score: true, jobId: true, summary: true },
-      });
-      evaluated += matches.length;
-      const aboveMatches = matches.filter((m) => m.score >= threshold);
-      above += aboveMatches.length;
-      for (const m of aboveMatches) {
-        const r = await this.notifications.notifyForMatch(u.id, m.jobId, m.score, m.summary || '');
-        if (r === 'SENT') sent++;
-        if (r === 'WEB') toInbox++;
-      }
-    }
-
+    const o = await this.matching.matchUnmatchedJobs();
     await this.prisma.matchCycle.create({
       data: {
-        jobsEvaluated: evaluated,
-        usersProcessed: users.length,
-        matchesCreated: created,
-        aboveThreshold: above,
-        notificationsSent: sent,
-        toInbox,
+        jobsEvaluated: o.jobsEvaluated,
+        usersProcessed: o.usersProcessed,
+        matchesCreated: o.matchesCreated,
+        aboveThreshold: o.aboveThreshold,
+        notificationsSent: o.sent,
+        toInbox: o.toInbox,
         finishedAt: new Date(),
         startedAt: new Date(start),
       },
     });
-    this.logger.log(`[MATCHER] cycle done: evaluations=${evaluated} above=${above} sent=${sent} inbox=${toInbox}`);
+    this.logger.log(
+      `[MATCHER] cycle done: jobs=${o.jobsEvaluated} users=${o.usersProcessed} created=${o.matchesCreated} above=${o.aboveThreshold} sent=${o.sent} inbox=${o.toInbox}`,
+    );
   }
 
   async latestCycle() {

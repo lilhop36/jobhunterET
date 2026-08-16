@@ -26,20 +26,27 @@ function createService() {
     job: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     skill: { upsert: jest.fn().mockResolvedValue({ id: 'skill-1' }) },
     sourceRun: { create: jest.fn().mockResolvedValue({}) },
-    user: { findMany: jest.fn().mockResolvedValue([]) },
-    jobMatch: { findMany: jest.fn().mockResolvedValue([]) },
-    notification: { create: jest.fn() },
   };
-  const matching: any = { recalculate: jest.fn().mockResolvedValue(0) };
-  const notifications: any = { notifyForMatch: jest.fn().mockResolvedValue('WEB') };
+  const matching: any = {
+    recalculate: jest.fn().mockResolvedValue(0),
+    matchUnmatchedJobs: jest.fn().mockResolvedValue({
+      jobsEvaluated: 0,
+      usersProcessed: 0,
+      matchesCreated: 0,
+      aboveThreshold: 0,
+      sent: 0,
+      toInbox: 0,
+      skipped: 0,
+    }),
+  };
   const reliefweb: any = { sourceId: 'reliefweb', fetchJobs: jest.fn() };
   const remotive: any = { sourceId: 'remotive', fetchJobs: jest.fn() };
   const arbeitnow: any = { sourceId: 'arbeitnow', fetchJobs: jest.fn() };
   const ethiongojobs: any = { sourceId: 'ethiongojobs', fetchJobs: jest.fn() };
   const geezjobs: any = { sourceId: 'geezjobs', fetchJobs: jest.fn() };
   const ethiojobs: any = { sourceId: 'ethiojobs', fetchJobs: jest.fn() };
-  const service = new SourcesService(prisma, matching, notifications, reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs);
-  return { service, prisma, matching, notifications, reliefweb, remotive };
+  const service = new SourcesService(prisma, matching, reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs);
+  return { service, prisma, matching, reliefweb, remotive };
 }
 
 describe('SourcesService.collect — FR-015 ghost detection via reconciliation', () => {
@@ -185,7 +192,7 @@ describe('SourcesService.collect — validation, dedup counting, isolation (FR-0
     expect(prisma.sourceRun.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'FAIL', errors: 1 }) }),
     );
-    expect(matching.recalculate).not.toHaveBeenCalled();
+    expect(matching.matchUnmatchedJobs).not.toHaveBeenCalled();
   });
 
   it('fails cleanly for sources without a registered adapter (no demo templates)', async () => {
