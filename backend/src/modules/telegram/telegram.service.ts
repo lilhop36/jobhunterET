@@ -1,8 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import { escHtml } from '../../common/utils/escape-html';
 import { RateLimiter } from '../../common/utils/rate-limiter';
+import { createExclusive } from '../../common/utils/exclusive';
 
 interface LinkCode {
   userId: string;
@@ -25,7 +26,7 @@ interface TelegramUpdate {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 @Injectable()
-export class TelegramService {
+export class TelegramService implements OnModuleInit {
   private readonly logger = new Logger(TelegramService.name);
   private readonly botToken = process.env.TELEGRAM_BOT_TOKEN || '';
   private readonly globalRate = Math.max(1, Number(process.env.TELEGRAM_GLOBAL_RATE_PER_SEC ?? 25));
@@ -37,8 +38,20 @@ export class TelegramService {
   private updateOffset = 0;
   /** SEC-005: per-chat attempt budget for the bot's /start code exchange. */
   private readonly startLimiter = new RateLimiter(Number(process.env.LINK_CODE_RATE_MAX ?? 10), 10 * 60_000);
+  /** BUG-002: skip a tick while a previous poll is still in flight. */
+  private readonly runExclusive = createExclusive();
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /** BUG-002: load the persisted poll offset on startup so we don't re-process old updates. */
+  async onModuleInit() {
+    const row = await this.prisma.botState.findUnique({ where: { key: 'telegram:pollOffset' } });
+    if (row) {
+      const parsed = parseInt(row.value, 10);
+      if (!Number.isNaN(parsed)) this.updateOffset = parsed;
+      this.logger.log(`[BOT] Loaded persisted poll offset: ${this.updateOffset}`);
+    }
+  }
 
   get configured(): boolean {
     return !!this.botToken;
@@ -198,11 +211,13 @@ export class TelegramService {
   @Interval(3000)
   async poll() {
     if (!this.botToken) return;
-    try {
-      await this.pollOnce();
-    } catch (err) {
-      this.logger.warn(`[BOT] poll failed: ${(err as Error).message}`);
-    }
+    await this.runExclusive('telegram-poll', async () => {
+      try {
+        await this.pollOnce();
+      } catch (err) {
+        this.logger.warn(`[BOT] poll failed: ${(err as Error).message}`);
+      }
+    });
   }
 
   private async pollOnce() {
@@ -222,6 +237,14 @@ export class TelegramService {
           u.callback_query.id,
         );
       }
+    }
+    // BUG-002: persist the offset so we don't re-process updates on restart.
+    if (body.result?.length) {
+      await this.prisma.botState.upsert({
+        where: { key: 'telegram:pollOffset' },
+        create: { key: 'telegram:pollOffset', value: String(this.updateOffset) },
+        update: { value: String(this.updateOffset) },
+      });
     }
   }
 

@@ -20,12 +20,19 @@ interface Job {
   match: { score: number } | null;
 }
 
+interface JobPage {
+  items: Job[];
+  nextCursor: string | null;
+  total: number;
+}
+
 export default function JobsPage() {
   const { api } = useAuth();
   const path = usePathname();
   const [q, setQ] = useState('');
   const [query, setQuery] = useState<string | null>(null);
-  const { data, err, loading, reload } = useApi<Job[]>(query === null ? '/api/jobs' : `/api/jobs?q=${encodeURIComponent(query)}`);
+  const { data, err, loading, reload } = useApi<JobPage>(query === null ? '/api/jobs' : `/api/jobs?q=${encodeURIComponent(query)}`);
+  const items = data?.items ?? [];
 
   // Pick up ?q= from the topbar global search (initial load and navigation).
   useEffect(() => {
@@ -62,7 +69,7 @@ export default function JobsPage() {
       {loading && <Loading />}
 
       <div className="card">
-        {data && data.length === 0 && (
+        {data && items.length === 0 && (
           <EmptyState
             icon="🔍"
             title="No jobs match your filters"
@@ -71,7 +78,7 @@ export default function JobsPage() {
             actionHref="/jobs"
           />
         )}
-        {data?.map((j) => (
+        {items.map((j) => (
           <Link key={j.id} href={`/jobs/${j.id}`} className="job-row">
             {j.match ? <ScoreBadge score={j.match.score} /> : <span className="muted" style={{ width: 42 }}>—</span>}
             <div className="info">

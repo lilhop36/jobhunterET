@@ -45,9 +45,9 @@ test.describe('phase 5 — admin flow', () => {
 
   test('job detail explainable panel equals stored JobMatch', async ({ page }) => {
     const jobs = await api(page, '/jobs');
-    expect(jobs.length).toBeGreaterThan(0);
+    expect(jobs.items.length).toBeGreaterThan(0);
     // pick a job the admin actually has a stored match for
-    const matched = jobs.find((j: any) => j.match) ?? jobs[0];
+    const matched = jobs.items.find((j: any) => j.match) ?? jobs.items[0];
     const jobId = matched.id;
     const detail = await api(page, `/jobs/${jobId}`);
     await page.goto(`/jobs/${jobId}`);
@@ -79,7 +79,7 @@ test.describe('phase 5 — admin flow', () => {
     // filter chip click changes the visible count to match the API
     await page.getByRole('button', { name: 'EXCELLENT', exact: true }).click();
     await page.waitForTimeout(800);
-    expect(await rows().count()).toBe(Math.min(excellent.length, await rows().count())); // robust: count matches API when data loads
+    expect(await rows().count()).toBe(Math.min(excellent.items.length, await rows().count())); // robust: count matches API when data loads
   });
 
   test('sources page: collect works for admin', async ({ page }) => {

@@ -22,8 +22,12 @@ export class NotificationsController {
   ) {}
 
   @Get('inbox')
-  inbox(@CurrentUser() user: AuthUser) {
-    return this.notifications.listInbox(user.id);
+  inbox(
+    @CurrentUser() user: AuthUser,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.notifications.listInbox(user.id, limit, cursor);
   }
 
   @Patch('inbox/:id/read')
@@ -37,8 +41,12 @@ export class NotificationsController {
   }
 
   @Get('notifications')
-  all(@CurrentUser() user: AuthUser) {
-    return this.notifications.listInbox(user.id);
+  all(
+    @CurrentUser() user: AuthUser,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.notifications.listInbox(user.id, limit, cursor);
   }
 
   @Get('settings/notifications-preview')

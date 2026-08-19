@@ -30,7 +30,8 @@ interface DashboardData {
 export default function DashboardPage() {
   const { user } = useAuth();
   const { data, err, loading, reload } = useApi<DashboardData>('/api/dashboard');
-  const { data: matches, loading: matchesLoading } = useApi<CarouselMatch[]>(
+  // PERF-002: /api/matches returns { items, nextCursor, total } — take the first page.
+  const { data: matchesPage, loading: matchesLoading } = useApi<{ items: CarouselMatch[] }>(
     data ? '/api/matches' : null,
   );
 
@@ -68,7 +69,11 @@ export default function DashboardPage() {
         )
       )}
 
-      {matchesLoading ? <CarouselSkeleton /> : matches && <MatchCarousel matches={matches.slice(0, 8)} />}
+      {matchesLoading ? (
+        <CarouselSkeleton />
+      ) : matchesPage ? (
+        <MatchCarousel matches={matchesPage.items.slice(0, 8)} />
+      ) : null}
 
       {data && !data.telegramLinked && (
         <div className="notice-amber">

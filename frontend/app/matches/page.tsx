@@ -26,13 +26,20 @@ interface Match {
   };
 }
 
+interface MatchPage {
+  items: Match[];
+  nextCursor: string | null;
+  total: number;
+}
+
 const FILTERS = ['ALL', 'EXCELLENT', 'STRONG', 'GOOD', 'UNSEEN'];
 
 export default function MatchesPage() {
   const { api } = useAuth();
   const [filter, setFilter] = useState('ALL');
   const [recalcMsg, setRecalcMsg] = useState<string | null>(null);
-  const { data, err, loading, reload } = useApi<Match[]>(`/api/matches?filter=${filter}`);
+  const { data, err, loading, reload } = useApi<MatchPage>(`/api/matches?filter=${filter}`);
+  const items = data?.items ?? [];
 
   const recalc = async () => {
     setRecalcMsg(null);
@@ -70,7 +77,7 @@ export default function MatchesPage() {
       {loading && <Loading />}
 
       <div className="card">
-        {data && data.length === 0 && (
+        {data && items.length === 0 && (
           <EmptyState
             icon="🎯"
             title={filter === 'UNSEEN' ? 'Nothing unseen' : 'No matches here yet'}
@@ -83,7 +90,7 @@ export default function MatchesPage() {
             actionHref={filter === 'UNSEEN' ? '/matches' : undefined}
           />
         )}
-        {data?.map((m) => (
+        {items.map((m) => (
           <Link key={m.jobId} href={`/jobs/${m.jobId}`} className="job-row" style={{ alignItems: 'flex-start' }}>
             <ScoreBadge score={m.score} />
             <div className="info">

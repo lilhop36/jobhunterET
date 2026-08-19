@@ -140,3 +140,71 @@ describe('TelegramService.buildMatchText — SEC-002 HTML escaping', () => {
     expect(text).not.toContain('<b>');
   });
 });
+
+describe('TelegramService.poll — BUG-002 offset persistence + reentrancy', () => {
+  it('onModuleInit loads persisted offset from BotState', async () => {
+    const prisma = {
+      botState: { findUnique: jest.fn().mockResolvedValue({ key: 'telegram:pollOffset', value: '42' }) },
+    } as any;
+    const svc = new TelegramService(prisma);
+    await svc.onModuleInit();
+    expect((svc as any).updateOffset).toBe(42);
+    expect(prisma.botState.findUnique).toHaveBeenCalledWith({ where: { key: 'telegram:pollOffset' } });
+  });
+
+  it('onModuleInit leaves offset at 0 when no row exists', async () => {
+    const prisma = {
+      botState: { findUnique: jest.fn().mockResolvedValue(null) },
+    } as any;
+    const svc = new TelegramService(prisma);
+    await svc.onModuleInit();
+    expect((svc as any).updateOffset).toBe(0);
+  });
+
+  it('pollOnce persists the offset after processing updates', async () => {
+    const upsert = jest.fn().mockResolvedValue({});
+    const prisma = {
+      botState: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        upsert,
+      },
+      telegramLink: { findUnique: jest.fn().mockResolvedValue(null) },
+    } as any;
+    const svc = new TelegramService(prisma);
+    (svc as any).botToken = 'test-token';
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: [{ update_id: 10, message: { chat: { id: 1 }, text: '/help' } }] }),
+    } as any);
+    jest.spyOn(svc as any, 'sendMessage').mockResolvedValue('SENT');
+
+    await (svc as any).pollOnce();
+
+    expect((svc as any).updateOffset).toBe(11);
+    expect(upsert).toHaveBeenCalledWith({
+      where: { key: 'telegram:pollOffset' },
+      create: { key: 'telegram:pollOffset', value: '11' },
+      update: { value: '11' },
+    });
+  });
+
+  it('pollOnce skips DB write when no updates received', async () => {
+    const upsert = jest.fn().mockResolvedValue({});
+    const prisma = {
+      botState: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        upsert,
+      },
+    } as any;
+    const svc = new TelegramService(prisma);
+    (svc as any).botToken = 'test-token';
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: [] }),
+    } as any);
+
+    await (svc as any).pollOnce();
+
+    expect(upsert).not.toHaveBeenCalled();
+  });
+});

@@ -10,8 +10,13 @@ export class MatchesController {
   constructor(private readonly matches: MatchesService) {}
 
   @Get()
-  list(@CurrentUser() user: AuthUser, @Query('filter') filter?: string) {
-    return this.matches.list(user.id, filter);
+  list(
+    @CurrentUser() user: AuthUser,
+    @Query('filter') filter?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.matches.list(user.id, filter, limit, cursor);
   }
 
   @Post('recalculate')
