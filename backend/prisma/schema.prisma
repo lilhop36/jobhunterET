@@ -413,3 +413,10 @@ model SystemLog {
 
   @@index([at])
 }
+
+// BUG-002: singleton key-value store for ephemeral bot state (poll offset, etc.).
+model BotState {
+  key   String @id
+  value String
+  updatedAt DateTime @updatedAt
+}

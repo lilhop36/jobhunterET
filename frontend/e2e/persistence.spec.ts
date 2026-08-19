@@ -30,9 +30,9 @@ test('create data via UI: save job, move application, upload CV', async ({ page 
   await login(page);
 
   // --- save a job via the UI (pick one that is genuinely not saved/applied yet) ---
-  const jobs: any[] = await api(page, '/jobs');
-  expect(jobs.length).toBeGreaterThan(0);
-  const job = jobs.find((j: any) => !j.saved && !j.application) ?? jobs[0];
+  const jobsPage = await api(page, '/jobs');
+  expect(jobsPage.items.length).toBeGreaterThan(0);
+  const job = jobsPage.items.find((j: any) => !j.saved && !j.application) ?? jobsPage.items[0];
   if (job.saved) {
     // idempotency: clean slate via API before UI steps
     await api(page, `/saved-jobs/${job.id}`, { method: 'POST' });
@@ -72,7 +72,7 @@ test('create data via UI: save job, move application, upload CV', async ({ page 
   expect(mine?.stage).toBe('ASSESSMENT');
   // list endpoint now reports the same user state as detail (regression guard)
   const jobsAfter = await api(page, '/jobs');
-  expect(jobsAfter.find((j: any) => j.id === job.id)?.saved).toBe(true);
+  expect(jobsAfter.items.find((j: any) => j.id === job.id)?.saved).toBe(true);
   const cv = await api(page, '/profile/cv');
   expect(cv?.originalName).toBe('qa-persistence-cv.pdf');
 });

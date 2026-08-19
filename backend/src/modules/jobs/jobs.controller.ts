@@ -17,9 +17,12 @@ export class JobsController {
       type: q.type,
       workplace: q.workplace,
       source: q.source,
-      sort: (q.sort as any) || 'score',
+      sort: (q.sort as any) || 'newest',
       showDead: q.showDead === 'true',
       userId: user.id,
+      // PERF-002: keyset pagination
+      limit: q.limit,
+      cursor: q.cursor,
     };
     return this.jobs.list(filter);
   }

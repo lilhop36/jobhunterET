@@ -2,6 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TelegramService } from '../telegram/telegram.service';
+import {
+  Page,
+  decodeCursor,
+  encodeCursor,
+  keysetAfter,
+  pageFrom,
+  parseLimit,
+} from '../../common/utils/keyset';
+
+const PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
 
 @Injectable()
 export class NotificationsService {
@@ -152,23 +163,43 @@ export class NotificationsService {
     return run;
   }
 
-  async listInbox(userId: string) {
-    const items = await this.prisma.notification.findMany({
-      where: { userId, channel: 'WEB' },
-      include: { job: { select: { title: true, company: true, location: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
-    return items.map((n) => ({
-      id: n.id,
-      jobId: n.jobId,
-      title: n.job?.title,
-      company: n.job?.company,
-      location: n.job?.location,
-      score: n.score,
-      summary: n.summary,
-      status: n.status,
-      createdAt: n.createdAt,
-    }));
+  /** PERF-002: keyset-paginated Web Inbox — stable (createdAt, id) ordering, total count. */
+  async listInbox(userId: string, limitRaw?: string, cursorRaw?: string): Promise<Page<any>> {
+    const where: any = { userId, channel: 'WEB' };
+    const limit = parseLimit(limitRaw, PAGE_SIZE, MAX_PAGE_SIZE);
+    const cursor = decodeCursor(cursorRaw);
+    const cursorWhere = cursor
+      ? keysetAfter('createdAt', cursor.createdAt ?? null, cursor.id, 'desc')
+      : null;
+
+    const [total, rows] = await Promise.all([
+      this.prisma.notification.count({ where }),
+      this.prisma.notification.findMany({
+        where: cursorWhere ? { AND: [where, cursorWhere] } : where,
+        include: { job: { select: { title: true, company: true, location: true } } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: limit + 1,
+      }),
+    ]);
+
+    const { items, nextCursor } = pageFrom(rows, limit, (last) =>
+      encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id }),
+    );
+    return {
+      items: items.map((n) => ({
+        id: n.id,
+        jobId: n.jobId,
+        title: n.job?.title,
+        company: n.job?.company,
+        location: n.job?.location,
+        score: n.score,
+        summary: n.summary,
+        status: n.status,
+        createdAt: n.createdAt,
+      })),
+      nextCursor,
+      total,
+    };
   }
 
   async markRead(userId: string, id: string) {

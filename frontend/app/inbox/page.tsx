@@ -16,9 +16,16 @@ interface InboxItem {
   createdAt: string;
 }
 
+interface InboxPage {
+  items: InboxItem[];
+  nextCursor: string | null;
+  total: number;
+}
+
 export default function InboxPage() {
   const { api } = useAuth();
-  const { data, err, loading, reload } = useApi<InboxItem[]>('/api/inbox');
+  const { data, err, loading, reload } = useApi<InboxPage>('/api/inbox');
+  const items = data?.items ?? [];
 
   const read = async (id: string) => {
     await api(`/api/inbox/${id}/read`, { method: 'PATCH' });
@@ -30,7 +37,7 @@ export default function InboxPage() {
     reload();
   };
 
-  const unread = data?.filter((n) => n.status === 'UNREAD_WEB').length ?? 0;
+  const unread = items.filter((n) => n.status === 'UNREAD_WEB').length;
 
   return (
     <RequireAuth>
@@ -49,14 +56,14 @@ export default function InboxPage() {
       {loading && <Loading />}
 
       <div className="card">
-        {data && data.length === 0 && (
+        {data && items.length === 0 && (
           <EmptyState
             icon="📭"
             title="Inbox empty — you're all caught up"
             message="When Telegram isn't linked (or delivery fails), qualifying matches land here so nothing is ever lost (FR-024c)."
           />
         )}
-        {data?.map((n) => (
+        {items.map((n) => (
           <div key={n.id} className="job-row" style={{ alignItems: 'flex-start' }}>
             <ScoreBadge score={n.score} />
             <div className="info">

@@ -1,5 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  Page,
+  decodeCursor,
+  encodeCursor,
+  keysetAfter,
+  pageFrom,
+  parseLimit,
+} from '../../common/utils/keyset';
 
 export interface JobFilter {
   q?: string;
@@ -7,16 +15,22 @@ export interface JobFilter {
   type?: string;
   workplace?: string;
   source?: string;
-  sort?: 'score' | 'newest' | 'deadline';
+  sort?: 'newest' | 'deadline';
   showDead?: boolean;
   userId?: string;
+  limit?: string;
+  cursor?: string;
 }
+
+const PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
 
 @Injectable()
 export class JobsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(f: JobFilter) {
+  /** PERF-002: keyset-paginated job list — stable (sortKey, id) ordering, total count. */
+  async list(f: JobFilter): Promise<Page<any>> {
     const where: any = f.showDead ? {} : { status: 'ACTIVE' };
     if (f.source) where.sourceId = f.source;
     if (f.type) where.employmentType = f.type;
@@ -33,25 +47,42 @@ export class JobsService {
       ];
     }
 
-    let orderBy: any = { firstSeenAt: 'desc' };
-    if (f.sort === 'newest') orderBy = { postedDate: 'desc' };
-    if (f.sort === 'deadline') orderBy = { deadline: 'asc' };
+    const limit = parseLimit(f.limit, PAGE_SIZE, MAX_PAGE_SIZE);
+    let sortCol = 'firstSeenAt';
+    let dir: 'asc' | 'desc' = 'desc';
+    if (f.sort === 'newest') sortCol = 'postedDate';
+    if (f.sort === 'deadline') {
+      sortCol = 'deadline';
+      dir = 'asc';
+    }
 
-    const jobs = await this.prisma.job.findMany({
-      where,
-      orderBy,
-      include: {
-        source: true,
-        skills: { include: { skill: true } },
-        matches: f.userId ? { where: { userId: f.userId } } : false,
-        // user-scoped state so the list reflects saved/application status exactly
-        // like the detail endpoint (was missing → list always reported saved:false)
-        savedBy: f.userId ? { where: { userId: f.userId } } : false,
-        apps: f.userId ? { where: { userId: f.userId } } : false,
-      },
-    });
+    const cursor = decodeCursor(f.cursor);
+    const cursorWhere = cursor
+      ? keysetAfter(sortCol, (cursor[sortCol] ?? null) as string | number | null, cursor.id, dir)
+      : null;
 
-    return jobs.map((j) => this.serialize(j));
+    const [total, rows] = await Promise.all([
+      this.prisma.job.count({ where }),
+      this.prisma.job.findMany({
+        where: cursorWhere ? { AND: [where, cursorWhere] } : where,
+        orderBy: [{ [sortCol]: dir }, { id: dir }],
+        take: limit + 1,
+        include: {
+          source: true,
+          skills: { include: { skill: true } },
+          matches: f.userId ? { where: { userId: f.userId } } : false,
+          // user-scoped state so the list reflects saved/application status exactly
+          // like the detail endpoint (was missing → list always reported saved:false)
+          savedBy: f.userId ? { where: { userId: f.userId } } : false,
+          apps: f.userId ? { where: { userId: f.userId } } : false,
+        },
+      }),
+    ]);
+
+    const { items, nextCursor } = pageFrom(rows, limit, (last) =>
+      encodeCursor({ [sortCol]: (last[sortCol] as Date | null)?.toISOString() ?? null, id: last.id }),
+    );
+    return { items: items.map((j) => this.serialize(j)), nextCursor, total };
   }
 
   async detail(id: string, userId?: string) {
