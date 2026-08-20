@@ -14,7 +14,7 @@ export class DashboardService {
   async summary(userId: string) {
     const [matches, saved, apps, unread, profileView, latestCycle, latestDigest] = await Promise.all([
       this.prisma.jobMatch.findMany({ where: { userId } }),
-      this.prisma.savedJob.count({ where: { userId } }),
+      this.prisma.application.count({ where: { userId, stage: 'SAVED' } }),
       this.prisma.application.findMany({ where: { userId } }),
       this.notifications.unreadCount(userId),
       this.profile.getProfile(userId),

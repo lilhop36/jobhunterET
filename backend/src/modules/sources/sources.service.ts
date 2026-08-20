@@ -11,6 +11,10 @@ import { ArbeitnowAdapter } from './adapters/arbeitnow.adapter';
 import { EthioNgoJobsAdapter } from './adapters/ethiongojobs.adapter';
 import { GeezJobsAdapter } from './adapters/geezjobs.adapter';
 import { EthiojobsAdapter } from './adapters/ethiojobs.adapter';
+import { JobicyAdapter } from './adapters/jobicy.adapter';
+import { RemoteOKAdapter } from './adapters/remoteok.adapter';
+import { LandingJobsAdapter } from './adapters/landingjobs.adapter';
+import { EtcareersAdapter } from './adapters/etcareers.adapter';
 
 const BACKOFF_THRESHOLD = Math.max(1, Number(process.env.SOURCE_BACKOFF_THRESHOLD ?? 3));
 
@@ -28,9 +32,13 @@ export class SourcesService {
     ethiongojobs: EthioNgoJobsAdapter,
     geezjobs: GeezJobsAdapter,
     ethiojobs: EthiojobsAdapter,
+    jobicy: JobicyAdapter,
+    remoteok: RemoteOKAdapter,
+    landingjobs: LandingJobsAdapter,
+    etcareers: EtcareersAdapter,
   ) {
     this.adapters = {};
-    for (const a of [reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs]) {
+    for (const a of [reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs, jobicy, remoteok, landingjobs, etcareers]) {
       this.adapters[a.sourceId] = a;
     }
   }
@@ -98,11 +106,25 @@ export class SourcesService {
     const startedAt = new Date();
     const adapter = this.adapters[source.id];
 
+    // A source without a registered adapter is a configuration gap, not an
+    // upstream failure (FR-008): record the run for traceability but do NOT
+    // accumulate a transient failure streak — nothing to retry, so backoff
+    // and the "will retry" alarm would be misleading.
+    if (!adapter) {
+      const message = 'No adapter registered for this source — add one in SourcesService (FR-008)';
+      await this.prisma.jobSource.update({
+        where: { id },
+        data: { lastError: message, lastFailedRun: new Date() },
+      });
+      await this.prisma.sourceRun.create({
+        data: { sourceId: id, startedAt, finishedAt: new Date(), status: 'FAIL', jobsFetched: 0, errors: 1, errorMessage: message },
+      });
+      this.logger.warn(`[COLLECTOR] ${source.name} has no registered adapter (FR-008)`);
+      return { status: 'FAIL', message };
+    }
+
     let raw: RawJob[];
     try {
-      // A source without a registered adapter is a configuration error, not a
-      // a missing adapter is a configuration error, not a fallback opportunity (FR-008).
-      if (!adapter) throw new Error('No adapter registered for this source — add one in SourcesService (FR-008)');
       raw = await adapter.fetchJobs({ since: new Date(Date.now() - 14 * 86_400_000) });
     } catch (err: any) {
       /* FR-036 + SEC-006: the failure is isolated (never blocks other sources or
@@ -226,15 +248,15 @@ export class SourcesService {
       description: j.description,
       salary: j.salary,
       currency: j.currency,
-      deadline: j.deadline as any,
+      deadline: j.deadline,
       postedDate: j.postedDate,
     });
 
     await this.prisma.job.create({
       data: {
-        title: j.title,
-        company: j.company,
-        location: j.location,
+        title: fidelity.title,
+        company: fidelity.company,
+        location: fidelity.location,
         locationClass: j.locationClass,
         employmentType: j.employmentType,
         experienceLevel: j.experienceLevel,

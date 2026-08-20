@@ -52,3 +52,25 @@ export function mapEmployment(raw: string | null | undefined): EmploymentType {
   if (t.includes('intern')) return 'INTERNSHIP';
   return 'FULL_TIME';
 }
+
+/** Clean HTML by removing scripts/styles but preserving structure. */
+export function stripHtml(html: string): string {
+  return (html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, ' ')
+    .replace(/<aside[\s\S]*?<\/aside>/gi, ' ')
+    .replace(/<form[\s\S]*?<\/form>/gi, ' ')
+    // We intentionally PRESERVE <p>, <br>, <li>, <tr>, etc. so the frontend RichDescription can render them properly
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Average two numeric salary bounds into a single figure. */
+export function parseNumericSalary(min: number | null, max: number | null): number | undefined {
+  if (min && max) return Math.round((min + max) / 2);
+  if (min) return min;
+  if (max) return max;
+  return undefined;
+}

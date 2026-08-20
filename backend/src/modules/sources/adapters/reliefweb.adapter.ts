@@ -115,7 +115,7 @@ export class ReliefWebAdapter implements JobSourceAdapter {
       url: i.link,
       sourceJobId: i.link.split('/').pop() || i.link,
       postedDate: new Date(i.pubDate),
-      description: i.description.slice(0, 4000),
+      description: i.description,
       country: 'Ethiopia',
       parseConfidence: 70,
       rawData: { feed: 'reliefweb-int-jobs-ethiopia', title: i.title, categories: i.categories },

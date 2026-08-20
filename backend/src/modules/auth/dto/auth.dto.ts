@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -9,6 +9,7 @@ export class RegisterDto {
   password: string;
 
   /** FR-002g: optional invite code gate. */
+  @IsOptional()
   @IsString()
   inviteCode?: string;
 }

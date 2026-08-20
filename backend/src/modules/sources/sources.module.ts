@@ -10,6 +10,10 @@ import { ArbeitnowAdapter } from './adapters/arbeitnow.adapter';
 import { EthioNgoJobsAdapter } from './adapters/ethiongojobs.adapter';
 import { GeezJobsAdapter } from './adapters/geezjobs.adapter';
 import { EthiojobsAdapter } from './adapters/ethiojobs.adapter';
+import { JobicyAdapter } from './adapters/jobicy.adapter';
+import { RemoteOKAdapter } from './adapters/remoteok.adapter';
+import { LandingJobsAdapter } from './adapters/landingjobs.adapter';
+import { EtcareersAdapter } from './adapters/etcareers.adapter';
 
 @Module({
   imports: [PrismaModule, MatchingModule, NotificationsModule],
@@ -22,6 +26,10 @@ import { EthiojobsAdapter } from './adapters/ethiojobs.adapter';
     EthioNgoJobsAdapter,
     GeezJobsAdapter,
     EthiojobsAdapter,
+    JobicyAdapter,
+    RemoteOKAdapter,
+    LandingJobsAdapter,
+    EtcareersAdapter,
   ],
   exports: [SourcesService],
 })

@@ -2,15 +2,15 @@ import { parsePort } from './parse-port';
 
 describe('parsePort', () => {
   it.each([
-    [undefined, 3001],
-    ['', 3001],
-    ['   ', 3001],
-    ['0', 3001],
-    ['abc', 3001],
-    ['3.5', 3001],
-    ['-1', 3001],
-    ['70000', 3001],
-  ])('falls back to 3001 for %p', (raw, expected) => {
+    [undefined, 3210],
+    ['', 3210],
+    ['   ', 3210],
+    ['0', 3210],
+    ['abc', 3210],
+    ['3.5', 3210],
+    ['-1', 3210],
+    ['70000', 3210],
+  ])('falls back to 3210 for %p', (raw, expected) => {
     expect(parsePort(raw)).toBe(expected);
   });
 
