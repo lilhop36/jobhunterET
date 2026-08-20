@@ -49,7 +49,6 @@ export class LifecycleService {
         statusChangedAt: { lt: cutoff },
         archivedAt: null,
         apps: { none: {} },
-        savedBy: { none: {} },
       },
       select: { id: true },
     });

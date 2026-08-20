@@ -40,6 +40,11 @@ async function main() {
     { id: 'arbeitnow', name: 'Arbeitnow', type: 'JSON', baseUrl: 'https://www.arbeitnow.com/api/job-board-api', priorityTier: 'REMOTE', status: 'ACTIVE' },
     // HaHuJobs domain is parked (for sale at HugeDomains) — no real data possible.
     { id: 'hahu', name: 'HaHuJobs', type: 'HTML', baseUrl: 'https://hahujobs.com', priorityTier: 'ETHIOPIA', status: 'DISABLED', lastError: 'Domain expired — parked at HugeDomains' },
+    // New sources — free public APIs, no auth required
+    { id: 'jobicy', name: 'Jobicy', type: 'API', baseUrl: 'https://jobicy.com/api/v2/remote-jobs', priorityTier: 'REMOTE', status: 'ACTIVE' },
+    { id: 'remoteok', name: 'RemoteOK', type: 'JSON', baseUrl: 'https://remoteok.com/api', priorityTier: 'REMOTE', status: 'ACTIVE' },
+    { id: 'landingjobs', name: 'LandingJobs', type: 'JSON', baseUrl: 'https://www.landing.jobs/api/v1/jobs', priorityTier: 'INTERNATIONAL', status: 'ACTIVE' },
+    { id: 'etcareers', name: 'ETCareers', type: 'RSS', baseUrl: 'https://etcareers.com/jobs.rss', priorityTier: 'ETHIOPIA', status: 'ACTIVE' },
   ];
   for (const s of sources) {
     await prisma.jobSource.upsert({ where: { id: s.id }, create: { ...s, lastSuccessfulRun: new Date() }, update: s });

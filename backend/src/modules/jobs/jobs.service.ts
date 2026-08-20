@@ -73,7 +73,6 @@ export class JobsService {
           matches: f.userId ? { where: { userId: f.userId } } : false,
           // user-scoped state so the list reflects saved/application status exactly
           // like the detail endpoint (was missing → list always reported saved:false)
-          savedBy: f.userId ? { where: { userId: f.userId } } : false,
           apps: f.userId ? { where: { userId: f.userId } } : false,
         },
       }),
@@ -92,7 +91,6 @@ export class JobsService {
         source: true,
         skills: { include: { skill: true } },
         matches: userId ? { where: { userId } } : false,
-        savedBy: userId ? { where: { userId } } : false,
         apps: userId ? { where: { userId } } : false,
       },
     });
@@ -133,7 +131,7 @@ export class JobsService {
       applyEmail: j.applyEmail ?? null,
       // FR-013/034c: URL liveness
       urlStatus: j.urlStatus ?? null,
-      saved: !!(j.savedBy && j.savedBy.length),
+      saved: !!(j.apps && j.apps.some((a: any) => a.stage === 'SAVED')),
       application: j.apps && j.apps.length
         ? { stage: j.apps[0].stage, stageSince: j.apps[0].stageSince }
         : null,

@@ -468,3 +468,223 @@ html.theme-transition,
 html.theme-transition * {
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease !important;
 }
+
+/* ------------------------------------------------------------------ */
+/* Rich description prose renderer                                     */
+/* ------------------------------------------------------------------ */
+.prose {
+  font-size: 14.5px;
+  line-height: 1.75;
+  color: hsl(var(--foreground));
+}
+.prose p {
+  margin: 0 0 12px;
+}
+.prose p:last-child {
+  margin-bottom: 0;
+}
+.prose ul,
+.prose ol {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+.prose li {
+  margin: 3px 0;
+}
+.prose h2,
+.prose h3,
+.prose strong,
+.prose b {
+  font-weight: 700;
+}
+.prose h2 {
+  font-size: 15px;
+  margin: 18px 0 6px;
+}
+.prose h3 {
+  font-size: 14px;
+  margin: 14px 0 5px;
+}
+.prose a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Meta pills — location / type / exp tags in the hero header          */
+/* ------------------------------------------------------------------ */
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+}
+.meta-pill.primary {
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+}
+
+/* ------------------------------------------------------------------ */
+/* Colour-coded score bars                                             */
+/* ------------------------------------------------------------------ */
+.score-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.score-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+.score-pct {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.score-pct.high {
+  background: hsl(var(--success) / 0.16);
+  color: hsl(var(--success));
+}
+.score-pct.mid {
+  background: hsl(var(--warning) / 0.18);
+  color: hsl(var(--warning));
+}
+.score-pct.low {
+  background: hsl(var(--destructive) / 0.15);
+  color: hsl(var(--destructive));
+}
+.bar.high > div { background: hsl(var(--success)); }
+.bar.mid  > div { background: hsl(var(--warning)); }
+.bar.low  > div { background: hsl(var(--destructive)); }
+
+/* ------------------------------------------------------------------ */
+/* Detail hero                                                         */
+/* ------------------------------------------------------------------ */
+.detail-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.detail-hero .company-avatar {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: hsl(var(--primary) / 0.14);
+  color: hsl(var(--primary));
+  font-size: 18px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid hsl(var(--border));
+}
+.detail-hero .hero-text {
+  flex: 1;
+  min-width: 0;
+}
+.detail-hero h1 {
+  font-size: 22px;
+  margin-bottom: 2px;
+}
+.detail-hero .hero-company {
+  font-size: 14px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 8px;
+}
+.detail-hero .hero-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.detail-hero .hero-score {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+/* ------------------------------------------------------------------ */
+/* kv-card — structured metadata panel                                 */
+/* ------------------------------------------------------------------ */
+.kv-card .kv {
+  grid-template-columns: 130px 1fr;
+  row-gap: 8px;
+}
+.kv-card .kv .k {
+  font-size: 13px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+.kv-card .kv .v {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.deadline-soon {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.deadline-badge {
+  display: inline-flex;
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.deadline-badge.urgent {
+  background: hsl(var(--destructive) / 0.14);
+  color: hsl(var(--destructive));
+}
+.deadline-badge.soon {
+  background: hsl(var(--warning) / 0.18);
+  color: hsl(var(--warning));
+}
+.deadline-badge.ok {
+  background: hsl(var(--success) / 0.14);
+  color: hsl(var(--success));
+}
+
+/* ------------------------------------------------------------------ */
+/* Sticky apply CTA bar (mobile)                                       */
+/* ------------------------------------------------------------------ */
+@media (max-width: 767px) {
+  .apply-cta-bar {
+    position: fixed;
+    bottom: 56px; /* above bottom-nav */
+    left: 0;
+    right: 0;
+    z-index: 30;
+    background: hsl(var(--card));
+    border-top: 1px solid hsl(var(--border));
+    padding: 10px 16px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+}
+@media (min-width: 768px) {
+  .apply-cta-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 4px;
+  }
+}
+

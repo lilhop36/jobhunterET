@@ -8,7 +8,7 @@
  */
 export function parsePort(
   raw: string | undefined,
-  fallback = 3001,
+  fallback = 3210, // must match the port the frontend proxy (/api/*) targets
 ): number {
   if (raw === undefined || raw.trim() === '') return fallback;
   const value = Number(raw);

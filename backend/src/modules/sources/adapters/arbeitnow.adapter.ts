@@ -49,7 +49,7 @@ export class ArbeitnowAdapter implements JobSourceAdapter {
       url: j.url,
       sourceJobId: j.slug,
       postedDate: Number.isNaN(posted.getTime()) ? new Date() : posted,
-      description: j.description?.slice(0, 4000),
+      description: j.description,
       country: 'Remote',
       parseConfidence: 80,
       rawData: { api: 'arbeitnow', slug: j.slug },

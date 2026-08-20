@@ -52,7 +52,14 @@ describe('TelegramService — link codes (FR-003b)', () => {
       application: { upsert: jest.fn() },
       matchCycle: { findFirst: jest.fn().mockResolvedValue(null) },
     } as any;
-    const s2 = new TelegramService(prisma2);
+    const applications = {
+      save: jest.fn(async (userId: string, jobId: string) =>
+        prisma2.savedJob.upsert({ where: { userId_jobId: { userId, jobId } }, create: { userId, jobId }, update: {} }),
+      ),
+      setStage: jest.fn(),
+      apply: jest.fn(),
+    };
+    const s2 = new TelegramService(prisma2, applications as any);
 
     await (s2 as any).handleCallback(555, 'save:job-xyz', 'cb1');
 

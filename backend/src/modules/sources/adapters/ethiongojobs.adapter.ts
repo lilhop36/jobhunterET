@@ -40,7 +40,9 @@ export class EthioNgoJobsAdapter implements JobSourceAdapter {
     if (!title || !p.link) return null;
 
     const text = this.stripHtml(p.content?.rendered ?? '');
-    const location = this.pick(text, /location\s*:\s*([^\n]+)/i) ?? 'Ethiopia';
+    const location = (this.pick(text, /location\s*:\s*([^\n]+)/i) ?? 'Ethiopia').split(
+      /\s+(?:Deadline|Job Description|Project|Ref|Employment|Salary)\b/i,
+    )[0];
     const company =
       this.pick(text, /organization\s*:\s*([^\n]+)/i) ??
       this.pick(title, /@\s*([^\n]+)/i) ??
@@ -61,7 +63,7 @@ export class EthioNgoJobsAdapter implements JobSourceAdapter {
       sourceJobId: String(p.id),
       postedDate: new Date(p.date),
       deadline,
-      description: text.slice(0, 4000),
+      description: p.content?.rendered ?? '',
       country: 'Ethiopia',
       parseConfidence: 70,
       rawData: { api: 'wp-json-v2-posts', id: p.id },

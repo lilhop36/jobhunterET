@@ -25,6 +25,6 @@ export class ApplicationsController {
     @Param('jobId') jobId: string,
     @Body('stage') stage: string,
   ) {
-    return this.apps.setStage(user.id, jobId, stage);
+    return this.apps.setStage(user.id, jobId, stage as any);
   }
 }

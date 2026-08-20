@@ -45,7 +45,11 @@ function createService() {
   const ethiongojobs: any = { sourceId: 'ethiongojobs', fetchJobs: jest.fn() };
   const geezjobs: any = { sourceId: 'geezjobs', fetchJobs: jest.fn() };
   const ethiojobs: any = { sourceId: 'ethiojobs', fetchJobs: jest.fn() };
-  const service = new SourcesService(prisma, matching, reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs);
+  const jobicy: any = { sourceId: 'jobicy', fetchJobs: jest.fn() };
+  const remoteok: any = { sourceId: 'remoteok', fetchJobs: jest.fn() };
+  const landingjobs: any = { sourceId: 'landingjobs', fetchJobs: jest.fn() };
+  const etcareers: any = { sourceId: 'etcareers', fetchJobs: jest.fn() };
+  const service = new SourcesService(prisma, matching, reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs, jobicy, remoteok, landingjobs, etcareers);
   return { service, prisma, matching, reliefweb, remotive };
 }
 
@@ -204,10 +208,14 @@ describe('SourcesService.collect — validation, dedup counting, isolation (FR-0
     const result = await service.collect('hahu');
 
     expect(result.status).toBe('FAIL');
+    expect(result.message).toContain('No adapter registered');
     expect(prisma.job.create).not.toHaveBeenCalled();
+    // Configuration gap, not an upstream failure — no transient streak accumulates,
+    // so the source never enters backoff for a problem retrying won't fix.
     const update = prisma.jobSource.update.mock.calls[0][0];
-    expect(update.data.consecutiveFailures).toEqual({ increment: 1 });
+    expect(update.data.consecutiveFailures).toBeUndefined();
     expect(update.data.status).toBeUndefined();
+    expect(update.data.lastError).toContain('No adapter registered');
     expect(prisma.sourceRun.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'FAIL', errors: 1 }) }),
     );

@@ -170,3 +170,22 @@ export function fmtDate(iso?: string | null): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
+
+/** Returns the deadline formatted as a date string plus a colour band. */
+export function fmtDeadline(iso?: string | null): {
+  label: string;
+  daysLeft: number | null;
+  band: 'urgent' | 'soon' | 'ok' | null;
+} {
+  if (!iso) return { label: '—', daysLeft: null, band: null };
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = d.getTime() - now.getTime();
+  const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  if (daysLeft <= 0) return { label: `${dateStr} (expired)`, daysLeft, band: 'urgent' };
+  const suffix = daysLeft === 1 ? '1 day left' : `${daysLeft} days left`;
+  const band = daysLeft <= 3 ? 'urgent' : daysLeft <= 7 ? 'soon' : 'ok';
+  return { label: dateStr, daysLeft, band, ...({ suffix } as any) };
+}
+

@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ApplicationsService } from '../applications/applications.service';
 import { escHtml } from '../../common/utils/escape-html';
 import { RateLimiter } from '../../common/utils/rate-limiter';
 import { createExclusive } from '../../common/utils/exclusive';
@@ -41,7 +42,7 @@ export class TelegramService implements OnModuleInit {
   /** BUG-002: skip a tick while a previous poll is still in flight. */
   private readonly runExclusive = createExclusive();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly applications?: ApplicationsService) {}
 
   /** BUG-002: load the persisted poll offset on startup so we don't re-process old updates. */
   async onModuleInit() {
@@ -290,7 +291,7 @@ export class TelegramService implements OnModuleInit {
     }
     const link = await this.chatToUser(chatId);
     if (!link) {
-      return this.sendMessage(String(chatId), '🔗 Your chat is not linked to a JobHunter account yet.\n\nOpen the web app → Settings → Telegram, tap "Open Telegram & Link", then send /start <code> here.');
+      return this.sendMessage(String(chatId), '🔔 Your chat is not linked to a JobHunter account yet.\n\nOpen the web app → Settings → Telegram, tap "Open Telegram & Link", then send /start <code> here.');
     }
     const cmd = trimmed.toLowerCase();
     if (cmd === '/status') return this.handleStatus(chatId, link.userId);
@@ -298,7 +299,7 @@ export class TelegramService implements OnModuleInit {
     if (cmd === '/pause') return this.handlePause(chatId, link.userId, true);
     if (cmd === '/resume') return this.handlePause(chatId, link.userId, false);
     if (cmd === '/help') return this.sendMessage(String(chatId), this.helpText());
-    return this.sendMessage(String(chatId), '🤖 Unknown command. Send /help for usage.');
+    return this.sendMessage(String(chatId), '🤔 Unknown command. Send /help for usage.');
   }
 
   private async handleStart(chatId: number, text: string) {
@@ -336,7 +337,7 @@ export class TelegramService implements OnModuleInit {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayMatches = await this.prisma.jobMatch.count({ where: { userId, createdAt: { gte: today } } });
-    const saved = await this.prisma.savedJob.count({ where: { userId } });
+    const saved = await this.prisma.application.count({ where: { userId, stage: 'SAVED' } });
     const apps = await this.prisma.application.count({ where: { userId } });
     return this.sendMessage(
       String(chatId),
@@ -345,12 +346,7 @@ export class TelegramService implements OnModuleInit {
   }
 
   private async handleSaved(chatId: number, userId: string) {
-    const saved = await this.prisma.savedJob.findMany({
-      where: { userId },
-      include: { job: { select: { title: true, company: true, url: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-    });
+    const saved = await this.prisma.application.findMany({ where: { userId, stage: 'SAVED' }, include: { job: { select: { title: true, company: true, url: true } } }, orderBy: { stageSince: 'desc' }, take: 10 });
     if (!saved.length) return this.sendMessage(String(chatId), 'You have no saved jobs yet.');
     const lines = saved.map(
       (s, i) => `${i + 1}. ${escHtml(s.job.title)} — ${escHtml(s.job.company)}\n   ${escHtml(s.job.url)}`,
@@ -362,13 +358,13 @@ export class TelegramService implements OnModuleInit {
     await this.prisma.user.update({ where: { id: userId }, data: { notificationsPaused: paused } });
     return this.sendMessage(
       String(chatId),
-      paused ? '⏸ Notifications paused. Send /resume to re-enable.' : '▶️ Notifications resumed.',
+      paused ? '⏸️ Notifications paused. Send /resume to re-enable.' : '▶️ Notifications resumed.',
     );
   }
 
   private helpText(): string {
     return [
-      '🤖 JobHunter commands:',
+      '🤔 JobHunter commands:',
       '/start <code> — link this chat to your account',
       '/status — link status + today\u2019s counts',
       '/saved — your latest saved jobs',
@@ -391,29 +387,17 @@ export class TelegramService implements OnModuleInit {
       return this.answerCallback(callbackId, job ? `Opening: ${job.url}` : 'Job not found');
     }
     if (action === 'save') {
-      await this.prisma.savedJob.upsert({
-        where: { userId_jobId: { userId, jobId } },
-        create: { userId, jobId },
-        update: {},
-      });
+      await this.applications!.save(userId, jobId);
       await this.trackAction();
       return this.answerCallback(callbackId, 'Saved ✓');
     }
     if (action === 'reject') {
-      await this.prisma.application.upsert({
-        where: { userId_jobId: { userId, jobId } },
-        create: { userId, jobId, stage: 'REJECTED', stageSince: new Date() },
-        update: { stage: 'REJECTED', stageSince: new Date(), followUp: null },
-      });
+      await this.applications!.setStage(userId, jobId, 'REJECTED');
       await this.trackAction();
       return this.answerCallback(callbackId, 'Noted as rejected');
     }
     if (action === 'apply') {
-      await this.prisma.application.upsert({
-        where: { userId_jobId: { userId, jobId } },
-        create: { userId, jobId, stage: 'APPLIED', stageSince: new Date(), followUp: new Date(Date.now() + 7 * 86_400_000) },
-        update: { stage: 'APPLIED', stageSince: new Date(), followUp: new Date(Date.now() + 7 * 86_400_000) },
-      });
+      await this.applications!.apply(userId, jobId);
       await this.trackAction();
       return this.answerCallback(callbackId, 'Application tracked — good luck!');
     }
