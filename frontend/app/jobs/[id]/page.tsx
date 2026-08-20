@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Copy, MapPin, FileText, AlertTriangle } from 'lucide-react';
 import { RequireAuth, useApi, ErrorBox, Loading, ScoreBadge, fmtDate } from '../../../lib/ui';
 import { buttonVariants } from '../../../components/ui/button';
 import { JobActions } from '../../../components/job-actions';
@@ -25,6 +26,12 @@ interface JobDetail {
   deadline: string | null;
   status: string;
   parseConfidence: number;
+  applyMethod: string;
+  applyUrl: string | null;
+  applyEmail: string | null;
+  urlStatus: string | null;
+  descriptionQuality: number | null;
+  descriptionSource: string | null;
   saved: boolean;
   application: { stage: string; stageSince: string } | null;
   match: {
@@ -54,6 +61,79 @@ export default function JobDetailPage() {
   const params = useParams<{ id: string }>();
   const { data, err, loading, reload } = useApi<JobDetail>(`/api/jobs/${params.id}`);
   const m = data?.match ?? null;
+  const [copiedEmail, setCopiedEmail] = useState(false);
+
+  const copyEmail = () => {
+    if (data?.applyEmail) {
+      navigator.clipboard.writeText(data.applyEmail);
+      setCopiedEmail(true);
+      setTimeout(() => setCopiedEmail(false), 2000);
+    }
+  };
+
+  /** FR-025: Adaptive apply CTA based on applyMethod. */
+  const renderApplyCTA = () => {
+    if (!data) return null;
+    const method = data.applyMethod || 'ONLINE_URL';
+    const isDead = data.urlStatus === 'NOT_FOUND' || data.urlStatus === 'ERROR';
+
+    if (isDead) {
+      return (
+        <div className="notice-amber" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <AlertTriangle className="h-4 w-4" />
+          <span>This apply link may be dead (status: {data.urlStatus}). Check the source site directly.</span>
+        </div>
+      );
+    }
+
+    switch (method) {
+      case 'EMAIL':
+        return (
+          <button className="btn" onClick={copyEmail}>
+            <Copy className="h-4 w-4" />
+            {copiedEmail ? 'Copied!' : `Copy Email: ${data.applyEmail || ''}`}
+          </button>
+        );
+      case 'IN_PERSON':
+        return (
+          <div className="notice">
+            <MapPin className="h-4 w-4" style={{ marginRight: 6 }} />
+            Apply in person — see description for address and office hours.
+          </div>
+        );
+      case 'SOURCE_ACCOUNT':
+        return (
+          <div className="notice-amber">
+            This posting requires an account on the source platform. Visit the source site to create one.
+          </div>
+        );
+      case 'PDF_FORM':
+        return (
+          <a
+            className={buttonVariants({ variant: 'outline' })}
+            href={data.applyUrl || data.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <FileText className="h-4 w-4" />
+            Open Application Form (PDF)
+          </a>
+        );
+      case 'ONLINE_URL':
+      default:
+        return (
+          <a
+            className={buttonVariants({ variant: 'outline' })}
+            href={data.applyUrl || data.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Apply on source site
+          </a>
+        );
+    }
+  };
 
   return (
     <RequireAuth>
@@ -70,6 +150,13 @@ export default function JobDetailPage() {
             {data.experienceLevel} · posted {fmtDate(data.postedDate)}
             {data.deadline && ` · deadline ${fmtDate(data.deadline)}`}
           </p>
+
+          {/* FR-012c: Low-confidence warning */}
+          {data.parseConfidence < 40 && (
+            <div className="notice-amber">
+              ⚠️ Low parse confidence ({data.parseConfidence}%) — details may be unreliable.
+            </div>
+          )}
 
           <div className="card" style={{ marginBottom: 16 }}>
             <h2 style={{ marginTop: 0 }}>Quick actions</h2>
@@ -142,20 +229,17 @@ export default function JobDetailPage() {
           <div className="card">
             <h2>Details</h2>
             <p>{data.description || 'No description provided.'}</p>
-            <p className="muted" style={{ fontSize: 13 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginTop: 12 }}>
+              {renderApplyCTA()}
+            </div>
+            <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>
               Source: {data.source.name} ({data.source.tier}) · parse confidence {data.parseConfidence}% · status{' '}
               {data.status}
               {data.salary != null && ` · salary ${data.salary} ${data.currency}`}
+              {data.descriptionQuality != null && ` · description quality ${data.descriptionQuality}%`}
+              {data.descriptionSource && ` · via ${data.descriptionSource}`}
+              {data.urlStatus && ` · link status: ${data.urlStatus}`}
             </p>
-            <a
-              className={buttonVariants({ variant: 'outline' })}
-              href={data.url}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <ExternalLink />
-              Apply on source site
-            </a>
           </div>
         </>
       )}

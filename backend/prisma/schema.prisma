@@ -15,6 +15,13 @@ enum Role {
   ADMIN
 }
 
+enum UserStatus {
+  ACTIVE
+  DORMANT
+  DISABLED
+  DELETED
+}
+
 enum EmploymentType {
   FULL_TIME
   CONTRACT
@@ -86,6 +93,26 @@ enum SourceTier {
   INTERNATIONAL
 }
 
+enum TelegramLinkStatus {
+  ACTIVE
+  UNREACHABLE
+}
+
+enum ApplyMethod {
+  ONLINE_URL
+  EMAIL
+  IN_PERSON
+  SOURCE_ACCOUNT
+  PDF_FORM
+}
+
+enum DescriptionSource {
+  API
+  LIST
+  DETAIL
+  PDF
+}
+
 enum SourceType {
   API
   RSS
@@ -105,11 +132,15 @@ model User {
   email       String   @unique
   passwordHash String
   role        Role     @default(USER)
+  status      UserStatus @default(ACTIVE) // FR-001a
   locale      String   @default("en")
   notificationsPaused Boolean @default(false)
   digestEnabled Boolean @default(true) // FR-028 / FR-026: daily digest on/off
-  matchThreshold Int @default(70)
+  matchThreshold Int @default(75)
   pausedUntil DateTime?
+  lastActiveAt DateTime? // FR-001a: updated on login + authenticated activity
+  tokenInvalidatedAt DateTime? // FR-002h: reject JWTs issued before this
+  emailVerifiedAt DateTime? // FR-002g: verification flow is Phase 2
   createdAt   DateTime @default(now())
 
   profile        CandidateProfile?
@@ -124,6 +155,8 @@ model User {
   notifications  Notification[]
   searches       SearchProfile[]
   digests        Digest[]
+
+  @@index([status, lastActiveAt])
 }
 
 model CandidateProfile {
@@ -156,11 +189,12 @@ model CvFile {
 }
 
 model TelegramLink {
-  id       String   @id @default(cuid())
-  userId   String   @unique
-  chatId   String   @unique
-  linkedAt DateTime @default(now())
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id       String              @id @default(cuid())
+  userId   String              @unique
+  chatId   String              @unique
+  linkedAt DateTime            @default(now())
+  status   TelegramLinkStatus  @default(ACTIVE)
+  user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Skill {
@@ -229,6 +263,10 @@ model SourceRun {
   duplicates   Int      @default(0)
   errors       Int      @default(0)
   errorMessage String?
+  descriptionFailures   Int   @default(0)
+  avgDescriptionQuality Float?
+  linkChecks            Int   @default(0)
+  linkFailures          Int   @default(0)
   source       JobSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
   @@index([sourceId])
@@ -264,7 +302,20 @@ model Job {
   fingerprint     String?
   rawData         Json?
   country         String?
-  createdAt       DateTime      @default(now())
+  // FR-012d/e: description provenance.
+  descriptionSource   DescriptionSource? // API | LIST | DETAIL | PDF
+  descriptionQuality  Int?                // 0-100, FR-012e
+  descriptionFetchedAt DateTime?
+  // FR-012f/g/h: apply-link fidelity.
+  applyMethod         ApplyMethod  @default(ONLINE_URL)
+  applyUrl            String?
+  applyUrlRaw         String?
+  applyEmail          String?
+  // FR-013/034c: URL liveness tracking.
+  urlStatus           String?       // OK | NOT_FOUND | ERROR
+  urlCheckedAt        DateTime?
+  finalUrl            String?
+  createdAt           DateTime      @default(now())
 
   source     JobSource    @relation(fields: [sourceId], references: [id])
   skills     JobSkill[]
@@ -277,6 +328,8 @@ model Job {
   @@index([status])
   @@index([firstSeenAt])
   @@index([status, matchedAt])
+  @@index([status, deadline])
+  @@index([status, urlStatus])
 }
 
 model JobSkill {
@@ -315,6 +368,7 @@ model JobMatch {
 
   @@unique([userId, jobId])
   @@index([userId])
+  @@index([userId, score])
 }
 
 model SavedJob {
@@ -340,6 +394,7 @@ model Application {
 
   @@unique([userId, jobId])
   @@index([userId])
+  @@index([userId, stage])
 }
 
 model Notification {

@@ -139,7 +139,7 @@ export class MatchingService extends MatchingEngine {
     }
 
     const profiles = await this.buildProfilesForUsers(users.map((u) => u.id));
-    const thresholds = new Map(users.map((u) => [u.id, u.matchThreshold ?? 70]));
+    const thresholds = new Map(users.map((u) => [u.id, u.matchThreshold ?? 75]));
 
     // Rows that already exist for these jobs (e.g. from a per-user profile
     // recalc) keep their score — only genuinely new pairs are inserted.
@@ -166,7 +166,7 @@ export class MatchingService extends MatchingEngine {
           score: result.score,
           ...this.toMatchData(result),
         });
-        if (result.score >= (thresholds.get(user.id) ?? 70)) {
+        if (result.score >= (thresholds.get(user.id) ?? 75)) {
           above++;
           notifyCandidates.push({ userId: user.id, jobId: job.id, score: result.score, summary: result.summary });
         }
@@ -250,7 +250,11 @@ export class MatchingService extends MatchingEngine {
     return out;
   }
 
-  /** Persist/upsert matches for a user against the latest ACTIVE jobs. */
+  /**
+   * Persist/upsert matches for a user against the latest ACTIVE jobs.
+   * Uses bulk createMany(skipDuplicates) for new pairs and a single
+   * updateMany for existing pairs — eliminates the old N+1 loop.
+   */
   async recalculate(
     userId: string,
     limit = Number(process.env.RECALC_JOB_LIMIT ?? 1000),
@@ -263,24 +267,39 @@ export class MatchingService extends MatchingEngine {
       include: { skills: { include: { skill: true } } },
     })) as unknown as JobWithSkills[];
 
+    // Score all jobs in memory — no DB round-trips per job.
+    const scored = jobs.map((job) => ({
+      jobId: job.id,
+      result: this.scoreJob(this.toJobInput(job), prof),
+    }));
+
+    // Partition into existing (update) and new (insert) pairs.
+    const existing = await this.prisma.jobMatch.findMany({
+      where: { userId, jobId: { in: jobs.map((j) => j.id) } },
+      select: { jobId: true },
+    });
+    const existingIds = new Set(existing.map((e) => e.jobId));
+
+    const newRows: Prisma.JobMatchCreateManyInput[] = [];
     let created = 0;
-    for (const job of jobs) {
-      const result = this.scoreJob(this.toJobInput(job), prof);
-      const existing = await this.prisma.jobMatch.findUnique({
-        where: { userId_jobId: { userId, jobId: job.id } },
-      });
-      if (existing) {
+
+    for (const { jobId, result } of scored) {
+      const data = { userId, jobId, score: result.score, ...this.toMatchData(result) };
+      if (existingIds.has(jobId)) {
         await this.prisma.jobMatch.update({
-          where: { userId_jobId: { userId, jobId: job.id } },
+          where: { userId_jobId: { userId, jobId } },
           data: this.toMatchData(result),
         });
       } else {
-        await this.prisma.jobMatch.create({
-          data: { userId, jobId: job.id, score: result.score, ...this.toMatchData(result) },
-        });
+        newRows.push(data);
         created++;
       }
     }
+
+    if (newRows.length) {
+      await this.prisma.jobMatch.createMany({ data: newRows, skipDuplicates: true });
+    }
+
     return created;
   }
 

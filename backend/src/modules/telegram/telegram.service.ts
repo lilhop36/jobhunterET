@@ -149,6 +149,31 @@ export class TelegramService implements OnModuleInit {
     return { ok: false, description: 'Rate limit retries exhausted' };
   }
 
+  /** Track consecutive delivery failures per chatId for UNREACHABLE detection. */
+  private consecutiveFailures = new Map<string, number>();
+
+  /** Mark a TelegramLink as UNREACHABLE after 5 consecutive failures (FR-003b). */
+  private async markDeliveryResult(chatId: string, result: 'SENT' | 'FAILED') {
+    if (result === 'SENT') {
+      this.consecutiveFailures.delete(chatId);
+      // Restore ACTIVE if previously UNREACHABLE
+      await this.prisma.telegramLink.updateMany({
+        where: { chatId, status: 'UNREACHABLE' },
+        data: { status: 'ACTIVE' },
+      });
+      return;
+    }
+    const count = (this.consecutiveFailures.get(chatId) ?? 0) + 1;
+    this.consecutiveFailures.set(chatId, count);
+    if (count >= 5) {
+      await this.prisma.telegramLink.updateMany({
+        where: { chatId, status: 'ACTIVE' },
+        data: { status: 'UNREACHABLE' },
+      });
+      this.logger.warn(`[BOT] TelegramLink chatId=${chatId} marked UNREACHABLE after ${count} failures`);
+    }
+  }
+
   async sendMessage(chatId: string, text: string, replyMarkup?: unknown): Promise<'SENT' | 'FAILED'> {
     if (!this.botToken) return 'FAILED';
     try {
@@ -156,9 +181,12 @@ export class TelegramService implements OnModuleInit {
       const body: Record<string, unknown> = { chat_id: chatId, text, parse_mode: 'HTML' };
       if (replyMarkup) body.reply_markup = replyMarkup;
       const res = await this.callApi('sendMessage', body);
-      return res.ok ? 'SENT' : 'FAILED';
+      const result = res.ok ? 'SENT' : 'FAILED';
+      await this.markDeliveryResult(chatId, result);
+      return result;
     } catch (err) {
       this.logger.error(`[NOTIFICATION] Telegram send failed (chatId=${chatId})`, err);
+      await this.markDeliveryResult(chatId, 'FAILED');
       return 'FAILED';
     }
   }

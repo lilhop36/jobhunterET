@@ -95,7 +95,7 @@ export class MatchesService {
   async recalculate(userId: string) {
     const created = await this.matching.recalculate(userId);
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    const threshold = user?.matchThreshold ?? 70;
+    const threshold = user?.matchThreshold ?? 75;
     const matches = await this.prisma.jobMatch.findMany({
       where: { userId, score: { gte: threshold } },
       select: { jobId: true, score: true, summary: true },

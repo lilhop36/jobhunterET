@@ -55,8 +55,13 @@ export class NotificationsService {
     if (user.notificationsPaused) return 'SKIPPED';
 
     // FR-024: only ACTIVE jobs are ever notified (REMOVED/EXPIRED are excluded).
-    const job = await this.prisma.job.findUnique({ where: { id: jobId }, select: { status: true } });
+    const job = await this.prisma.job.findUnique({ where: { id: jobId }, select: { status: true, urlStatus: true, applyMethod: true } });
     if (!job || job.status !== 'ACTIVE') return 'SKIPPED';
+
+    // FR-024: dead online apply links are NEVER pushed.
+    if (job.applyMethod === 'ONLINE_URL' && job.urlStatus && (job.urlStatus === 'NOT_FOUND' || job.urlStatus === 'ERROR')) {
+      return 'SKIPPED';
+    }
 
     // FR-027 / SEC-003: never repeat the same (userId, jobId) delivery — any row,
     // any status, counts as delivered. The unique (userId, jobId) constraint
@@ -66,8 +71,8 @@ export class NotificationsService {
     });
     if (existing) return 'SKIPPED';
 
-    // Telegram-first (FR-025); permanent failure falls back to the Web Inbox (FR-024c).
-    if (user.telegramLink && this.telegram.configured) {
+    // Telegram-first (FR-025); UNREACHABLE links fall back to the Web Inbox (FR-024c).
+    if (user.telegramLink && user.telegramLink.status !== 'UNREACHABLE' && this.telegram.configured) {
       const [jobFull, match] = await Promise.all([
         this.prisma.job.findUnique({ where: { id: jobId } }),
         this.prisma.jobMatch.findUnique({ where: { userId_jobId: { userId, jobId } } }),

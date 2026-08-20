@@ -46,6 +46,14 @@ function retentionIntervalMs(): number {
   const h = raw.trim().match(/^(\d+)\s*h$/);
   return h ? Number(h[1]) * 60 * 60 * 1000 : 24 * 60 * 60 * 1000; // "24h"
 }
+function backupIntervalMs(): number {
+  const raw = process.env.BACKUP_INTERVAL;
+  if (!raw) return 24 * 60 * 60 * 1000;
+  const n = Number(raw);
+  if (!Number.isNaN(n)) return n; // plain milliseconds
+  const h = raw.trim().match(/^(\d+)\s*h$/);
+  return h ? Number(h[1]) * 60 * 60 * 1000 : 24 * 60 * 60 * 1000; // "24h"
+}
 
 /** FR-035: collection interval in ms — reads JOB_COLLECTION_INTERVAL (default 30m). */
 function collectIntervalMs(): number {
@@ -128,6 +136,50 @@ export class LifecycleTasks {
       } catch (e) {
         this.logger.error('Daily digest failed', e);
       }
+    });
+  }
+
+  /** FR-034d: nightly dormancy sweep — mark inactive users as DORMANT. */
+  @Interval(24 * 60 * 60 * 1000) // nightly (24h)
+  async dormancySweep() {
+    await this.runExclusive('dormancy', async () => {
+      try {
+        await this.lifecycle.sweepDormant();
+      } catch (e) {
+        this.logger.error('Dormancy sweep failed', e);
+      }
+    });
+  }
+
+  /** FR-034c: daily link-rot sweep — recheck apply URLs for active jobs. */
+  @Interval(24 * 60 * 60 * 1000) // daily (24h)
+  async linkRotSweep() {
+    await this.runExclusive('linkrot', async () => {
+      try {
+        await this.lifecycle.sweepLinkRot();
+      } catch (e) {
+        this.logger.error('Link-rot sweep failed', e);
+      }
+    });
+  }
+
+  /** FR-037c: nightly notification & log retention. */
+  @Interval(24 * 60 * 60 * 1000) // nightly (24h)
+  async notificationRetention() {
+    await this.runExclusive('retention-notify', async () => {
+      try {
+        await this.lifecycle.retentionNotificationsAndLogs();
+      } catch (e) {
+        this.logger.error('Notification retention failed', e);
+      }
+    });
+  }
+
+  /** NFR-008: nightly PostgreSQL + uploads backup. */
+  @Interval(backupIntervalMs())
+  async backup() {
+    await this.runExclusive('backup', async () => {
+      await this.lifecycle.runBackup();
     });
   }
 }

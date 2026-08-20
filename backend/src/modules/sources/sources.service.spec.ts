@@ -104,7 +104,7 @@ describe('SourcesService.persist — upsert, dedup, reactivation (FR-014 / FR-01
 
     const result = await (service as any).persist('reliefweb', rawJob());
 
-    expect(result).toBe('CREATED');
+    expect(result.status).toBe('CREATED');
     expect(prisma.job.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -124,7 +124,7 @@ describe('SourcesService.persist — upsert, dedup, reactivation (FR-014 / FR-01
 
     const result = await (service as any).persist('reliefweb', rawJob());
 
-    expect(result).toBe('DUPLICATE');
+    expect(result.status).toBe('DUPLICATE');
     expect(prisma.job.create).not.toHaveBeenCalled();
     expect(prisma.job.update).toHaveBeenCalledWith({
       where: { id: 'j-1' },
@@ -138,7 +138,7 @@ describe('SourcesService.persist — upsert, dedup, reactivation (FR-014 / FR-01
 
     const result = await (service as any).persist('reliefweb', rawJob());
 
-    expect(result).toBe('DUPLICATE');
+    expect(result.status).toBe('DUPLICATE');
     const update = prisma.job.update.mock.calls[0][0];
     expect(update.data.status).toBe('ACTIVE');
     expect(update.data.statusChangedAt).toBeNull();

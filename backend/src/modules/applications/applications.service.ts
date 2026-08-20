@@ -1,5 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+
+// FR-031a: allowed transitions per stage.
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  DISCOVERED: ['SAVED', 'APPLIED', 'REJECTED'],
+  SAVED: ['APPLIED', 'REJECTED'],
+  APPLIED: ['ASSESSMENT', 'INTERVIEW', 'REJECTED', 'WITHDRAWN'],
+  ASSESSMENT: ['INTERVIEW', 'REJECTED', 'WITHDRAWN'],
+  INTERVIEW: ['OFFER', 'REJECTED', 'WITHDRAWN'],
+  OFFER: [],    // terminal
+  REJECTED: [], // terminal
+  WITHDRAWN: [], // terminal
+};
+
+const VALID_STAGES = Object.keys(VALID_TRANSITIONS);
 
 @Injectable()
 export class ApplicationsService {
@@ -40,6 +54,8 @@ export class ApplicationsService {
       where: { userId_jobId: { userId, jobId } },
     });
     if (existing) {
+      // FR-031a: validate transition from current stage to APPLIED.
+      this.validateTransition(existing.stage, 'APPLIED');
       const updated = await this.prisma.application.update({
         where: { userId_jobId: { userId, jobId } },
         data: { stage: 'APPLIED', stageSince: new Date(), followUp: new Date(Date.now() + 7 * 86_400_000) },
@@ -59,21 +75,43 @@ export class ApplicationsService {
   }
 
   async setStage(userId: string, jobId: string, stage: string) {
+    if (!VALID_STAGES.includes(stage)) {
+      throw new ConflictException(`Invalid stage: ${stage}`);
+    }
     const existing = await this.prisma.application.findUnique({
       where: { userId_jobId: { userId, jobId } },
     });
-    const followUp =
-      ['APPLIED', 'ASSESSMENT', 'INTERVIEW'].includes(stage)
+
+    if (!existing) {
+      // Creating a new application — only DISCOVERED → first valid move is allowed.
+      // But allow direct creation into SAVED or APPLIED as a convenience.
+      const followUp = ['APPLIED', 'ASSESSMENT', 'INTERVIEW'].includes(stage)
         ? new Date(Date.now() + 7 * 86_400_000)
         : null;
-    if (existing) {
-      return this.prisma.application.update({
-        where: { userId_jobId: { userId, jobId } },
-        data: { stage: stage as any, stageSince: new Date(), followUp },
+      return this.prisma.application.create({
+        data: { userId, jobId, stage: stage as any, stageSince: new Date(), followUp },
       });
     }
-    return this.prisma.application.create({
-      data: { userId, jobId, stage: stage as any, stageSince: new Date(), followUp },
+
+    // FR-031a: validate transition.
+    this.validateTransition(existing.stage, stage);
+
+    const followUp = ['APPLIED', 'ASSESSMENT', 'INTERVIEW'].includes(stage)
+      ? new Date(Date.now() + 7 * 86_400_000)
+      : null;
+    return this.prisma.application.update({
+      where: { userId_jobId: { userId, jobId } },
+      data: { stage: stage as any, stageSince: new Date(), followUp },
     });
+  }
+
+  /** FR-031a: enforce the application transition graph — illegal moves return 409. */
+  private validateTransition(from: string, to: string): void {
+    const allowed = VALID_TRANSITIONS[from];
+    if (!allowed || !allowed.includes(to)) {
+      throw new ConflictException(
+        `Illegal transition: ${from} → ${to}. Allowed: ${allowed?.join(', ') || '(none — terminal stage)'}`,
+      );
+    }
   }
 }
