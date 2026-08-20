@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import { RegisterDto, LoginDto, ChangePasswordDto } from './dto/auth.dto';
+import { MatchingService } from '../matching/matching.service';
 
 @Injectable()
 export class AuthService {
@@ -17,6 +18,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly matching: MatchingService,
   ) {}
 
   private async hash(pw: string): Promise<string> {
@@ -109,7 +111,9 @@ export class AuthService {
         data: { status: 'ACTIVE', lastActiveAt: new Date() },
       });
       this.logger.log(`[AUTH] Dormant user reactivated: userId=${user.id}`);
-      // Background recalc is triggered by the profile module or login hook.
+      this.matching.recalculate(user.id).catch((err) => {
+        this.logger.error(`[RECALC] dormant login recalc failed for userId=${user.id}`, err);
+      });
     } else {
       await this.prisma.user.update({
         where: { id: user.id },
