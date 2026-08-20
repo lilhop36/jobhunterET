@@ -7,6 +7,10 @@ export class RegisterDto {
   @IsString()
   @MinLength(8)
   password: string;
+
+  /** FR-002g: optional invite code gate. */
+  @IsString()
+  inviteCode?: string;
 }
 
 export class LoginDto {

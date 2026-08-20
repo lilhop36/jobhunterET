@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MatchingService } from '../matching/matching.service';
 import { normalizeSkill } from '../matching/matching-engine';
+import { runFidelityPipeline } from '../jobs/job-fidelity';
 import { JobSourceAdapter, RawJob } from './adapters/job-source.adapter';
 import { ReliefWebAdapter } from './adapters/reliefweb.adapter';
 import { RemotiveAdapter } from './adapters/remotive.adapter';
@@ -125,24 +126,46 @@ export class SourcesService {
 
     let created = 0;
     let duplicates = 0;
+    let descFailures = 0;
+    let totalDescQuality = 0;
+    let linkChecks = 0;
+    let linkFailures = 0;
     const seenIds = new Set<string>();
     for (const j of valid) {
       seenIds.add(j.sourceJobId);
-      const createdJob = await this.persist(source.id, j);
-      if (createdJob === 'CREATED') created++;
+      const result = await this.persist(source.id, j, source.baseUrl);
+      if (result.status === 'CREATED') created++;
       else duplicates++;
+      if (result.descQuality !== null) totalDescQuality += result.descQuality;
+      if (result.descQuality !== null && result.descQuality < 40) descFailures++;
+      if (result.linkChecked) linkChecks++;
+      if (result.urlStatus === 'NOT_FOUND') linkFailures++;
     }
 
     /* FR-015: jobs absent from the latest fetch accrue missedCycles; >= 3 → REMOVED. */
     await this.reconcileGhosts(id, seenIds);
 
     // SEC-006: a successful run clears the failure streak so backoff restarts fresh.
+    const avgDescQuality = created > 0 ? totalDescQuality / created : null;
     await this.prisma.jobSource.update({
       where: { id },
       data: { status: 'ACTIVE', consecutiveFailures: 0, lastSuccessfulRun: new Date(), lastError: null },
     });
     await this.prisma.sourceRun.create({
-      data: { sourceId: id, startedAt, finishedAt: new Date(), status: 'OK', jobsFetched: valid.length, jobsCreated: created, duplicates, errors: invalid },
+      data: {
+        sourceId: id,
+        startedAt,
+        finishedAt: new Date(),
+        status: 'OK',
+        jobsFetched: valid.length,
+        jobsCreated: created,
+        duplicates,
+        errors: invalid,
+        descriptionFailures: descFailures,
+        avgDescriptionQuality: avgDescQuality,
+        linkChecks,
+        linkFailures,
+      },
     });
     this.logger.log(`[COLLECTOR] Source: ${source.name} — Retrieved: ${valid.length} (created ${created}, dupes ${duplicates})`);
 
@@ -157,7 +180,16 @@ export class SourcesService {
   }
 
   /** Upsert a raw job: create new, or refresh lastSeenAt / reset missedCycles / reactivate REMOVED. */
-  private async persist(sourceId: string, j: RawJob): Promise<'CREATED' | 'DUPLICATE'> {
+  private async persist(
+    sourceId: string,
+    j: RawJob,
+    baseUrl?: string,
+  ): Promise<{
+    status: 'CREATED' | 'DUPLICATE';
+    descQuality: number | null;
+    linkChecked: boolean;
+    urlStatus: string;
+  }> {
     const skills = [...new Set(j.skills.map(normalizeSkill))].filter(Boolean);
     const skillIds: string[] = [];
     for (const name of skills) {
@@ -181,8 +213,22 @@ export class SourcesService {
           statusChangedAt: wasRemoved ? null : undefined,
         },
       });
-      return 'DUPLICATE';
+      return { status: 'DUPLICATE', descQuality: null, linkChecked: false, urlStatus: 'OK' };
     }
+
+    // FR-012d through FR-013: run the full fidelity pipeline.
+    const fidelity = await runFidelityPipeline({
+      title: j.title,
+      company: j.company,
+      location: j.location,
+      url: j.url,
+      baseUrl,
+      description: j.description,
+      salary: j.salary,
+      currency: j.currency,
+      deadline: j.deadline as any,
+      postedDate: j.postedDate,
+    });
 
     await this.prisma.job.create({
       data: {
@@ -193,24 +239,43 @@ export class SourcesService {
         employmentType: j.employmentType,
         experienceLevel: j.experienceLevel,
         workPlace: j.workPlace,
-        salary: j.salary ?? null,
-        currency: j.currency ?? 'USD',
+        salary: fidelity.salary,
+        currency: fidelity.currency,
         url: j.url,
         sourceId,
         sourceJobId: j.sourceJobId,
         postedDate: j.postedDate,
-        deadline: j.deadline,
+        deadline: fidelity.deadline,
         firstSeenAt: new Date(),
         lastSeenAt: new Date(),
         status: 'ACTIVE',
         parseConfidence: j.parseConfidence ?? 80,
         rawData: j.rawData as any,
         country: j.country ?? null,
-        description: j.description ?? null,
+        description: fidelity.description,
+        // FR-012d/e: description provenance
+        descriptionSource: fidelity.descriptionSource as any,
+        descriptionQuality: fidelity.descriptionQuality ?? null,
+        // FR-012g: apply method
+        applyMethod: fidelity.applyMethod as any,
+        applyUrl: fidelity.applyUrl,
+        applyEmail: fidelity.applyEmail,
+        // FR-013/034c: URL liveness
+        urlStatus: fidelity.urlStatus,
+        urlCheckedAt: fidelity.urlCheckedAt ?? null,
+        finalUrl: fidelity.finalUrl,
+        // FR-014: fingerprint for dedup
+        fingerprint: fidelity.fingerprint,
         skills: skillIds.length ? { create: skillIds.map((skillId) => ({ skillId })) } : undefined,
       },
     });
-    return 'CREATED';
+
+    return {
+      status: 'CREATED',
+      descQuality: fidelity.descriptionQuality,
+      linkChecked: fidelity.urlCheckedAt !== null,
+      urlStatus: fidelity.urlStatus,
+    };
   }
 
   /** FR-015 ghost detection: increment missedCycles for unseen ACTIVE jobs; REMOVE at the limit. */

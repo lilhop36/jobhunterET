@@ -124,6 +124,15 @@ export class JobsService {
       missedCycles: j.missedCycles,
       status: j.status,
       parseConfidence: j.parseConfidence,
+      // FR-012d/e: description provenance
+      descriptionSource: j.descriptionSource ?? null,
+      descriptionQuality: j.descriptionQuality ?? null,
+      // FR-012g: apply method
+      applyMethod: j.applyMethod ?? 'ONLINE_URL',
+      applyUrl: j.applyUrl ?? j.url,
+      applyEmail: j.applyEmail ?? null,
+      // FR-013/034c: URL liveness
+      urlStatus: j.urlStatus ?? null,
       saved: !!(j.savedBy && j.savedBy.length),
       application: j.apps && j.apps.length
         ? { stage: j.apps[0].stage, stageSince: j.apps[0].stageSince }

@@ -87,7 +87,8 @@ describe('TelegramService.throttle — SEC-005 atomic slot reservation', () => {
   });
 
   it('serializes concurrent sends so they respect the global rate cap (no burst)', async () => {
-    const svc = new TelegramService({} as any);
+    const prismaMock = { telegramLink: { updateMany: jest.fn().mockResolvedValue({}) } } as any;
+    const svc = new TelegramService(prismaMock);
     (svc as any).botToken = 'test-token';
     (svc as any).globalRate = 20; // 50 ms minimum gap
     (svc as any).perChatInterval = 0; // isolate the global cap

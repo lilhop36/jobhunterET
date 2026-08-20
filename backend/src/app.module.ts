@@ -15,6 +15,8 @@ import { SourcesModule } from './modules/sources/sources.module';
 import { LifecycleModule } from './modules/lifecycle/lifecycle.module';
 import { MatchingModule } from './modules/matching/matching.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { AccountModule } from './modules/account/account.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     SearchesModule,
     SourcesModule,
     DashboardModule,
+    AccountModule,
+    AdminModule,
   ],
 })
 export class AppModule {}
