@@ -42,15 +42,19 @@ export class TelegramService implements OnModuleInit {
   /** BUG-002: skip a tick while a previous poll is still in flight. */
   private readonly runExclusive = createExclusive();
 
-  constructor(private readonly prisma: PrismaService, private readonly applications?: ApplicationsService) {}
+  constructor(private readonly prisma: PrismaService, private readonly applications: ApplicationsService) {}
 
   /** BUG-002: load the persisted poll offset on startup so we don't re-process old updates. */
   async onModuleInit() {
-    const row = await this.prisma.botState.findUnique({ where: { key: 'telegram:pollOffset' } });
-    if (row) {
-      const parsed = parseInt(row.value, 10);
-      if (!Number.isNaN(parsed)) this.updateOffset = parsed;
-      this.logger.log(`[BOT] Loaded persisted poll offset: ${this.updateOffset}`);
+    try {
+      const row = await this.prisma.botState.findUnique({ where: { key: 'telegram:pollOffset' } });
+      if (row) {
+        const parsed = parseInt(row.value, 10);
+        if (!Number.isNaN(parsed)) this.updateOffset = parsed;
+        this.logger.log('Poll offset restored');
+      }
+    } catch (err: any) {
+      this.logger.warn('DB unavailable during Telegram init — continuing without poll offset');
     }
   }
 
@@ -387,17 +391,17 @@ export class TelegramService implements OnModuleInit {
       return this.answerCallback(callbackId, job ? `Opening: ${job.url}` : 'Job not found');
     }
     if (action === 'save') {
-      await this.applications!.save(userId, jobId);
+      await this.applications.save(userId, jobId);
       await this.trackAction();
       return this.answerCallback(callbackId, 'Saved ✓');
     }
     if (action === 'reject') {
-      await this.applications!.setStage(userId, jobId, 'REJECTED');
+      await this.applications.setStage(userId, jobId, 'REJECTED');
       await this.trackAction();
       return this.answerCallback(callbackId, 'Noted as rejected');
     }
     if (action === 'apply') {
-      await this.applications!.apply(userId, jobId);
+      await this.applications.apply(userId, jobId);
       await this.trackAction();
       return this.answerCallback(callbackId, 'Application tracked — good luck!');
     }

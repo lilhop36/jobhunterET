@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { EventsService } from '../events/events.service';
 import {
   Page,
   decodeCursor,
@@ -22,6 +23,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly telegram: TelegramService,
+    @Optional() @Inject(EventsService) private readonly events?: EventsService,
   ) {}
 
   /** FR-024 / FR-024c: deliver a qualifying match — Telegram when linked & configured, else Web Inbox. */
@@ -113,6 +115,9 @@ export class NotificationsService {
             summary,
             sentAt: new Date(),
           });
+          if (recorded !== 'ALREADY_EXISTS') {
+            this.emitMatchEvent(userId, jobId, score, summary);
+          }
           return recorded === 'ALREADY_EXISTS' ? 'SKIPPED' : 'SENT';
         }
       }
@@ -126,6 +131,9 @@ export class NotificationsService {
       score,
       summary,
     });
+    if (recorded !== 'ALREADY_EXISTS') {
+      this.emitMatchEvent(userId, jobId, score, summary);
+    }
     return recorded === 'ALREADY_EXISTS' ? 'SKIPPED' : 'WEB';
   }
 
@@ -151,6 +159,27 @@ export class NotificationsService {
       }
       throw e;
     }
+  }
+
+  /** Push a real-time SSE event to the user if they are connected. */
+  private emitMatchEvent(userId: string, jobId: string, score: number, summary: string) {
+    if (!this.events) return;
+    // Fire-and-forget: fetch job title/company, then push. Failures are silent.
+    this.prisma.job
+      .findUnique({ where: { id: jobId }, select: { title: true, company: true } })
+      .then((job) => {
+        if (!job) return;
+        this.events!.pushToUser(userId, {
+          type: 'match',
+          jobId,
+          score,
+          title: job.title,
+          company: job.company,
+          summary,
+          createdAt: new Date().toISOString(),
+        });
+      })
+      .catch(() => {});
   }
 
   /** SEC-003: run one task at a time per key, within this process. */

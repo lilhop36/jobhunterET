@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MatchingService } from '../matching/matching.service';
@@ -15,8 +15,26 @@ import { JobicyAdapter } from './adapters/jobicy.adapter';
 import { RemoteOKAdapter } from './adapters/remoteok.adapter';
 import { LandingJobsAdapter } from './adapters/landingjobs.adapter';
 import { EtcareersAdapter } from './adapters/etcareers.adapter';
+import { TELEGRAM_ADAPTERS } from './adapters/telegram-tokens';
 
 const BACKOFF_THRESHOLD = Math.max(1, Number(process.env.SOURCE_BACKOFF_THRESHOLD ?? 3));
+
+/**
+ * Source Resilience: fallback chain — when a primary source fails, the
+ * system automatically retries with the listed alternatives (same tier).
+ * This prevents silent coverage gaps when a single source breaks.
+ */
+const FALLBACK_CHAIN: Record<string, string[]> = {
+  ethiojobs: ['ethiongojobs', 'etcareers', 'reliefweb'],
+  ethiongojobs: ['etcareers', 'reliefweb'],
+  geez: ['ethiojobs', 'ethiongojobs'],
+  etcareers: ['reliefweb', 'ethiongojobs'],
+  reliefweb: ['etcareers', 'ethiongojobs'],
+};
+
+/** Health score: percentage of successful runs over the last HEALTH_WINDOW runs. */
+const HEALTH_WINDOW = 10;
+const HEALTH_AUTO_DISABLE_THRESHOLD = 50; // percent
 
 @Injectable()
 export class SourcesService {
@@ -36,10 +54,16 @@ export class SourcesService {
     remoteok: RemoteOKAdapter,
     landingjobs: LandingJobsAdapter,
     etcareers: EtcareersAdapter,
+    @Inject(TELEGRAM_ADAPTERS) telegramAdapters: JobSourceAdapter[],
   ) {
     this.adapters = {};
     for (const a of [reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs, jobicy, remoteok, landingjobs, etcareers]) {
       this.adapters[a.sourceId] = a;
+    }
+    // FR-008: register dynamically-configured Telegram channel adapters
+    for (const a of telegramAdapters) {
+      this.adapters[a.sourceId] = a;
+      this.logger.log(`[ADAPTER] Registered Telegram channel: ${a.sourceId}`);
     }
   }
 
@@ -298,6 +322,143 @@ export class SourcesService {
       linkChecked: fidelity.urlCheckedAt !== null,
       urlStatus: fidelity.urlStatus,
     };
+  }
+
+  // ── Source Resilience: health scoring ──────────────────────────────────────
+
+  /**
+   * Compute health score for a source based on the last HEALTH_WINDOW runs.
+   * Score = percentage of OK runs. Persists to JobSource.healthScore.
+   * If score < threshold, auto-disables the source (FR-037 + resilience).
+   */
+  async computeHealthScore(sourceId: string): Promise<number | null> {
+    const runs = await this.prisma.sourceRun.findMany({
+      where: { sourceId },
+      orderBy: { startedAt: 'desc' },
+      take: HEALTH_WINDOW,
+      select: { status: true },
+    });
+    if (!runs.length) return null;
+
+    const okCount = runs.filter((r) => r.status === 'OK').length;
+    const score = Math.round((okCount / runs.length) * 100);
+
+    await this.prisma.jobSource.update({
+      where: { id: sourceId },
+      data: { healthScore: score, lastHealthCheckAt: new Date() },
+    });
+
+    // Auto-disable sources below threshold (skip Telegram channel adapters
+    // — those are dynamically configured and shouldn't be auto-disabled)
+    if (score < HEALTH_AUTO_DISABLE_THRESHOLD && !sourceId.startsWith('telegram:')) {
+      this.logger.warn(
+        `[HEALTH] Source ${sourceId} health score ${score}% < ${HEALTH_AUTO_DISABLE_THRESHOLD}% — auto-disabling`,
+      );
+      await this.prisma.jobSource.update({
+        where: { id: sourceId },
+        data: { status: 'DISABLED', lastError: `Auto-disabled: health score ${score}% below ${HEALTH_AUTO_DISABLE_THRESHOLD}%` },
+      });
+    }
+
+    return score;
+  }
+
+  /**
+   * FR-037 + Source Resilience: get health summary for all sources.
+   * Used by the admin dashboard.
+   */
+  async getSourceHealthSummary() {
+    const sources = await this.prisma.jobSource.findMany({
+      include: {
+        runs: {
+          orderBy: { startedAt: 'desc' },
+          take: HEALTH_WINDOW,
+          select: { status: true, startedAt: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return sources.map((s) => {
+      const okCount = s.runs.filter((r) => r.status === 'OK').length;
+      const totalRuns = s.runs.length;
+      const score = totalRuns > 0 ? Math.round((okCount / totalRuns) * 100) : null;
+      const hasAdapter = !!this.adapters[s.id];
+      const fallbacks = FALLBACK_CHAIN[s.id] ?? [];
+
+      return {
+        id: s.id,
+        name: s.name,
+        status: s.status,
+        priorityTier: s.priorityTier,
+        healthScore: s.healthScore ?? score,
+        recentRuns: totalRuns,
+        lastSuccessfulRun: s.lastSuccessfulRun,
+        lastFailedRun: s.lastFailedRun,
+        lastError: s.lastError,
+        hasAdapter,
+        selectorVersion: hasAdapter ? this.adapters[s.id].selectorVersion ?? null : null,
+        fallbacks,
+      };
+    });
+  }
+
+  // ── Source Resilience: fallback chain ───────────────────────────────────────
+
+  /**
+   * Collect from a source, and if it fails, automatically retry with
+   * fallback sources from the same priority tier (FR-037, resilience).
+   */
+  async collectWithFallback(id: string) {
+    // Try the primary source first
+    const primaryResult = await this.collect(id);
+    if (primaryResult.status === 'OK') {
+      // Also compute health score after a successful run
+      await this.computeHealthScore(id);
+      return primaryResult;
+    }
+
+    // Primary failed — try fallback chain
+    const fallbacks = FALLBACK_CHAIN[id] ?? [];
+    if (!fallbacks.length) {
+      await this.computeHealthScore(id);
+      return primaryResult;
+    }
+
+    this.logger.log(
+      `[FALLBACK] Source ${id} failed (status=${primaryResult.status}), trying fallbacks: ${fallbacks.join(', ')}`,
+    );
+
+    for (const fallbackId of fallbacks) {
+      const fallbackSource = await this.prisma.jobSource.findUnique({ where: { id: fallbackId } });
+      if (!fallbackSource || fallbackSource.status !== 'ACTIVE') {
+        this.logger.log(`[FALLBACK] Skipping ${fallbackId} — status=${fallbackSource?.status ?? 'NOT_FOUND'}`);
+        continue;
+      }
+      if (!this.adapters[fallbackId]) {
+        this.logger.log(`[FALLBACK] Skipping ${fallbackId} — no adapter registered`);
+        continue;
+      }
+
+      try {
+        this.logger.log(`[FALLBACK] Attempting ${fallbackId} as fallback for ${id}`);
+        const fallbackResult = await this.collect(fallbackId);
+        if (fallbackResult.status === 'OK') {
+          this.logger.log(`[FALLBACK] ${fallbackId} succeeded as fallback — fetched ${fallbackResult.jobsFetched} jobs`);
+          return {
+            ...fallbackResult,
+            fallbackUsed: fallbackId,
+            primaryStatus: primaryResult.status,
+          };
+        }
+      } catch (err: any) {
+        this.logger.warn(`[FALLBACK] ${fallbackId} also failed: ${err?.message}`);
+      }
+    }
+
+    // All fallbacks exhausted — still report the primary failure
+    await this.computeHealthScore(id);
+    return { ...primaryResult, fallbacksExhausted: true };
   }
 
   /** FR-015 ghost detection: increment missedCycles for unseen ACTIVE jobs; REMOVE at the limit. */

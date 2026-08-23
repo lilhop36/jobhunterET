@@ -28,6 +28,12 @@ export class SourcesController {
 
   @Post(':id/collect')
   collect(@Param('id') id: string) {
-    return this.sources.collect(id);
+    return this.sources.collectWithFallback(id);
+  }
+
+  /** Source Resilience: per-source health scoring endpoint. */
+  @Get('health')
+  healthSummary() {
+    return this.sources.getSourceHealthSummary();
   }
 }

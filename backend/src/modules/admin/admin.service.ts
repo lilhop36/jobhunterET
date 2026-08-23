@@ -15,6 +15,93 @@ export class AdminService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * §32.12: Admin analytics dashboard — system overview, source health, match cycle metrics.
+   */
+  async getStats() {
+    const [
+      totalUsers,
+      activeUsers,
+      dormantUsers,
+      totalJobs,
+      activeJobs,
+      expiredJobs,
+      removedJobs,
+      totalMatches,
+      aboveThreshold,
+      totalNotifications,
+      unreadInbox,
+      totalApplications,
+    ] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.user.count({ where: { status: 'ACTIVE' } }),
+      this.prisma.user.count({ where: { status: 'DORMANT' } }),
+      this.prisma.job.count(),
+      this.prisma.job.count({ where: { status: 'ACTIVE' } }),
+      this.prisma.job.count({ where: { status: 'EXPIRED' } }),
+      this.prisma.job.count({ where: { status: 'REMOVED' } }),
+      this.prisma.jobMatch.count(),
+      this.prisma.jobMatch.count({ where: { score: { gte: 75 } } }),
+      this.prisma.notification.count(),
+      this.prisma.notification.count({ where: { status: 'UNREAD_WEB' } }),
+      this.prisma.application.count(),
+    ]);
+
+    const sources = await this.prisma.jobSource.findMany({
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        priorityTier: true,
+        healthScore: true,
+        consecutiveFailures: true,
+        lastSuccessfulRun: true,
+        lastFailedRun: true,
+        lastError: true,
+        runs: {
+          select: {
+            avgDescriptionQuality: true,
+            linkFailures: true,
+            linkChecks: true,
+          },
+          orderBy: { startedAt: 'desc' },
+          take: 3,
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const lastCycle = await this.prisma.matchCycle.findFirst({
+      orderBy: { startedAt: 'desc' },
+    });
+
+    const recentActivity = await this.prisma.systemLog.findMany({
+      orderBy: { at: 'desc' },
+      take: 30,
+      select: { tag: true, msg: true, at: true },
+    });
+
+    return {
+      overview: {
+        totalUsers,
+        activeUsers,
+        dormantUsers,
+        totalJobs,
+        activeJobs,
+        expiredJobs,
+        removedJobs,
+        totalMatches,
+        aboveThreshold,
+        totalNotifications,
+        unreadInbox,
+        totalApplications,
+      },
+      sourceHealth: sources,
+      lastCycle,
+      recentActivity,
+    };
+  }
+
   /** FR-002f: list user metadata — never CV contents, matches, or notifications. */
   async listUsers() {
     return this.prisma.user.findMany({

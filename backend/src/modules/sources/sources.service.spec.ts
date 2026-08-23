@@ -49,7 +49,7 @@ function createService() {
   const remoteok: any = { sourceId: 'remoteok', fetchJobs: jest.fn() };
   const landingjobs: any = { sourceId: 'landingjobs', fetchJobs: jest.fn() };
   const etcareers: any = { sourceId: 'etcareers', fetchJobs: jest.fn() };
-  const service = new SourcesService(prisma, matching, reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs, jobicy, remoteok, landingjobs, etcareers);
+  const service = new SourcesService(prisma, matching, reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs, jobicy, remoteok, landingjobs, etcareers, []);
   return { service, prisma, matching, reliefweb, remotive };
 }
 
@@ -262,5 +262,149 @@ describe('SourcesService.collect — validation, dedup counting, isolation (FR-0
     );
     expect(successUpdate).toBeDefined();
     expect(matching.matchUnmatchedJobs).toHaveBeenCalled();
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
+// Source Resilience: health scoring + fallback chain
+// ══════════════════════════════════════════════════════════════
+
+describe('SourcesService.computeHealthScore', () => {
+  it('computes 100% when all recent runs are OK', async () => {
+    const { service, prisma } = createService();
+    (prisma as any).sourceRun = { findMany: jest.fn().mockResolvedValue([
+      { status: 'OK' },
+      { status: 'OK' },
+      { status: 'OK' },
+      { status: 'OK' },
+      { status: 'OK' },
+    ]) };
+
+    const score = await service.computeHealthScore('reliefweb');
+
+    expect(score).toBe(100);
+    expect(prisma.jobSource.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'reliefweb' },
+        data: expect.objectContaining({ healthScore: 100 }),
+      }),
+    );
+  });
+
+  it('computes 50% when half the runs failed', async () => {
+    const { service, prisma } = createService();
+    (prisma as any).sourceRun = { findMany: jest.fn().mockResolvedValue([
+      { status: 'OK' },
+      { status: 'FAIL' },
+      { status: 'OK' },
+      { status: 'FAIL' },
+      { status: 'OK' },
+    ]) };
+
+    const score = await service.computeHealthScore('reliefweb');
+    expect(score).toBe(60); // 3 OK out of 5 = 60%
+  });
+
+  it('returns null when no runs exist', async () => {
+    const { service, prisma } = createService();
+    (prisma as any).sourceRun = { findMany: jest.fn().mockResolvedValue([]) };
+
+    const score = await service.computeHealthScore('reliefweb');
+    expect(score).toBeNull();
+  });
+
+  it('auto-disables a source with health score below 50%', async () => {
+    const { service, prisma } = createService();
+    (prisma as any).sourceRun = { findMany: jest.fn().mockResolvedValue([
+      { status: 'FAIL' },
+      { status: 'FAIL' },
+      { status: 'FAIL' },
+      { status: 'FAIL' },
+      { status: 'OK' },
+    ]) };
+
+    const score = await service.computeHealthScore('ethiojobs');
+    expect(score).toBe(20); // 1 OK out of 5 = 20%
+
+    // Should auto-disable
+    const disableCall = prisma.jobSource.update.mock.calls.find(
+      (c: any[]) => c[0]?.data?.status === 'DISABLED',
+    );
+    expect(disableCall).toBeDefined();
+    expect(disableCall[0].data.lastError).toContain('Auto-disabled');
+  });
+
+  it('does NOT auto-disable Telegram channel adapters', async () => {
+    const { service, prisma } = createService();
+    (prisma as any).sourceRun = { findMany: jest.fn().mockResolvedValue([
+      { status: 'FAIL' },
+      { status: 'FAIL' },
+      { status: 'FAIL' },
+    ]) };
+
+    const score = await service.computeHealthScore('telegram:somechannel');
+    expect(score).toBe(0); // 0 OK out of 3 = 0%
+
+    // Should NOT auto-disable Telegram adapters
+    const disableCall = prisma.jobSource.update.mock.calls.find(
+      (c: any[]) => c[0]?.data?.status === 'DISABLED',
+    );
+    expect(disableCall).toBeUndefined();
+  });
+});
+
+describe('SourcesService.collectWithFallback', () => {
+  it('returns primary result when primary source succeeds', async () => {
+    const { service, prisma, reliefweb } = createService();
+    prisma.jobSource.findUnique.mockResolvedValue({ id: 'reliefweb', name: 'ReliefWeb', status: 'ACTIVE' });
+    reliefweb.fetchJobs.mockResolvedValue([rawJob()]);
+    prisma.job.findUnique.mockResolvedValue(null);
+    prisma.job.create.mockResolvedValue({ id: 'j-new' });
+    prisma.job.findMany.mockResolvedValue([]);
+    (prisma as any).sourceRun = { create: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([{ status: 'OK' }]) };
+
+    const result = await service.collectWithFallback('reliefweb');
+
+    expect(result.status).toBe('OK');
+    expect((result as any).fallbackUsed).toBeUndefined();
+  });
+
+  it('tries fallback when primary source fails', async () => {
+    const { service, prisma, reliefweb } = createService();
+    // findUnique is called: (1) collect('ethiojobs'), (2) fallback check ethiongojobs, (3) collect('ethiongojobs')
+    prisma.jobSource.findUnique
+      .mockResolvedValueOnce({ id: 'ethiojobs', name: 'Ethiojobs', status: 'ACTIVE' })
+      .mockResolvedValueOnce({ id: 'ethiongojobs', name: 'EthioNGOJobs', status: 'ACTIVE' })
+      .mockResolvedValueOnce({ id: 'ethiongojobs', name: 'EthioNGOJobs', status: 'ACTIVE' });
+    // ethiojobs adapter fails
+    (service as any).adapters['ethiojobs'].fetchJobs.mockRejectedValue(new Error('Connection refused'));
+    // ethiongojobs adapter succeeds
+    (service as any).adapters['ethiongojobs'].fetchJobs.mockResolvedValue([rawJob({ sourceJobId: 'ngo-1' })]);
+    prisma.job.findUnique.mockResolvedValue(null);
+    prisma.job.create.mockResolvedValue({ id: 'j-new' });
+    prisma.job.findMany.mockResolvedValue([]);
+    (prisma as any).sourceRun = { create: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([{ status: 'FAIL' }]) };
+
+    const result = await service.collectWithFallback('ethiojobs');
+
+    // ethiojobs failed, ethiongojobs was tried as fallback and succeeded
+    expect((result as any).fallbackUsed).toBe('ethiongojobs');
+    expect((service as any).adapters['ethiongojobs'].fetchJobs).toHaveBeenCalled();
+  });
+
+  it('returns fallbacksExhausted when all alternatives also fail', async () => {
+    const { service, prisma } = createService();
+    prisma.jobSource.findUnique
+      .mockResolvedValueOnce({ id: 'ethiojobs', name: 'Ethiojobs', status: 'ACTIVE' })
+      // Fallback 1: ethiongojobs is DISABLED — skipped
+      .mockResolvedValueOnce({ id: 'ethiongojobs', name: 'EthioNGOJobs', status: 'DISABLED' });
+    // ethiojobs adapter must throw (not return undefined) so collect enters the catch block
+    (service as any).adapters['ethiojobs'].fetchJobs.mockRejectedValue(new Error('ENOTFOUND'));
+    (prisma as any).sourceRun = { create: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([{ status: 'FAIL' }]) };
+
+    const result = await service.collectWithFallback('ethiojobs');
+
+    // Primary failed and fallbacks exhausted
+    expect(result.status).toBe('FAIL');
   });
 });

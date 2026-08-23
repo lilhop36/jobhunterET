@@ -155,15 +155,13 @@ export function decodeHtmlEntities(html: string): string {
   return html.replace(
     /&(?:#(\d{2,6})|#x([0-9a-f]{2,6})|([a-z]{2,8}));/gi,
     (match: string, dec?: string, hex?: string, name?: string) => {
-      if (dec) {
-        const cp = Number(dec);
-        return cp >= 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : match;
-      }
-      if (hex) {
-        const cp = Number.parseInt(hex, 16);
-        return cp >= 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : match;
-      }
-      const named = NAMED_ENTITIES[(name || '').toLowerCase()];
+      const cp = dec
+        ? Number(dec)
+        : hex
+          ? Number.parseInt(hex, 16)
+          : null;
+      if (cp !== null && cp >= 0 && cp <= 0x10ffff) return String.fromCodePoint(cp);
+      const named = NAMED_ENTITIES[(name ?? '').toLowerCase()];
       return named ?? match;
     },
   );
@@ -207,8 +205,8 @@ const BOILERPLATE_PATTERNS = [
 const STRIP_TAGS = ['script', 'style', 'nav', 'aside', 'footer', 'header', 'form', 'noscript'];
 
 /**
- * FR-012d: Clean a raw HTML or plain-text description.
- * Returns cleaned plain text.
+ * FR-012d: Clean a raw description — preserves inline HTML structure for the
+ * frontend (entities are decoded earlier by decodeHtmlEntities).
  */
 export function cleanDescription(raw: string): string {
   if (!raw) return '';
@@ -221,11 +219,6 @@ export function cleanDescription(raw: string): string {
     text = text.replace(regex, '');
   }
 
-  // We intentionally PRESERVE <p>, <br>, <li>, <table> etc. for the frontend.
-  // We no longer collapse everything to plain text.
-  
-  // We don't decode HTML entities because the frontend renders HTML directly
-  
   // Fix common mojibake patterns (Latin-1/Windows-1252)
   text = text
     .replace(/â€™/g, "'")
@@ -418,9 +411,10 @@ const MONTH_INDEX: Record<string, number> = {
 /**
  * FR-012h: Best-effort deadline extraction from description text. Some sources
  * (ReliefWeb, ETCareers, geezjobs) put the deadline in prose/HTML rather than
- * a structured field. Patterns are anchored to a real month name, next to an
- * explicit "deadline"/"closing date" keyword — free-text mentions of
- * "deadline" without an adjacent date never match.
+ * a structured field. Dates are anchored to a deadline keyword and a real
+ * month name — free-text mentions of "deadline" without an adjacent date never
+ * match. Both month-first ("September 6, 2026") and day-first
+ * ("6 September 2026") shapes are accepted after any keyword.
  */
 export function extractDeadlineFromDescription(text: string): Date | null {
   if (!text) return null;
@@ -432,26 +426,25 @@ export function extractDeadlineFromDescription(text: string): Date | null {
 
   const monthFirst = /\b([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})\b/;
   const dayFirst = /\b(\d{1,2})\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})\b/;
-  const rules = [
-    { kw: /application\s+deadline/i, shape: monthFirst, reorder: (m: RegExpExecArray) => ({ month: m[1], day: m[2], year: m[3] }) },
-    { kw: /closing\s+date/i, shape: dayFirst, reorder: (m: RegExpExecArray) => ({ month: m[2], day: m[1], year: m[3] }) },
-    { kw: /\bdeadline\b/i, shape: monthFirst, reorder: (m: RegExpExecArray) => ({ month: m[1], day: m[2], year: m[3] }) },
+  // Shape knows which group holds the month; group 3 is always the year.
+  const shapes = [
+    { re: monthFirst, month: 1, day: 2 },
+    { re: dayFirst, month: 2, day: 1 },
   ];
+  const keyword = /\b(?:application\s+deadline|closing\s+date|deadline)\b/gi;
 
-  for (const { kw, shape, reorder } of rules) {
-    const scan = new RegExp(kw.source, `${kw.flags}g`);
-    let kwMatch: RegExpExecArray | null;
-    while ((kwMatch = scan.exec(stripped))) {
-      const tail = stripped
-        .slice(kwMatch.index + kwMatch[0].length)
-        .replace(/^[^a-z0-9]{0,10}/, '')
-        .slice(0, 80);
-      const dateMatch = shape.exec(tail);
+  let kwMatch: RegExpExecArray | null;
+  while ((kwMatch = keyword.exec(stripped))) {
+    const tail = stripped
+      .slice(kwMatch.index + kwMatch[0].length)
+      .replace(/^[^a-zA-Z0-9]{0,10}/, '')
+      .slice(0, 80);
+    for (const { re, month, day } of shapes) {
+      const dateMatch = re.exec(tail);
       if (!dateMatch) continue;
-      const { month, day, year } = reorder(dateMatch);
-      const mi = MONTH_INDEX[month.slice(0, 3).toLowerCase()];
-      const dayNum = Number(day);
-      const yearNum = Number(year);
+      const mi = MONTH_INDEX[dateMatch[month].slice(0, 3).toLowerCase()];
+      const dayNum = Number(dateMatch[day]);
+      const yearNum = Number(dateMatch[3]);
       if (mi === undefined || dayNum < 1 || dayNum > 31 || yearNum < 2000 || yearNum > 2100) continue;
       return new Date(yearNum, mi, dayNum);
     }

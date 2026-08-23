@@ -30,9 +30,9 @@ export default function LoginPage() {
       <form className="card auth-box" onSubmit={submit}>
         {err && <div className="error-box">{err}</div>}
         <label htmlFor="email">Email</label>
-        <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <input id="email" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <label htmlFor="password">Password</label>
-        <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         <div style={{ marginTop: 16 }}>
           <button className="btn" disabled={busy} style={{ width: '100%' }}>
             {busy ? 'Signing in…' : 'Sign in'}

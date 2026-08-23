@@ -22,6 +22,7 @@ const FEED = 'https://reliefweb.int/jobs/rss.xml?advanced-search=%28C87%29';
 @Injectable()
 export class ReliefWebAdapter implements JobSourceAdapter {
   readonly sourceId = 'reliefweb';
+  readonly selectorVersion = 'rss:v1.0';
 
   async fetchJobs(options?: { since?: Date }): Promise<RawJob[]> {
     // Note: ReliefWeb's bot protection TLS-fingerprints undici (global fetch)

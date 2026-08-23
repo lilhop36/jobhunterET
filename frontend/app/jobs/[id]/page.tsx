@@ -26,6 +26,7 @@ import {
 } from '../../../lib/ui';
 import { buttonVariants } from '../../../components/ui/button';
 import { JobActions } from '../../../components/job-actions';
+import { SalaryBenchmarkCard } from '../../../components/salary-benchmark';
 
 interface JobDetail {
   id: string;
@@ -71,6 +72,21 @@ interface JobDetail {
       freshness: number;
       salary: number;
     };
+  } | null;
+  salaryBenchmark: {
+    hasSalary: boolean;
+    salary?: number;
+    currency?: string;
+    benchmark?: {
+      role: string;
+      level: string;
+      etb: { min: number; median: number; max: number; currency: string };
+      usd: { min: number; median: number; max: number; currency: string };
+      notes?: string;
+    } | null;
+    percentile?: number | null;
+    comparison?: string | null;
+    percentAboveMedian?: number;
   } | null;
 }
 
@@ -295,7 +311,7 @@ export default function JobDetailPage() {
       {loading && <Loading />}
       {data && (() => {
         const dl = fmtDeadline(data.deadline);
-        const salaryStr = fmtSalary(data.salary, (data as any).salaryMax ?? null, data.currency);
+        const salaryStr = fmtSalary(data.salary, data.salaryMax ?? null, data.currency);
 
         return (
           <>
@@ -524,6 +540,13 @@ export default function JobDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* ── Salary benchmark (out-of-SRS: Ethiopian market data) ── */}
+            <SalaryBenchmarkCard
+              benchmark={data.salaryBenchmark ?? null}
+              jobSalary={data.salary}
+              jobCurrency={data.currency}
+            />
 
             {/* ── Job description ───────────────────────────────────── */}
             <div className="card">

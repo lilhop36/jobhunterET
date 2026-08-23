@@ -1,0 +1,24 @@
+{
+  "name": "jobhunter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "JobHunter — Intelligent Job Search & Notification System",
+  "scripts": {
+    "dev": "concurrently -n FE,BE -c blue,green \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run start:dev --prefix backend",
+    "build": "npm run build --prefix frontend && npm run build --prefix backend",
+    "lint": "npm run lint --prefix frontend && npm run lint --prefix backend",
+    "test": "npm run test --prefix backend",
+    "test:e2e": "npm run test:e2e --prefix frontend",
+    "prisma:generate": "npm run prisma:generate --prefix backend",
+    "prisma:migrate": "npm run prisma:migrate --prefix backend",
+    "prisma:studio": "npm run prisma:studio --prefix backend",
+    "db:sqlite": "npm run db:sqlite --prefix backend",
+    "db:pg": "npm run db:pg --prefix backend",
+    "db:switch": "npm run db:switch --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

@@ -5,7 +5,7 @@
  * Relevant for the REMOTE and INTERNATIONAL tiers. */
 
 import { Injectable } from '@nestjs/common';
-import { JobSourceAdapter, RawJob, deriveExperience, mapEmployment, FETCH_TIMEOUT_MS } from './job-source.adapter';
+import { JobSourceAdapter, RawJob, deriveExperience, mapEmployment, parseNumericSalary, FETCH_TIMEOUT_MS } from './job-source.adapter';
 
 interface JobicyJob {
   id: number;
@@ -28,6 +28,7 @@ const API = 'https://jobicy.com/api/v2/remote-jobs';
 @Injectable()
 export class JobicyAdapter implements JobSourceAdapter {
   readonly sourceId = 'jobicy';
+  readonly selectorVersion = 'api:jobicy:v1.0';
 
   async fetchJobs(options?: { since?: Date }): Promise<RawJob[]> {
     const since = options?.since ?? new Date(Date.now() - 14 * 86_400_000);
@@ -50,7 +51,7 @@ export class JobicyAdapter implements JobSourceAdapter {
   private toRaw(j: JobicyJob): RawJob | null {
     if (!j.jobTitle || !j.url) return null;
 
-    const salary = this.parseSalary(j.annualSalaryMin, j.annualSalaryMax);
+    const salary = parseNumericSalary(j.annualSalaryMin, j.annualSalaryMax);
     const tags = (j.jobIndustry ?? []).map(t => t.replace(/&amp;/g, '&').trim());
 
     return {
@@ -74,10 +75,5 @@ export class JobicyAdapter implements JobSourceAdapter {
     };
   }
 
-  private parseSalary(min: number | null, max: number | null): number | undefined {
-    if (min && max) return Math.round((min + max) / 2);
-    if (min) return min;
-    if (max) return max;
-    return undefined;
-  }
+
 }

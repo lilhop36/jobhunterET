@@ -21,6 +21,7 @@ const API = 'https://remotive.com/api/remote-jobs';
 @Injectable()
 export class RemotiveAdapter implements JobSourceAdapter {
   readonly sourceId = 'remotive';
+  readonly selectorVersion = 'api:remotive:v1.0';
 
   async fetchJobs(options?: { since?: Date }): Promise<RawJob[]> {
     const since = options?.since ?? new Date(Date.now() - 7 * 86_400_000);

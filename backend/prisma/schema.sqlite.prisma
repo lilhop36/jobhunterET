@@ -1,0 +1,361 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ══════════════════════════════════════════════════════════════
+// SQLite-compatible schema — same models as schema.prisma but
+// with PostgreSQL-specific types replaced:
+//   - String[]  →  String (JSON-encoded array)
+//   - Json      →  String (raw JSON string)
+// Use `scripts/switch-db.sh` to copy the right schema.
+// ══════════════════════════════════════════════════════════════
+
+model User {
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  passwordHash        String
+  role                String               @default("USER")
+  locale              String               @default("en")
+  notificationsPaused Int                  @default(0)
+  matchThreshold      Int                  @default(75)
+  pausedUntil         DateTime?
+  createdAt           DateTime             @default(now())
+  digestEnabled       Int                  @default(1)
+  emailVerifiedAt     DateTime?
+  lastActiveAt        DateTime?
+  status              String               @default("ACTIVE")
+  tokenInvalidatedAt  DateTime?
+  applications        Application[]
+  profile             CandidateProfile?
+  skills              CandidateSkill[]
+  cvFiles             CvFile[]
+  digests             Digest[]
+  matches             JobMatch[]
+  locations           LocationPreference[]
+  notifications       Notification[]
+  searches            SearchProfile[]
+  targetRoles         TargetRole[]
+  telegramLink        TelegramLink?
+
+  @@index([status, lastActiveAt])
+}
+
+model CandidateProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  title           String?
+  summary         String?
+  years           Int      @default(0)
+  remote          Int      @default(0)
+  minSalary       Int      @default(0)
+  excludeOnsite   Int      @default(0)
+  // SQLite: employmentTypes stored as JSON array string
+  employmentTypes String   @default("[]")
+  onboardDone     Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CvFile {
+  id           String   @id @default(cuid())
+  userId       String
+  filePath     String
+  originalName String
+  sizeBytes    Int
+  uploadedAt   DateTime @default(now())
+  active       Int      @default(1)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model TelegramLink {
+  id       String   @id @default(cuid())
+  userId   String   @unique
+  chatId   String   @unique
+  linkedAt DateTime @default(now())
+  status   String   @default("ACTIVE")
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Skill {
+  id    String           @id @default(cuid())
+  name  String           @unique
+  users CandidateSkill[]
+  jobs  JobSkill[]
+}
+
+model CandidateSkill {
+  id      String @id @default(cuid())
+  userId  String
+  skillId String
+  skill   Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillId])
+}
+
+model TargetRole {
+  id       String   @id @default(cuid())
+  userId   String
+  role     String
+  priority String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model LocationPreference {
+  id     String @id @default(cuid())
+  userId String
+  region String
+  tier   String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, region])
+}
+
+model JobSource {
+  id                  String       @id @default(cuid())
+  name                String
+  type                String
+  baseUrl             String
+  status              String       @default("ACTIVE")
+  priorityTier        String
+  collectionFrequency String       @default("30 min")
+  lastSuccessfulRun   DateTime?
+  lastFailedRun       DateTime?
+  lastError           String?
+  createdAt           DateTime     @default(now())
+  consecutiveFailures Int          @default(0)
+  healthScore         Float?       @map("health_score")
+  lastHealthCheckAt   DateTime?    @map("last_health_check_at")
+  jobs                Job[]
+  runs                SourceRun[]
+
+  @@map("JobSource")
+}
+
+model SourceRun {
+  id                    String    @id @default(cuid())
+  sourceId              String
+  startedAt             DateTime  @default(now())
+  finishedAt            DateTime?
+  status                String
+  jobsFetched           Int       @default(0)
+  jobsCreated           Int       @default(0)
+  duplicates            Int       @default(0)
+  errors                Int       @default(0)
+  errorMessage          String?
+  avgDescriptionQuality Float?
+  descriptionFailures   Int       @default(0)
+  linkChecks            Int       @default(0)
+  linkFailures          Int       @default(0)
+  source                JobSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+}
+
+model Job {
+  id                   String             @id @default(cuid())
+  title                String
+  description          String?
+  company              String
+  location             String
+  workPlace            String             @default("ONSITE")
+  locationClass        String
+  employmentType       String
+  experienceLevel      String
+  salary               Int?
+  currency             String             @default("USD")
+  url                  String
+  sourceId             String
+  sourceJobId          String?
+  postedDate           DateTime
+  deadline             DateTime?
+  firstSeenAt          DateTime           @default(now())
+  lastSeenAt           DateTime           @default(now())
+  missedCycles         Int                @default(0)
+  status               String             @default("ACTIVE")
+  statusChangedAt      DateTime?
+  parseConfidence      Int                @default(85)
+  archivedAt           DateTime?
+  fingerprint          String?
+  // SQLite: rawData stored as JSON string
+  rawData              String?
+  country              String?
+  createdAt            DateTime           @default(now())
+  matchedAt            DateTime?
+  urlCheckedAt         DateTime?
+  urlStatus            String?
+  applyEmail           String?
+  applyMethod          String             @default("ONLINE_URL")
+  applyUrl             String?
+  applyUrlRaw          String?
+  descriptionFetchedAt DateTime?
+  descriptionQuality   Int?
+  descriptionSource    String?
+  finalUrl             String?
+  apps                 Application[]
+  source               JobSource          @relation(fields: [sourceId], references: [id])
+  matches              JobMatch[]
+  skills               JobSkill[]
+  notifications        Notification[]
+
+  @@unique([sourceId, sourceJobId])
+  @@index([status])
+  @@index([firstSeenAt])
+  @@index([status, matchedAt])
+  @@index([status, deadline])
+  @@index([status, urlStatus])
+}
+
+model JobSkill {
+  id      String @id @default(cuid())
+  jobId   String
+  skillId String
+  job     Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  skill   Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, skillId])
+}
+
+model JobMatch {
+  id              String   @id @default(cuid())
+  userId          String
+  jobId           String
+  score           Int
+  roleScore       Float
+  skillScore      Float
+  experienceScore Float
+  locationScore   Float
+  employmentScore Float
+  freshnessScore  Float
+  salaryScore     Float
+  // SQLite: arrays stored as JSON strings
+  matchedSkills   String   @default("[]")
+  relatedSkills   String   @default("[]")
+  missingSkills   String   @default("[]")
+  reasons         String   @default("[]")
+  summary         String?
+  matcherVersion  String   @default("v2.2-rules")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  job             Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@index([userId])
+  @@index([userId, score])
+}
+
+model Application {
+  id          String   @id @default(cuid())
+  userId      String
+  jobId       String
+  stage       String   @default("APPLIED")
+  stageSince  DateTime @default(now())
+  followUp    DateTime?
+  version     Int      @default(1)
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transitions ApplicationTransition[]
+
+  @@unique([userId, jobId])
+  @@index([userId])
+  @@index([userId, stage])
+}
+
+model ApplicationTransition {
+  id             String    @id @default(cuid())
+  applicationId  String
+  fromStage      String?
+  toStage        String
+  transitionedAt DateTime  @default(now())
+  application    Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, transitionedAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  jobId     String
+  channel   String
+  status    String   @default("UNREAD_WEB")
+  score     Int
+  summary   String?
+  createdAt DateTime @default(now())
+  sentAt    DateTime?
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@index([userId, channel, status])
+}
+
+model SearchProfile {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  q         String?
+  tier      String   @default("ALL")
+  remote    Int      @default(0)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Digest {
+  id            String   @id @default(cuid())
+  userId        String
+  createdAt     DateTime @default(now())
+  jobsCollected Int
+  newJobs       Int
+  strongMatches Int
+  // SQLite: JSON stored as string
+  topMatches    String
+  searches      String
+  deliveredTo   String   @default("WEB")
+  status        String   @default("SENT")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model MatchCycle {
+  id                  String    @id @default(cuid())
+  startedAt           DateTime  @default(now())
+  finishedAt          DateTime?
+  jobsEvaluated       Int
+  usersProcessed      Int
+  matchesCreated      Int
+  aboveThreshold      Int
+  notificationsSent   Int       @default(0)
+  notificationsFailed Int       @default(0)
+  toInbox             Int       @default(0)
+  errors              Int       @default(0)
+  actionsTaken        Int       @default(0)
+}
+
+model SystemLog {
+  id  String   @id @default(cuid())
+  tag String
+  msg String
+  at  DateTime @default(now())
+
+  @@index([at])
+}
+
+model BotState {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

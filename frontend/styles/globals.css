@@ -8,7 +8,7 @@
     --foreground: 220 15% 10%;
     --card: 0 0% 100%;
     --card-foreground: 220 15% 10%;
-    --primary: 175 80% 27%;
+    --primary: 156 72% 30%;
     --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
@@ -23,7 +23,7 @@
     --info: 213 75% 45%;
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 175 80% 27%;
+    --ring: 156 72% 30%;
     --radius: 0.625rem;
   }
 
@@ -32,7 +32,7 @@
     --foreground: 210 40% 98%;
     --card: 222 47% 8%;
     --card-foreground: 210 40% 98%;
-    --primary: 173 70% 55%;
+    --primary: 160 84% 39%;
     --primary-foreground: 222 47% 8%;
     --secondary: 217 33% 16%;
     --secondary-foreground: 210 40% 98%;
@@ -47,7 +47,7 @@
     --info: 213 75% 62%;
     --border: 217 33% 19%;
     --input: 217 33% 21%;
-    --ring: 173 70% 55%;
+    --ring: 160 84% 39%;
   }
 
   * {
@@ -466,7 +466,25 @@ code {
 /* Theme transition */
 html.theme-transition,
 html.theme-transition * {
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease !important;
+  transition-property: background-color, border-color, color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
+  transition-behavior: allow-discrete;
+}
+
+/* Score ring animation — respects prefers-reduced-motion */
+.score-ring-animate {
+  transition: stroke-dashoffset 0.6s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .score-ring-animate {
+    transition: none;
+  }
+}
+
+/* Touch target helper */
+button, a, input[type=checkbox], input[type=radio], label {
+  touch-action: manipulation;
 }
 
 /* ------------------------------------------------------------------ */
@@ -686,5 +704,11 @@ html.theme-transition * {
     align-items: center;
     margin-top: 4px;
   }
+}
+
+/* ── SSE live-notification pulse ─────────────────────────────── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 

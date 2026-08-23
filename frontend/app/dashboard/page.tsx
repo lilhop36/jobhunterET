@@ -1,10 +1,12 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../lib/auth';
 import { RequireAuth, useApi, ErrorBox, ScoreBadge, StatusPill, ListSkeleton, StatSkeleton } from '../../lib/ui';
 import { MatchCarousel, CarouselSkeleton, type CarouselMatch } from '../../components/match-carousel';
 import { Progress } from '../../components/ui/progress';
+import { useMatchStream } from '../../lib/use-match-stream';
 
 interface DashboardData {
   greeting: string;
@@ -31,9 +33,20 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const { data, err, loading, reload } = useApi<DashboardData>('/api/dashboard');
   // PERF-002: /api/matches returns { items, nextCursor, total } — take the first page.
-  const { data: matchesPage, loading: matchesLoading } = useApi<{ items: CarouselMatch[] }>(
+  const { data: matchesPage, loading: matchesLoading, reload: reloadMatches } = useApi<{ items: CarouselMatch[] }>(
     data ? '/api/matches' : null,
   );
+
+  // ── SSE: live match notifications ───────────────────────────
+  const sse = useMatchStream();
+  // When a new match arrives via SSE, refresh both the dashboard stats and the match carousel.
+  useEffect(() => {
+    if (sse.event) {
+      reload();
+      reloadMatches();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sse.matchCount]);
 
   return (
     <RequireAuth>
@@ -43,6 +56,13 @@ export default function DashboardPage() {
       <p className="subtitle">Here&apos;s what your job search looks like today.</p>
 
       {err && <ErrorBox msg={err} onRetry={reload} />}
+      {sse.event && sse.matchCount > 0 && (
+        <div className="notice" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ animation: 'pulse 1s ease-in-out infinite' }}>🔔</span>
+          New match: <strong>{sse.event.title}</strong> at {sse.event.company} ({sse.event.score}%)
+          {!sse.connected && <span className="muted" style={{ marginLeft: 'auto', fontSize: 12 }}>Reconnecting…</span>}
+        </div>
+      )}
       {data && !data.onboardDone && (
         <div className="notice">
           🎓 Your profile is {data.completion}% complete — finish the{' '}
