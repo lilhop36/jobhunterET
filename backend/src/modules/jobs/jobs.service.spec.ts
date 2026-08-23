@@ -23,7 +23,8 @@ function createService() {
     count: jest.fn().mockResolvedValue(0),
     findMany: jest.fn().mockResolvedValue([]),
   };
-  return { service: new JobsService({ job } as any), job };
+  const salary: any = { compareJobSalary: jest.fn().mockReturnValue(null) };
+  return { service: new JobsService({ job } as any, salary), job, salary };
 }
 
 describe('JobsService.list — PERF-002 keyset pagination', () => {

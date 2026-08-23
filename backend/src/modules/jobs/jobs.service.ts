@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SalaryService } from '../salary/salary.service';
 import {
   Page,
   decodeCursor,
@@ -27,7 +28,10 @@ const MAX_PAGE_SIZE = 100;
 
 @Injectable()
 export class JobsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly salary: SalaryService,
+  ) {}
 
   /** PERF-002: keyset-paginated job list — stable (sortKey, id) ordering, total count. */
   async list(f: JobFilter): Promise<Page<any>> {
@@ -154,6 +158,13 @@ export class JobsService {
             },
           }
         : null,
+      // §32.5: Salary benchmark for the Ethiopian market
+      salaryBenchmark: this.salary.compareJobSalary(
+        j.salary,
+        j.currency,
+        j.title,
+        j.experienceLevel,
+      ),
     };
   }
 }

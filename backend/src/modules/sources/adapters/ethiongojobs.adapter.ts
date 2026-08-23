@@ -18,6 +18,7 @@ const API = 'https://ethiongojobs.com/wp-json/wp/v2/posts';
 @Injectable()
 export class EthioNgoJobsAdapter implements JobSourceAdapter {
   readonly sourceId = 'ethiongojobs';
+  readonly selectorVersion = 'api:wp-json:v1.0';
 
   async fetchJobs(options?: { since?: Date }): Promise<RawJob[]> {
     const since = options?.since ?? new Date(Date.now() - 30 * 86_400_000);

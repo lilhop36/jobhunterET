@@ -19,6 +19,11 @@ import { Roles } from '../../common/decorators/roles.decorator';
 export class AdminController {
   constructor(private readonly admin: AdminService) {}
 
+  @Get('stats')
+  getStats() {
+    return this.admin.getStats();
+  }
+
   @Get('users')
   listUsers() {
     return this.admin.listUsers();

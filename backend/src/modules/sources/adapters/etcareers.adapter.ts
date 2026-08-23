@@ -22,6 +22,7 @@ const FEED = 'https://etcareers.com/jobs.rss';
 @Injectable()
 export class EtcareersAdapter implements JobSourceAdapter {
   readonly sourceId = 'etcareers';
+  readonly selectorVersion = 'rss:etcareers:v1.0';
 
   async fetchJobs(options?: { since?: Date }): Promise<RawJob[]> {
     const xml = await this.getFeed();

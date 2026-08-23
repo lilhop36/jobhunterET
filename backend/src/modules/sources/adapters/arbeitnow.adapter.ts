@@ -21,6 +21,7 @@ const API = 'https://www.arbeitnow.com/api/job-board-api';
 @Injectable()
 export class ArbeitnowAdapter implements JobSourceAdapter {
   readonly sourceId = 'arbeitnow';
+  readonly selectorVersion = 'api:arbeitnow:v1.0';
 
   async fetchJobs(options?: { since?: Date }): Promise<RawJob[]> {
     const since = options?.since ?? new Date(Date.now() - 7 * 86_400_000);

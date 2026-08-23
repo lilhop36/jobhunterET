@@ -1,5 +1,11 @@
 import { TelegramService } from './telegram.service';
 
+const applicationsMock = {
+  save: jest.fn(),
+  setStage: jest.fn(),
+  apply: jest.fn(),
+} as any;
+
 describe('TelegramService — link codes (FR-003b)', () => {
   const prismaMock = {
     telegramLink: {
@@ -14,7 +20,7 @@ describe('TelegramService — link codes (FR-003b)', () => {
     matchCycle: { findFirst: jest.fn().mockResolvedValue(null) },
   } as any;
 
-  const svc = new TelegramService(prismaMock);
+  const svc = new TelegramService(prismaMock, applicationsMock);
 
   it('createCode returns { code, expiresAt, deepLink } with the bot username', () => {
     process.env.TELEGRAM_BOT_USERNAME = 'JobHunterBot';
@@ -52,22 +58,16 @@ describe('TelegramService — link codes (FR-003b)', () => {
       application: { upsert: jest.fn() },
       matchCycle: { findFirst: jest.fn().mockResolvedValue(null) },
     } as any;
-    const applications = {
-      save: jest.fn(async (userId: string, jobId: string) =>
-        prisma2.savedJob.upsert({ where: { userId_jobId: { userId, jobId } }, create: { userId, jobId }, update: {} }),
-      ),
+    const apps2 = {
+      save: jest.fn(),
       setStage: jest.fn(),
       apply: jest.fn(),
     };
-    const s2 = new TelegramService(prisma2, applications as any);
+    const s2 = new TelegramService(prisma2, apps2 as any);
 
     await (s2 as any).handleCallback(555, 'save:job-xyz', 'cb1');
 
-    expect(upsert).toHaveBeenCalledWith({
-      where: { userId_jobId: { userId: 'u-owned', jobId: 'job-xyz' } },
-      create: { userId: 'u-owned', jobId: 'job-xyz' },
-      update: {},
-    });
+    expect(apps2.save).toHaveBeenCalledWith('u-owned', 'job-xyz');
   });
 
   it('FR-025b/§33: an unknown chatId receives no user data (linking prompt only)', async () => {
@@ -78,7 +78,7 @@ describe('TelegramService — link codes (FR-003b)', () => {
       application: { upsert: jest.fn() },
       matchCycle: { findFirst: jest.fn().mockResolvedValue(null) },
     } as any;
-    const s2 = new TelegramService(prisma2);
+    const s2 = new TelegramService(prisma2, applicationsMock);
     const answer = jest.spyOn(s2 as any, 'answerCallback').mockResolvedValue(undefined);
 
     await (s2 as any).handleCallback(999, 'save:job-xyz', 'cb2');
@@ -95,7 +95,7 @@ describe('TelegramService.throttle — SEC-005 atomic slot reservation', () => {
 
   it('serializes concurrent sends so they respect the global rate cap (no burst)', async () => {
     const prismaMock = { telegramLink: { updateMany: jest.fn().mockResolvedValue({}) } } as any;
-    const svc = new TelegramService(prismaMock);
+    const svc = new TelegramService(prismaMock, applicationsMock);
     (svc as any).botToken = 'test-token';
     (svc as any).globalRate = 20; // 50 ms minimum gap
     (svc as any).perChatInterval = 0; // isolate the global cap
@@ -120,7 +120,7 @@ describe('TelegramService.throttle — SEC-005 atomic slot reservation', () => {
 });
 
 describe('TelegramService.buildMatchText — SEC-002 HTML escaping', () => {
-  const svc = new TelegramService({} as any); // buildMatchText touches no DB state
+  const svc = new TelegramService({} as any, applicationsMock); // buildMatchText touches no DB state
 
   it('escapes source-controlled fields for Telegram HTML parse mode', () => {
     const text = svc.buildMatchText({
@@ -154,7 +154,7 @@ describe('TelegramService.poll — BUG-002 offset persistence + reentrancy', () 
     const prisma = {
       botState: { findUnique: jest.fn().mockResolvedValue({ key: 'telegram:pollOffset', value: '42' }) },
     } as any;
-    const svc = new TelegramService(prisma);
+    const svc = new TelegramService(prisma, applicationsMock);
     await svc.onModuleInit();
     expect((svc as any).updateOffset).toBe(42);
     expect(prisma.botState.findUnique).toHaveBeenCalledWith({ where: { key: 'telegram:pollOffset' } });
@@ -164,7 +164,7 @@ describe('TelegramService.poll — BUG-002 offset persistence + reentrancy', () 
     const prisma = {
       botState: { findUnique: jest.fn().mockResolvedValue(null) },
     } as any;
-    const svc = new TelegramService(prisma);
+    const svc = new TelegramService(prisma, applicationsMock);
     await svc.onModuleInit();
     expect((svc as any).updateOffset).toBe(0);
   });
@@ -178,7 +178,7 @@ describe('TelegramService.poll — BUG-002 offset persistence + reentrancy', () 
       },
       telegramLink: { findUnique: jest.fn().mockResolvedValue(null) },
     } as any;
-    const svc = new TelegramService(prisma);
+    const svc = new TelegramService(prisma, applicationsMock);
     (svc as any).botToken = 'test-token';
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
@@ -204,7 +204,7 @@ describe('TelegramService.poll — BUG-002 offset persistence + reentrancy', () 
         upsert,
       },
     } as any;
-    const svc = new TelegramService(prisma);
+    const svc = new TelegramService(prisma, applicationsMock);
     (svc as any).botToken = 'test-token';
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,

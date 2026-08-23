@@ -16,6 +16,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 @Injectable()
 export class GeezJobsAdapter implements JobSourceAdapter {
   readonly sourceId = 'geez'; // matches the seeded JobSource.id
+  readonly selectorVersion = 'html:jsonld+dom:v1.0';
 
   async fetchJobs(): Promise<RawJob[]> {
     const res = await fetch(HOME, {
@@ -90,21 +91,56 @@ export class GeezJobsAdapter implements JobSourceAdapter {
     }
 
     // 4. Extract Sidebar Metadata (Salary, Experience)
+    // Strategy: JSON-LD first → text-based extraction → fragile <p> tag regex (last resort)
+    // The <p> tag pairing is brittle (breaks on any layout change) — text extraction
+    // is more robust per the universal-scraping-architect skill guidance.
     let salaryNum: number | undefined;
     let currency = 'ETB';
-    const salaryMatch = /<p[^>]*>Salary<\/p>\s*<p[^>]*>([^<]+)<\/p>/i.exec(html);
-    if (salaryMatch) {
-      const rawSalary = salaryMatch[1];
-      // e.g. "ETB 30,000-35,000"
-      const nums = [...rawSalary.matchAll(/[\d,]+/g)].map(m => parseInt(m[0].replace(/,/g, ''), 10));
-      if (nums.length > 0) {
-        salaryNum = Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
+    let sidebarConfidenceBonus = 0; // bonus when JSON-LD has structured data
+
+    if (ld?.baseSalary?.value) {
+      salaryNum = Number(ld.baseSalary.value);
+      currency = ld.baseSalary.currency || 'ETB';
+      sidebarConfidenceBonus = 5;
+    } else {
+      // Fallback 1: text-based extraction (robust against layout changes)
+      const sidebarText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      const salaryTextMatch = /Salary\s+([A-Z]{2,3}\s+[\d,\s.-]+)/i.exec(sidebarText);
+      if (salaryTextMatch) {
+        const rawSalary = salaryTextMatch[1];
+        const nums = [...rawSalary.matchAll(/[\d,]+/g)].map(m => parseInt(m[0].replace(/,/g, ''), 10)).filter(n => !Number.isNaN(n));
+        if (nums.length > 0) {
+          salaryNum = Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
+        }
+        if (/USD/i.test(rawSalary)) currency = 'USD';
+      } else {
+        // Fallback 2: fragile <p> tag pairing (last resort — breaks on layout change)
+        const salaryMatch = /<p[^>]*>Salary<\/p>\s*<p[^>]*>([^<]+)<\/p>/i.exec(html);
+        if (salaryMatch) {
+          const rawSalary = salaryMatch[1];
+          const nums = [...rawSalary.matchAll(/[\d,]+/g)].map(m => parseInt(m[0].replace(/,/g, ''), 10));
+          if (nums.length > 0) {
+            salaryNum = Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
+          }
+          if (/USD/i.test(rawSalary)) currency = 'USD';
+        }
       }
-      if (/USD/i.test(rawSalary)) currency = 'USD';
     }
 
-    const expMatch = /<p[^>]*>Experience<\/p>\s*<p[^>]*>([^<]+)<\/p>/i.exec(html);
-    const expText = expMatch ? expMatch[1] : title;
+    let expText: string;
+    if (ld?.experienceRequirements) {
+      expText = String(ld.experienceRequirements);
+    } else {
+      // Fallback 1: text-based extraction
+      const sidebarText2 = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      const expTextMatch = /Experience\s+(.+?)(?=\s+Deadline|\s+Salary|\s+How|$)/i.exec(sidebarText2);
+      expText = expTextMatch ? expTextMatch[1].trim() : title;
+      if (!expTextMatch) {
+        // Fallback 2: fragile <p> tag pairing
+        const expMatch = /<p[^>]*>Experience<\/p>\s*<p[^>]*>([^<]+)<\/p>/i.exec(html);
+        if (expMatch) expText = expMatch[1];
+      }
+    }
 
     // 5. Deadline from JSON-LD (structured) or the sidebar "Deadline Aug. 24, 2026"
     let deadlineDate: Date | undefined;
@@ -133,7 +169,7 @@ export class GeezJobsAdapter implements JobSourceAdapter {
       deadline: deadlineDate,
       description, // capped downstream by the fidelity pipeline (MAX_DESCRIPTION_CHARS)
       country: 'Ethiopia',
-      parseConfidence: 90, // Upgraded confidence now that we parse structured data
+      parseConfidence: 90 + sidebarConfidenceBonus, // 90 base (JSON-LD) + 5 if salary came from structured data
       rawData: { site: 'geezjobs', slug },
     };
   }

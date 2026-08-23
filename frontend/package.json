@@ -4,7 +4,7 @@
   "description": "JobHunter frontend — Next.js + React + TypeScript (SRS v2.2 §32)",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3211",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -15,19 +15,19 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.31.0",
-    "next": "^14.2.5",
+    "next": "^15.5.23",
     "next-themes": "^0.4.6",
     "postcss": "^8.5.26",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^3.4.19"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "@types/node": "^20.14.0",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
     "typescript": "^5.5.4"
   }
 }

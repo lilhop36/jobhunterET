@@ -25,6 +25,7 @@ interface RemoteOKJob {
 @Injectable()
 export class RemoteOKAdapter implements JobSourceAdapter {
   readonly sourceId = 'remoteok';
+  readonly selectorVersion = 'api:remoteok:v1.0';
 
   async fetchJobs(options?: { since?: Date }): Promise<RawJob[]> {
     const since = options?.since ?? new Date(Date.now() - 14 * 86_400_000);

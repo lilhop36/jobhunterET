@@ -47,6 +47,7 @@ const MAX_PAGES = 5; // polite bounded crawl — up to 60 jobs per run
 @Injectable()
 export class EthiojobsAdapter implements JobSourceAdapter {
   readonly sourceId = 'ethiojobs';
+  readonly selectorVersion = 'html:__NEXT_DATA__:v1.0';
 
   async fetchJobs(options?: { since?: Date }): Promise<RawJob[]> {
     const since = options?.since ?? new Date(Date.now() - 30 * 86_400_000);
@@ -80,13 +81,22 @@ export class EthiojobsAdapter implements JobSourceAdapter {
 
     const html = await res.text();
     const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-    if (!match) throw new Error('Ethiojobs: __NEXT_DATA__ not found in HTML');
+    if (!match) {
+      throw new Error(
+        'Ethiojobs: __NEXT_DATA__ not found in HTML — selectorVersion html:__NEXT_DATA__:v1.0 may be stale. '
+        + 'Check if ethiojobs.net migrated away from Next.js or changed their page structure. '
+        + 'Update selectorVersion and the extraction regex in EthiojobsAdapter.',
+      );
+    }
 
     let props: EjPageProps;
     try {
       props = JSON.parse(match[1]).props?.pageProps;
     } catch {
-      throw new Error('Ethiojobs: failed to parse __NEXT_DATA__ JSON');
+      throw new Error(
+        'Ethiojobs: failed to parse __NEXT_DATA__ JSON — the script tag exists but contains invalid JSON. '
+        + 'Possible injection or encoding change on the upstream page.',
+      );
     }
 
     const data = props?.jobs?.data;

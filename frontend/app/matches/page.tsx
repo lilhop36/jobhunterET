@@ -63,7 +63,7 @@ export default function MatchesPage() {
             key={f}
             className={`btn ghost small ${filter === f ? 'active-filter' : ''}`}
             onClick={() => setFilter(f)}
-            style={filter === f ? { background: '#eef2ff', borderColor: '#c7d2fe' } : {}}
+            style={filter === f ? { background: 'hsl(var(--primary) / 0.1)', borderColor: 'hsl(var(--primary) / 0.3)' } : {}}
           >
             {f}
           </button>
@@ -72,7 +72,7 @@ export default function MatchesPage() {
           Recalculate now
         </button>
       </div>
-      {recalcMsg && <div className={recalcMsg.startsWith('Recalculated') ? 'ok-box' : 'error-box'}>{recalcMsg}</div>}
+      {recalcMsg && <div className={recalcMsg.startsWith('Recalculated') ? 'ok-box' : 'error-box'} aria-live="polite">{recalcMsg}</div>}
       {err && <ErrorBox msg={err} onRetry={reload} />}
       {loading && <Loading />}
 

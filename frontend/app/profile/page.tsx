@@ -174,7 +174,7 @@ export default function ProfilePage() {
                   <strong style={{ wordBreak: 'break-all' }}>{cv.originalName}</strong>
                   <div className="muted" style={{ fontSize: 13 }}>
                     {(cv.sizeBytes / 1024).toFixed(0)} KB · uploaded{' '}
-                    {new Date(cv.uploadedAt).toLocaleDateString()}
+                    {new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(cv.uploadedAt))}
                   </div>
                 </div>
                 <a className="btn ghost small" href={cv.downloadUrl}>
@@ -220,22 +220,26 @@ export default function ProfilePage() {
           <div className="grid grid-2">
             <div className="card">
               <h2>Basics</h2>
-              <label>Professional title</label>
-              <input value={profile.title ?? ''} onChange={(e) => set('title', e.target.value)} />
-              <label>Summary</label>
-              <textarea rows={3} value={profile.summary ?? ''} onChange={(e) => set('summary', e.target.value)} />
+              <label htmlFor="profile-title">Professional title</label>
+              <input id="profile-title" name="title" value={profile.title ?? ''} onChange={(e) => set('title', e.target.value)} />
+              <label htmlFor="profile-summary">Summary</label>
+              <textarea id="profile-summary" name="summary" rows={3} value={profile.summary ?? ''} onChange={(e) => set('summary', e.target.value)} />
               <div className="grid grid-2">
                 <div>
-                  <label>Years of experience</label>
+                  <label htmlFor="profile-years">Years of experience</label>
                   <input
+                    id="profile-years"
+                    name="years"
                     type="number"
                     value={profile.years}
                     onChange={(e) => set('years', Number(e.target.value))}
                   />
                 </div>
                 <div>
-                  <label>Min salary (USD)</label>
+                  <label htmlFor="profile-salary">Min salary (USD)</label>
                   <input
+                    id="profile-salary"
+                    name="minSalary"
                     type="number"
                     value={profile.minSalary}
                     onChange={(e) => set('minSalary', Number(e.target.value))}
@@ -258,15 +262,19 @@ export default function ProfilePage() {
 
             <div className="card">
               <h2>Skills, roles & locations</h2>
-              <label>Skills (comma separated)</label>
+              <label htmlFor="profile-skills">Skills (comma separated)</label>
               <input
+                id="profile-skills"
+                name="skills"
                 value={profile.skills.join(', ')}
                 onChange={(e) =>
                   set('skills', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))
                 }
               />
-              <label>Target roles — one per line: Role, PRIORITY</label>
+              <label htmlFor="profile-roles">Target roles — one per line: Role, PRIORITY</label>
               <textarea
+                id="profile-roles"
+                name="targetRoles"
                 rows={3}
                 value={profile.targetRoles.map((t) => `${t.role}, ${t.priority}`).join('\n')}
                 onChange={(e) =>
@@ -283,8 +291,10 @@ export default function ProfilePage() {
                   )
                 }
               />
-              <label>Location tiers — one per line: Region, PRIORITY</label>
+              <label htmlFor="profile-locations">Location tiers — one per line: Region, PRIORITY</label>
               <textarea
+                id="profile-locations"
+                name="locationTiers"
                 rows={2}
                 value={profile.locationTiers.map((l) => `${l.region}, ${l.tier}`).join('\n')}
                 onChange={(e) =>
@@ -301,8 +311,10 @@ export default function ProfilePage() {
                   )
                 }
               />
-              <label>Employment types (comma separated)</label>
+              <label htmlFor="profile-employment">Employment types (comma separated)</label>
               <input
+                id="profile-employment"
+                name="employmentTypes"
                 value={profile.employmentTypes.join(', ')}
                 onChange={(e) =>
                   set('employmentTypes', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))

@@ -120,7 +120,7 @@ export class LifecycleTasks {
       try {
         const sources = await this.sources.listActive();
         for (const s of sources) {
-          await this.sources.collect(s.id);
+          await this.sources.collectWithFallback(s.id);
         }
       } catch (e) {
         this.logger.error('Scheduled collection failed', e);

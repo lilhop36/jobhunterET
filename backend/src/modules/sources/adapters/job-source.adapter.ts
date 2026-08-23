@@ -27,6 +27,12 @@ export interface RawJob {
 
 export interface JobSourceAdapter {
   readonly sourceId: string;
+  /**
+   * Selector/struct version — increment when the upstream page structure
+   * changes so tests can detect regressions (FR-008, selector drift).
+   * Adapters that use a stable JSON API may omit this.
+   */
+  readonly selectorVersion?: string;
   /** Fetch raw postings. `since` may be used to limit to recent postings. */
   fetchJobs(options?: { since?: Date }): Promise<RawJob[]>;
 }
@@ -53,8 +59,8 @@ export function mapEmployment(raw: string | null | undefined): EmploymentType {
   return 'FULL_TIME';
 }
 
-/** Clean HTML by removing scripts/styles but preserving structure. */
-export function stripHtml(html: string): string {
+/** Clean HTML by removing scripts/styles/nav/footer but preserving structural tags. */
+export function cleanHtml(html: string): string {
   return (html || '')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')

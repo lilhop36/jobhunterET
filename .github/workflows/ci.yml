@@ -1,0 +1,162 @@
+# ──────────────────────────────────────────────────────────────
+# JobHunter CI — runs on every PR and push to main
+#
+# Gate 1: Static analysis (lint + typecheck) — <2 min
+# Gate 2: Unit tests with coverage gates — <5 min
+# Gate 3: Frontend build verification — <3 min
+# ──────────────────────────────────────────────────────────────
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  # ═══════════════════════════════════════════════════════════
+  # Gate 1: Static Analysis — lint + typecheck
+  # ═══════════════════════════════════════════════════════════
+  lint-and-typecheck:
+    name: "Gate 1: Lint & Typecheck"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      # ── Backend ──
+      - name: Backend — install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Backend — TypeScript check
+        working-directory: backend
+        run: npx tsc --noEmit
+
+      - name: Backend — ESLint
+        working-directory: backend
+        run: npx eslint "src/**/*.ts" --max-warnings 0
+
+      # ── Frontend ──
+      - name: Frontend — install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend — TypeScript check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+  # ═══════════════════════════════════════════════════════════
+  # Gate 2: Unit Tests — backend + coverage gate
+  # ═══════════════════════════════════════════════════════════
+  test-backend:
+    name: "Gate 2: Backend Tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: lint-and-typecheck
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run tests with coverage
+        working-directory: backend
+        run: npx jest --coverage --forceExit --testTimeout=30000 --ci | tee test-output.txt
+
+      - name: Check coverage thresholds
+        working-directory: backend
+        run: |
+          COVERAGE=$(grep "All files" test-output.txt | awk -F'|' '{gsub(/ /,"",$5); print $5}')
+          echo "Backend line coverage: ${COVERAGE}%"
+          THRESHOLD=45
+          if [ "$(echo "$COVERAGE < $THRESHOLD" | bc -l 2>/dev/null || echo 0)" -eq 1 ]; then
+            echo "::error::Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
+            exit 1
+          fi
+          echo "✓ Coverage ${COVERAGE}% meets threshold ${THRESHOLD}%"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage/
+          retention-days: 7
+
+  # ═══════════════════════════════════════════════════════════
+  # Gate 3: Frontend build verification
+  # ═══════════════════════════════════════════════════════════
+  build-frontend:
+    name: "Gate 3: Frontend Build"
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    needs: lint-and-typecheck
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build (verifies TypeScript + all imports resolve)
+        working-directory: frontend
+        run: npm run build
+
+  # ═══════════════════════════════════════════════════════════
+  # Gate 4: Dependency audit
+  # ═══════════════════════════════════════════════════════════
+  security:
+    name: "Dependency Audit"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Backend — install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Audit backend dependencies (high+)
+        working-directory: backend
+        run: npm audit --audit-level=high
+
+      - name: Frontend — install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Audit frontend dependencies (high+)
+        working-directory: frontend
+        run: npm audit --audit-level=high

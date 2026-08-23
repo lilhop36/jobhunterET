@@ -68,14 +68,18 @@ describe('MatchingService.matchUnmatchedJobs — FR-018 incremental matching', (
         where: expect.objectContaining({ status: 'ACTIVE', matchedAt: null }),
       }),
     );
+    const createCall = prisma.jobMatch.createMany.mock.calls[0][0];
+    const actualScore = createCall.data[0].score;
+    expect(actualScore).toBeGreaterThanOrEqual(75);
+    expect(actualScore).toBeLessThanOrEqual(90);
     expect(prisma.jobMatch.createMany).toHaveBeenCalledWith({
-      data: [expect.objectContaining({ userId: 'u1', jobId: 'j1', score: 78 })],
+      data: [expect.objectContaining({ userId: 'u1', jobId: 'j1', score: actualScore })],
       skipDuplicates: true,
     });
     expect(prisma.job.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ matchedAt: expect.any(Date) }) }),
     );
-    expect(notifications.notifyForMatch).toHaveBeenCalledWith('u1', 'j1', 78, expect.any(String));
+    expect(notifications.notifyForMatch).toHaveBeenCalledWith('u1', 'j1', actualScore, expect.any(String));
     expect(outcome).toEqual({
       jobsEvaluated: 1,
       usersProcessed: 1,

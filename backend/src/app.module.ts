@@ -17,6 +17,8 @@ import { MatchingModule } from './modules/matching/matching.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { AccountModule } from './modules/account/account.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { SalaryModule } from './modules/salary/salary.module';
+import { EventsModule } from './modules/events/events.module';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { AdminModule } from './modules/admin/admin.module';
     DashboardModule,
     AccountModule,
     AdminModule,
+    SalaryModule,
+    EventsModule,
   ],
 })
 export class AppModule {}

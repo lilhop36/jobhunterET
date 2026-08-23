@@ -5,7 +5,7 @@
  * Relevant for the INTERNATIONAL tier — good for Ethiopian devs targeting EU remote. */
 
 import { Injectable } from '@nestjs/common';
-import { JobSourceAdapter, RawJob, deriveExperience, mapEmployment, stripHtml, parseNumericSalary, FETCH_TIMEOUT_MS } from './job-source.adapter';
+import { JobSourceAdapter, RawJob, deriveExperience, mapEmployment, cleanHtml, parseNumericSalary, FETCH_TIMEOUT_MS } from './job-source.adapter';
 
 interface LJJob {
   id: number;
@@ -31,6 +31,7 @@ const API = 'https://www.landing.jobs/api/v1/jobs';
 @Injectable()
 export class LandingJobsAdapter implements JobSourceAdapter {
   readonly sourceId = 'landingjobs';
+  readonly selectorVersion = 'api:landingjobs:v1.0';
 
   async fetchJobs(options?: { since?: Date }): Promise<RawJob[]> {
     const since = options?.since ?? new Date(Date.now() - 14 * 86_400_000);
@@ -89,7 +90,7 @@ export class LandingJobsAdapter implements JobSourceAdapter {
   }
 
   private extractSkills(html: string): string[] {
-    const text = stripHtml(html);
+    const text = cleanHtml(html);
     // Look for common tech skills mentioned in requirements
     const skillPatterns = [
       'Java', 'Python', 'JavaScript', 'TypeScript', 'React', 'Angular', 'Vue',

@@ -3,7 +3,23 @@
 
 # Build artifacts
 *.tsbuildinfo
+.next/
 
 # OS junk
 .DS_Store
 Thumbs.db
+.env
+.env.local
+.dev-logs/
+
+# Editor / agent state
+.agents/
+.cursor/
+
+# Dependencies
+node_modules/
+
+# Backend artifacts
+backend/coverage/
+backend/.dev-logs-backend.log
+backend/.swcrc
