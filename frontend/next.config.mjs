@@ -38,6 +38,10 @@ const nextConfig = {
 
   async rewrites() {
     // SRS §24 API lives at /api/* — proxy to the NestJS backend.
+    // Only apply rewrites in development (not on Vercel)
+    if (process.env.VERCEL) {
+      return [];
+    }
     return [
       {
         source: '/api/:path*',

@@ -1,33 +1,41 @@
-# Freebuff/agent runtime state — DB files, logs, QA tokens (u*.token contain JWTs)
-.freebuff/
-
-# Build artifacts
-*.tsbuildinfo
-.next/
-
-# OS junk
-.DS_Store
-Thumbs.db
-.env
-.env.local
-.dev-logs/
-
-# Editor / agent state
-.agents/
-.cursor/
-
+```
 # Dependencies
 node_modules/
 
-# Backend artifacts
-backend/coverage/
-backend/.dev-logs-backend.log
-backend/.swcrc
+# Environment
+.env
+.env.local
+.env.*
 
-# Build output
+# Build outputs
 dist/
+build/
+.next/
+out/
 
-# SQLite dev database
-*.db
-*.db-journal
-*.bak
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+
+# Editors
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# OS
+.DS_Store
+Thumbs.db
+```
