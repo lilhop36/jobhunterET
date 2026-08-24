@@ -6,7 +6,9 @@ import { useAuth } from '../../lib/auth';
 import { RequireAuth, useApi, ErrorBox, ScoreBadge, StatusPill, ListSkeleton, StatSkeleton } from '../../lib/ui';
 import { MatchCarousel, CarouselSkeleton, type CarouselMatch } from '../../components/match-carousel';
 import { Progress } from '../../components/ui/progress';
-import { useMatchStream } from '../../lib/use-match-stream';
+import { useEventStream } from '../../lib/use-match-stream';
+import { MatchToastStack } from '../../components/match-toast-stack';
+import { ConnectionBadge } from '../../components/connection-badge';
 
 interface DashboardData {
   greeting: string;
@@ -37,32 +39,29 @@ export default function DashboardPage() {
     data ? '/api/matches' : null,
   );
 
-  // ── SSE: live match notifications ───────────────────────────
-  const sse = useMatchStream();
-  // When a new match arrives via SSE, refresh both the dashboard stats and the match carousel.
+  // ── SSE: live notifications (matches, application changes, digests) ──
+  const sse = useEventStream();
   useEffect(() => {
-    if (sse.event) {
+    if (sse.matchCount > 0 || sse.appCount > 0 || sse.digestCount > 0) {
       reload();
       reloadMatches();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sse.matchCount]);
+  }, [sse.matchCount, sse.appCount, sse.digestCount]);
 
   return (
     <RequireAuth>
-      <h1>
-        {data?.greeting ?? 'Selam'}, {user?.email?.split('@')[0] ?? 'there'} 👋
-      </h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h1 style={{ margin: 0, flex: '1 1 auto' }}>
+          {data?.greeting ?? 'Selam'}, {user?.email?.split('@')[0] ?? 'there'} 👋
+        </h1>
+        <ConnectionBadge connected={sse.connected} />
+      </div>
       <p className="subtitle">Here&apos;s what your job search looks like today.</p>
 
       {err && <ErrorBox msg={err} onRetry={reload} />}
-      {sse.event && sse.matchCount > 0 && (
-        <div className="notice" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ animation: 'pulse 1s ease-in-out infinite' }}>🔔</span>
-          New match: <strong>{sse.event.title}</strong> at {sse.event.company} ({sse.event.score}%)
-          {!sse.connected && <span className="muted" style={{ marginLeft: 'auto', fontSize: 12 }}>Reconnecting…</span>}
-        </div>
-      )}
+
+      <MatchToastStack events={sse.events} onDismiss={sse.dismiss} />
       {data && !data.onboardDone && (
         <div className="notice">
           🎓 Your profile is {data.completion}% complete — finish the{' '}

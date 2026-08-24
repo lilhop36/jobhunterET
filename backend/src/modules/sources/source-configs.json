@@ -1,0 +1,150 @@
+{
+  "sources": [
+    {
+      "id": "reliefweb",
+      "name": "ReliefWeb (Ethiopia)",
+      "adapter": "reliefweb",
+      "type": "RSS",
+      "baseUrl": "https://reliefweb.int/jobs/rss.xml?advanced-search=(C87)",
+      "frequency": 30,
+      "priorityTier": "ETHIOPIA",
+      "defaultLocationClass": "ETHIOPIA_LOCAL",
+      "defaultTags": ["ethiopian", "ngo", "humanitarian"],
+      "fetchTimeout": 30000
+    },
+    {
+      "id": "remotive",
+      "name": "Remotive",
+      "adapter": "remotive",
+      "type": "JSON_API",
+      "baseUrl": "https://remotive.com/api/remote-jobs?limit=100",
+      "frequency": 60,
+      "priorityTier": "INTERNATIONAL",
+      "defaultLocationClass": "INTERNATIONAL_REMOTE",
+      "defaultTags": ["remote", "international", "tech"],
+      "fetchTimeout": 30000
+    },
+    {
+      "id": "arbeitnow",
+      "name": "Arbeitnow",
+      "adapter": "arbeitnow",
+      "type": "JSON_API",
+      "baseUrl": "https://www.arbeitnow.com/api/job-board-api",
+      "frequency": 60,
+      "priorityTier": "INTERNATIONAL",
+      "defaultLocationClass": "INTERNATIONAL_REMOTE",
+      "defaultTags": ["remote", "international"],
+      "fetchTimeout": 30000
+    },
+    {
+      "id": "ethiojobs",
+      "name": "EthioJobs",
+      "adapter": "ethiojobs",
+      "type": "HTML",
+      "baseUrl": "https://www.ethiojobs.net",
+      "frequency": 30,
+      "priorityTier": "ETHIOPIA",
+      "defaultLocationClass": "ETHIOPIA_LOCAL",
+      "defaultTags": ["ethiopian"],
+      "fetchTimeout": 45000
+    },
+    {
+      "id": "ethiongojobs",
+      "name": "Ethio NGO Jobs",
+      "adapter": "ethiongojobs",
+      "type": "HTML",
+      "baseUrl": "https://www.ethiongojobs.com",
+      "frequency": 30,
+      "priorityTier": "ETHIOPIA",
+      "defaultLocationClass": "ETHIOPIA_LOCAL",
+      "defaultTags": ["ethiopian", "ngo"],
+      "fetchTimeout": 45000
+    },
+    {
+      "id": "geez",
+      "name": "GeezJobs",
+      "adapter": "geezjobs",
+      "type": "HTML",
+      "baseUrl": "https://www.geezjobs.com",
+      "frequency": 60,
+      "priorityTier": "ETHIOPIA",
+      "defaultLocationClass": "ETHIOPIA_LOCAL",
+      "defaultTags": ["ethiopian"],
+      "fetchTimeout": 45000
+    },
+    {
+      "id": "etcareers",
+      "name": "ET Careers",
+      "adapter": "etcareers",
+      "type": "HTML",
+      "baseUrl": "https://www.etcareers.com",
+      "frequency": 30,
+      "priorityTier": "ETHIOPIA",
+      "defaultLocationClass": "ETHIOPIA_LOCAL",
+      "defaultTags": ["ethiopian", "tech"],
+      "fetchTimeout": 45000
+    },
+    {
+      "id": "jobicy",
+      "name": "Jobicy",
+      "adapter": "jobicy",
+      "type": "JSON_API",
+      "baseUrl": "https://jobicy.com/api/v2/remote-jobs?count=50",
+      "frequency": 120,
+      "priorityTier": "INTERNATIONAL",
+      "defaultLocationClass": "INTERNATIONAL_REMOTE",
+      "defaultTags": ["remote", "international", "tech"],
+      "fetchTimeout": 30000
+    },
+    {
+      "id": "remoteok",
+      "name": "RemoteOK",
+      "adapter": "remoteok",
+      "type": "JSON_API",
+      "baseUrl": "https://remoteok.com/api",
+      "frequency": 120,
+      "priorityTier": "INTERNATIONAL",
+      "defaultLocationClass": "INTERNATIONAL_REMOTE",
+      "defaultTags": ["remote", "international", "tech"],
+      "fetchTimeout": 30000
+    },
+    {
+      "id": "landingjobs",
+      "name": "Landing.jobs",
+      "adapter": "landingjobs",
+      "type": "JSON_API",
+      "baseUrl": "https://landing.jobs/api/v1/jobs",
+      "frequency": 120,
+      "priorityTier": "INTERNATIONAL",
+      "defaultLocationClass": "INTERNATIONAL_REMOTE",
+      "defaultTags": ["remote", "international", "tech"],
+      "fetchTimeout": 30000
+    }
+  ],
+  "fallbackChains": {
+    "ethiojobs": ["ethiongojobs", "etcareers", "reliefweb"],
+    "ethiongojobs": ["etcareers", "reliefweb"],
+    "geez": ["ethiojobs", "ethiongojobs"],
+    "etcareers": ["reliefweb", "ethiongojobs"],
+    "reliefweb": ["etcareers", "ethiongojobs"]
+  },
+  "queue": {
+    "concurrency": 3,
+    "maxRetries": 2,
+    "retryDelayMs": 5000,
+    "backoffMultiplier": 2,
+    "maxBackoffMs": 600000
+  },
+  "classification": {
+    "tags": {
+      "ethiopian": "Based in Ethiopia (Addis Ababa or other cities)",
+      "remote": "Work-from-anywhere / fully remote",
+      "international": "Outside Ethiopia",
+      "ngo": "Non-profit, humanitarian, or UN organization",
+      "tech": "Software engineering, data, or IT role",
+      "entry_level": "Junior / intern / graduate positions",
+      "senior": "Senior / lead / principal positions",
+      "freelance": "Contract, freelance, or gig work"
+    }
+  }
+}

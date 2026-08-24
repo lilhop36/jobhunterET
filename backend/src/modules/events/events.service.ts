@@ -11,7 +11,38 @@ export interface MatchEvent {
   createdAt: string;
 }
 
-export type SseEvent = MatchEvent;
+export interface ApplicationEvent {
+  type: 'application';
+  jobId: string;
+  title: string;
+  company: string;
+  from: string;
+  to: string;
+  createdAt: string;
+}
+
+export interface DigestEvent {
+  type: 'digest';
+  digestId: string;
+  jobsCollected: number;
+  newJobs: number;
+  strongMatches: number;
+  createdAt: string;
+}
+
+export interface CollectionEvent {
+  type: 'collection';
+  sourceId: string;
+  sourceName: string;
+  status: string;
+  jobsFetched: number;
+  jobsCreated: number;
+  duplicates: number;
+  duration: number;
+  createdAt: string;
+}
+
+export type SseEvent = MatchEvent | ApplicationEvent | DigestEvent | CollectionEvent;
 
 @Injectable()
 export class EventsService {
@@ -41,12 +72,12 @@ export class EventsService {
     return { stream$: subject.asObservable(), close };
   }
 
-  /** Push a match event to a specific user's SSE stream (no-op if not connected). */
+  /** Push an event to a specific user's SSE stream (no-op if not connected). */
   pushToUser(userId: string, event: SseEvent) {
     const subject = this.clients.get(userId);
     if (subject) {
       subject.next(event);
-      this.logger.debug(`SSE event pushed to user ${userId}: ${event.type} score=${event.score}`);
+      this.logger.debug(`SSE event pushed to user ${userId}: ${event.type}`);
     }
   }
 

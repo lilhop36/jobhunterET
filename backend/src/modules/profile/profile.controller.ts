@@ -83,7 +83,7 @@ export class ProfileController {
   @Get('cv')
   async getCv(@CurrentUser() user: AuthUser) {
     const cv = await this.prisma.cvFile.findFirst({
-      where: { userId: user.id, active: true },
+      where: { userId: user.id, active: this.prisma.bool(true) as any },
       orderBy: { uploadedAt: 'desc' },
     });
     if (!cv) return null;
@@ -100,7 +100,7 @@ export class ProfileController {
   @Get('cv/download')
   async downloadCv(@CurrentUser() user: AuthUser, @Res() res: Response) {
     const cv = await this.prisma.cvFile.findFirst({
-      where: { userId: user.id, active: true },
+      where: { userId: user.id, active: this.prisma.bool(true) as any },
       orderBy: { uploadedAt: 'desc' },
     });
     if (!cv) throw new NotFoundException('No CV uploaded');
@@ -120,8 +120,8 @@ export class ProfileController {
   @Delete('cv')
   async deleteCv(@CurrentUser() user: AuthUser) {
     await this.prisma.cvFile.updateMany({
-      where: { userId: user.id, active: true },
-      data: { active: false },
+      where: { userId: user.id, active: this.prisma.bool(true) as any },
+      data: { active: this.prisma.bool(false) as any },
     });
     return { ok: true };
   }

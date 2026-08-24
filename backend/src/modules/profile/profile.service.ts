@@ -47,7 +47,7 @@ export class ProfileService {
       remote: p.remote,
       minSalary: p.minSalary,
       excludeOnsite: p.excludeOnsite,
-      employmentTypes: p.employmentTypes,
+      employmentTypes: this.prisma.isSQLite && typeof p.employmentTypes === 'string' ? (() => { try { return JSON.parse(p.employmentTypes); } catch { return []; } })() : p.employmentTypes,
       onboardDone: p.onboardDone,
       skills: skills.map((s) => s.skill.name),
       targetRoles: roles.map((r) => ({ role: r.role, priority: r.priority })),
@@ -59,7 +59,15 @@ export class ProfileService {
   async updateProfile(userId: string, dto: UpdateProfileDto) {
     const data: any = {};
     for (const k of ['title', 'summary', 'years', 'remote', 'minSalary', 'excludeOnsite', 'employmentTypes', 'onboardDone'] as const) {
-      if (dto[k] !== undefined) data[k] = dto[k];
+      if (dto[k] !== undefined) {
+        // SQLite compat: stringify arrays and convert booleans to int
+        let val = dto[k];
+        if (this.prisma.isSQLite) {
+          if (k === 'employmentTypes' && Array.isArray(val)) val = JSON.stringify(val);
+          if (typeof val === 'boolean') val = val ? 1 : 0;
+        }
+        data[k] = val;
+      }
     }
 
     const touchedCore = UpdateProfileDto.CORE_KEYS.some((k) => (dto as any)[k] !== undefined);
@@ -116,7 +124,7 @@ export class ProfileService {
       this.prisma.candidateSkill.count({ where: { userId } }),
       this.prisma.targetRole.count({ where: { userId } }),
       this.prisma.locationPreference.count({ where: { userId } }),
-      this.prisma.cvFile.findFirst({ where: { userId, active: true } }),
+      this.prisma.cvFile.findFirst({ where: { userId, active: this.prisma.bool(true) as any } }),
     ]);
     let v = 0;
     if (p.title) v += 10;
@@ -124,7 +132,8 @@ export class ProfileService {
     v += Math.min(15, skillCount * 5);
     v += Math.min(20, roleCount * 7);
     if (locCount) v += 15;
-    if (p.employmentTypes.length) v += 10;
+    const et = this.prisma.isSQLite && typeof p.employmentTypes === 'string' ? (() => { try { return JSON.parse(p.employmentTypes); } catch { return []; } })() : p.employmentTypes;
+    if (et.length) v += 10;
     if (p.years > 0) v += 5;
     if (p.minSalary > 0) v += 5;
     if (cv) v += 15;

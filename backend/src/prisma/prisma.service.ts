@@ -23,6 +23,15 @@ export class PrismaService
     }
   }
 
+  /**
+   * SEC-010: SQLite stores booleans as Int (0/1). Prisma on SQLite rejects
+   * `true`/`false` in where-filters for Int fields. This helper converts
+   * booleans to integers when in SQLite mode.
+   */
+  bool(v: boolean): number | boolean {
+    return this.isSQLite ? (v ? 1 : 0) : v;
+  }
+
   async onModuleInit() {
     await this.$connect();
   }

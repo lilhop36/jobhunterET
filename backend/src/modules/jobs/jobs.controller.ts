@@ -17,6 +17,7 @@ export class JobsController {
       type: q.type,
       workplace: q.workplace,
       source: q.source,
+      tag: q.tag,
       sort: (q.sort as any) || 'newest',
       showDead: q.showDead === 'true',
       userId: user.id,

@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, BadRequestException, ConflictException, Logger, OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MatchingService } from '../matching/matching.service';
@@ -16,34 +16,31 @@ import { RemoteOKAdapter } from './adapters/remoteok.adapter';
 import { LandingJobsAdapter } from './adapters/landingjobs.adapter';
 import { EtcareersAdapter } from './adapters/etcareers.adapter';
 import { TELEGRAM_ADAPTERS } from './adapters/telegram-tokens';
+import { EventsService } from '../events/events.service';
+import { CollectionQueue, QueueResult } from './collection-queue';
+import { classifyJob, getAllTags, type SourceConfig } from './source-classifier';
+import * as sourceConfigs from './source-configs.json';
 
 const BACKOFF_THRESHOLD = Math.max(1, Number(process.env.SOURCE_BACKOFF_THRESHOLD ?? 3));
 
-/**
- * Source Resilience: fallback chain — when a primary source fails, the
- * system automatically retries with the listed alternatives (same tier).
- * This prevents silent coverage gaps when a single source breaks.
- */
-const FALLBACK_CHAIN: Record<string, string[]> = {
-  ethiojobs: ['ethiongojobs', 'etcareers', 'reliefweb'],
-  ethiongojobs: ['etcareers', 'reliefweb'],
-  geez: ['ethiojobs', 'ethiongojobs'],
-  etcareers: ['reliefweb', 'ethiongojobs'],
-  reliefweb: ['etcareers', 'ethiongojobs'],
-};
+/** Config-driven fallback chain (from source-configs.json). */
+const FALLBACK_CHAIN: Record<string, string[]> = (sourceConfigs as any).fallbackChains ?? {};
 
 /** Health score: percentage of successful runs over the last HEALTH_WINDOW runs. */
 const HEALTH_WINDOW = 10;
 const HEALTH_AUTO_DISABLE_THRESHOLD = 50; // percent
 
 @Injectable()
-export class SourcesService {
+export class SourcesService implements OnModuleInit {
   private readonly logger = new Logger(SourcesService.name);
   private readonly adapters: Record<string, JobSourceAdapter>;
+  private readonly queue: CollectionQueue;
+  private readonly sourceConfigMap: Record<string, SourceConfig> = {};
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly matching: MatchingService,
+    private readonly events: EventsService,
     reliefweb: ReliefWebAdapter,
     remotive: RemotiveAdapter,
     arbeitnow: ArbeitnowAdapter,
@@ -64,6 +61,53 @@ export class SourcesService {
     for (const a of telegramAdapters) {
       this.adapters[a.sourceId] = a;
       this.logger.log(`[ADAPTER] Registered Telegram channel: ${a.sourceId}`);
+    }
+
+    // Load config-driven source definitions
+    const cfg = (sourceConfigs as any).queue ?? {};
+    this.queue = new CollectionQueue(
+      cfg.concurrency ?? 3,
+      cfg.maxRetries ?? 2,
+      cfg.retryDelayMs ?? 5000,
+      cfg.backoffMultiplier ?? 2,
+      cfg.maxBackoffMs ?? 600000,
+    );
+    for (const src of (sourceConfigs as any).sources ?? []) {
+      this.sourceConfigMap[src.id] = src;
+    }
+  }
+
+  async onModuleInit() {
+    // Log queue events
+    this.queue.on('batch:completed', (stats) => {
+      this.logger.log(`[QUEUE] Batch completed: ${stats.completed} OK, ${stats.failed} failed`);
+    });
+    this.logger.log(`[QUEUE] Initialized with concurrency=${(sourceConfigs as any).queue?.concurrency ?? 3}`);
+    this.logger.log(`[CONFIG] Loaded ${Object.keys(this.sourceConfigMap).length} source configs`);
+
+    // Auto-create Telegram source rows if missing
+    await this.ensureTelegramSources();
+  }
+
+  /** Create JobSource rows for dynamically-registered Telegram channels. */
+  private async ensureTelegramSources() {
+    for (const [id, adapter] of Object.entries(this.adapters)) {
+      if (!id.startsWith('tg-')) continue;
+      const exists = await this.prisma.jobSource.findUnique({ where: { id } });
+      if (!exists) {
+        await this.prisma.jobSource.create({
+          data: {
+            id,
+            name: (adapter as any).name ?? id,
+            type: 'TELEGRAM',
+            baseUrl: `https://t.me/s/${id.replace('tg-', '')}`,
+            status: 'ACTIVE',
+            priorityTier: 'ETHIOPIA',
+            collectionFrequency: '30 min',
+          },
+        });
+        this.logger.log(`[CONFIG] Auto-created Telegram source: ${id}`);
+      }
     }
   }
 
@@ -215,6 +259,25 @@ export class SourcesService {
     });
     this.logger.log(`[COLLECTOR] Source: ${source.name} — Retrieved: ${valid.length} (created ${created}, dupes ${duplicates})`);
 
+    // Push collection event to all connected SSE clients
+    if (created > 0) {
+      const users = await this.prisma.user.findMany({ select: { id: true } });
+      const duration = Date.now() - startedAt.getTime();
+      for (const u of users) {
+        this.events.pushToUser(u.id, {
+          type: 'collection',
+          sourceId: source.id,
+          sourceName: source.name,
+          status: 'OK',
+          jobsFetched: valid.length,
+          jobsCreated: created,
+          duplicates,
+          duration,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+
     // FR-018: score the newly created jobs against every user's profile once
     // (incremental pass — no full re-score of the pool on every cycle).
     let delivered = 0;
@@ -296,7 +359,7 @@ export class SourcesService {
         lastSeenAt: new Date(),
         status: 'ACTIVE',
         parseConfidence: j.parseConfidence ?? 80,
-        rawData: j.rawData as any,
+        rawData: this.prisma.isSQLite ? JSON.stringify(j.rawData ?? null) : j.rawData as any,
         country: j.country ?? null,
         description: fidelity.description,
         // FR-012d/e: description provenance
@@ -312,6 +375,8 @@ export class SourcesService {
         finalUrl: fidelity.finalUrl,
         // FR-014: fingerprint for dedup
         fingerprint: fidelity.fingerprint,
+        // Classification: auto-tag based on source config + job attributes
+        ...this.classifySourceJob(sourceId, j),
         skills: skillIds.length ? { create: skillIds.map((skillId) => ({ skillId })) } : undefined,
       },
     });
@@ -321,6 +386,25 @@ export class SourcesService {
       descQuality: fidelity.descriptionQuality,
       linkChecked: fidelity.urlCheckedAt !== null,
       urlStatus: fidelity.urlStatus,
+    };
+  }
+
+  /**
+   * Classify a job using source config defaults + per-job analysis.
+   * Returns { tags, locationClass } to merge into the create payload.
+   */
+  private classifySourceJob(sourceId: string, j: RawJob) {
+    const cfg = this.sourceConfigMap[sourceId];
+    if (!cfg) return { locationClass: j.locationClass, tags: '[]' };
+    const result = classifyJob(cfg, {
+      title: j.title,
+      location: j.location,
+      locationClass: j.locationClass,
+      workPlace: j.workPlace,
+    });
+    return {
+      locationClass: result.locationClass,
+      tags: this.prisma.isSQLite ? JSON.stringify(result.tags) : result.tags as any,
     };
   }
 
@@ -482,6 +566,74 @@ export class SourcesService {
       });
       this.logger.log(`[GHOST] Marked ${doomed.length} job(s) REMOVED (missedCycles >= 3)`);
     }
+  }
+
+  // ── Config-driven collection ──────────────────────────────────────────────
+
+  /** Get the config for a source (from source-configs.json). */
+  getSourceConfig(sourceId: string): SourceConfig | undefined {
+    return this.sourceConfigMap[sourceId];
+  }
+
+  /** Enqueue collection for a single source (non-blocking). */
+  enqueueCollect(sourceId: string): { enqueued: boolean; message: string } {
+    const source = this.adapters[sourceId];
+    if (!source) {
+      return { enqueued: false, message: `No adapter registered for ${sourceId}` };
+    }
+    this.queue.enqueue(sourceId, () => this.collectWithFallback(sourceId));
+    return { enqueued: true, message: `${sourceId} queued for collection` };
+  }
+
+  /** Enqueue collection for ALL active sources (non-blocking). */
+  collectAll(): { enqueued: number; sources: string[] } {
+    const activeSources = Object.keys(this.adapters)
+      .filter((id) => !id.startsWith('telegram:')) // skip Telegram for bulk
+      .map((id) => ({
+        id,
+        priorityTier: this.sourceConfigMap[id]?.priorityTier ?? 'INTERNATIONAL',
+        execute: () => this.collectWithFallback(id),
+      }));
+    const count = this.queue.enqueueAll(activeSources);
+    this.logger.log(`[QUEUE] Enqueued ${count} sources for collection`);
+    return { enqueued: count, sources: activeSources.map((s) => s.id) };
+  }
+
+  /** Get current queue statistics. */
+  getQueueStats() {
+    return this.queue.stats;
+  }
+
+  /** Get all source configs (for frontend category management). */
+  getAllSourceConfigs() {
+    return (sourceConfigs as any).sources ?? [];
+  }
+
+  /** Get classification tag definitions (for frontend category filter). */
+  getClassificationTags() {
+    return (sourceConfigs as any).classification?.tags ?? {};
+  }
+
+  /** Get all tags with job counts for the category browsing page. */
+  async getTagCounts() {
+    const jobs = await this.prisma.job.findMany({
+      where: { status: 'ACTIVE' },
+      select: { tags: true, id: true },
+    });
+    const tagCounts: Record<string, number> = {};
+    for (const j of jobs) {
+      if (!j.tags) continue;
+      try {
+        const tags: string[] = typeof j.tags === 'string' ? JSON.parse(j.tags) : j.tags;
+        for (const t of tags) tagCounts[t] = (tagCounts[t] ?? 0) + 1;
+      } catch {}
+    }
+    // Merge with tag metadata from getAllTags
+    const allTags = getAllTags();
+    return allTags.map((t) => ({
+      ...t,
+      count: tagCounts[t.id] ?? 0,
+    })).sort((a, b) => b.count - a.count);
   }
 
 }

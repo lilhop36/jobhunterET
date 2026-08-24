@@ -64,15 +64,20 @@ export class MatchesService {
     return { items: items.map((m) => this.serializeMatch(m)), nextCursor, total };
   }
 
+  private parseJsonField(v: any): any {
+    if (typeof v === 'string') { try { return JSON.parse(v); } catch { return []; } }
+    return v ?? [];
+  }
+
   private serializeMatch(m: any) {
     return {
       jobId: m.jobId,
       score: m.score,
       roleTarget: null,
-      matchedSkills: m.matchedSkills,
-      relatedSkills: m.relatedSkills,
-      missingSkills: m.missingSkills,
-      reasons: m.reasons,
+      matchedSkills: this.parseJsonField(m.matchedSkills),
+      relatedSkills: this.parseJsonField(m.relatedSkills),
+      missingSkills: this.parseJsonField(m.missingSkills),
+      reasons: this.parseJsonField(m.reasons),
       summary: m.summary,
       job: {
         id: m.job.id,

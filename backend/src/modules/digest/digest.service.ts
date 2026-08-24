@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { EventsService } from '../events/events.service';
 import { escHtml } from '../../common/utils/escape-html';
 
 const WINDOW_MS = 24 * 60 * 60 * 1000; // FR-028: daily report window
@@ -28,6 +29,7 @@ export class DigestService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly telegram: TelegramService,
+    @Optional() @Inject(EventsService) private readonly events?: EventsService,
   ) {}
 
   async latestFor(userId: string) {
@@ -45,8 +47,8 @@ export class DigestService {
             jobsCollected: last.jobsCollected,
             newJobs: last.newJobs,
             strongMatches: last.strongMatches,
-            topMatches: last.topMatches,
-            searches: last.searches,
+          topMatches: this.prisma.isSQLite && typeof last.topMatches === 'string' ? JSON.parse(last.topMatches) : last.topMatches,
+          searches: this.prisma.isSQLite && typeof last.searches === 'string' ? JSON.parse(last.searches) : last.searches,
           }
         : null,
     };
@@ -70,8 +72,8 @@ export class DigestService {
         jobsCollected: report.jobsCollected,
         newJobs: report.newJobs,
         strongMatches: report.strongMatches,
-        topMatches: report.topMatches,
-        searches: report.searches,
+        topMatches: this.prisma.isSQLite ? JSON.stringify(report.topMatches) : report.topMatches as any,
+        searches: this.prisma.isSQLite ? JSON.stringify(report.searches) : report.searches as any,
         deliveredTo: 'WEB',
         status: hasContent ? 'SENT' : 'NO_CONTENT',
       },
@@ -89,6 +91,7 @@ export class DigestService {
           data: { deliveredTo: 'TELEGRAM', status: 'SENT' },
         });
         this.logger.log(`[DIGEST] sent to Telegram userId=${userId}`);
+        this.emitDigestEvent(userId, digest);
         return this.serialize(digest);
       }
       this.logger.warn(`[DIGEST] Telegram failed for userId=${userId} — falling back to Web Inbox`);
@@ -103,13 +106,14 @@ export class DigestService {
       }
     }
     this.logger.log(`[DIGEST] recorded userId=${userId} newJobs=${report.newJobs} strong=${report.strongMatches}`);
+    this.emitDigestEvent(userId, digest);
     return this.serialize(digest);
   }
 
   /** Scheduled entry point: every user with the digest on and notifications not paused. */
   async runAll() {
     const users = await this.prisma.user.findMany({
-      where: { digestEnabled: true, notificationsPaused: false },
+      where: { digestEnabled: this.prisma.bool(true) as any, notificationsPaused: this.prisma.bool(false) as any },
       select: { id: true },
     });
     let ok = 0;
@@ -238,6 +242,18 @@ export class DigestService {
     return lines.join('\n');
   }
 
+  private emitDigestEvent(userId: string, digest: any) {
+    if (!this.events) return;
+    this.events.pushToUser(userId, {
+      type: 'digest',
+      digestId: digest.id,
+      jobsCollected: digest.jobsCollected,
+      newJobs: digest.newJobs,
+      strongMatches: digest.strongMatches,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
   private serialize(digest: any) {
     return {
       id: digest.id,
@@ -246,9 +262,8 @@ export class DigestService {
       deliveredTo: digest.deliveredTo,
       jobsCollected: digest.jobsCollected,
       newJobs: digest.newJobs,
-      strongMatches: digest.strongMatches,
-      topMatches: digest.topMatches,
-      searches: digest.searches,
+      strongMatches: digest.strongMatches,        topMatches: this.prisma.isSQLite && typeof digest.topMatches === 'string' ? JSON.parse(digest.topMatches) : digest.topMatches,
+      searches: this.prisma.isSQLite && typeof digest.searches === 'string' ? JSON.parse(digest.searches) : digest.searches,
     };
   }
 }
