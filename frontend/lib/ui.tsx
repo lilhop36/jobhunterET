@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from './auth';
@@ -8,31 +8,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-/** Fetch a GET endpoint on mount; `reload()` re-runs it. */
-export function useApi<T>(path: string | null) {
-  const { api } = useAuth();
-  const [data, setData] = useState<T | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [n, setN] = useState(0);
-
-  useEffect(() => {
-    if (!path) return;
-    let alive = true;
-    setLoading(true);
-    setErr(null);
-    api(path)
-      .then((d) => alive && setData(d))
-      .catch((e) => alive && setErr(e.message))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, n]);
-
-  return { data, err, loading, reload: () => setN((x) => x + 1) };
-}
+// Re-export the Zustand-backed useApi — same API, shared cache + dedup.
+export { useApi } from './api-store';
+export type { UseApiResult } from './api-store';
 
 /** Redirect to /login until a token exists. */
 export function RequireAuth({ children }: { children: ReactNode }) {

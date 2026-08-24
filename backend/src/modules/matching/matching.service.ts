@@ -66,7 +66,7 @@ export class MatchingService extends MatchingEngine {
       targetRoles: roles.map((r) => ({ role: r.role, priority: r.priority })),
       locationTiers,
       remote: profile?.remote ?? false,
-      employmentTypes: profile?.employmentTypes ?? [],
+      employmentTypes: (() => { const et = profile?.employmentTypes; if (this.prisma.isSQLite && typeof et === 'string') { try { return JSON.parse(et); } catch { return []; } } return et ?? []; })(),
       years: profile?.years ?? 0,
       minSalary: profile?.minSalary ?? 0,
       excludeOnsite: profile?.excludeOnsite ?? false,
@@ -175,7 +175,7 @@ export class MatchingService extends MatchingEngine {
 
     let createdCount = 0;
     if (rows.length) {
-      createdCount = (await this.prisma.jobMatch.createMany({ data: rows, skipDuplicates: true })).count;
+      createdCount = await this.safeCreateMany(rows);
     }
 
     // Mark processed now that the batch has been scored. Per-user profile
@@ -241,7 +241,7 @@ export class MatchingService extends MatchingEngine {
         targetRoles: rolesByUser.get(p.userId) ?? [],
         locationTiers: locationsByUser.get(p.userId) ?? {},
         remote: p.remote,
-        employmentTypes: p.employmentTypes,
+        employmentTypes: (() => { const et = p.employmentTypes; if (this.prisma.isSQLite && typeof et === 'string') { try { return JSON.parse(et); } catch { return []; } } return et ?? []; })(),
         years: p.years,
         minSalary: p.minSalary,
         excludeOnsite: p.excludeOnsite,
@@ -297,10 +297,28 @@ export class MatchingService extends MatchingEngine {
     }
 
     if (newRows.length) {
-      await this.prisma.jobMatch.createMany({ data: newRows, skipDuplicates: true });
+      await this.safeCreateMany(newRows);
     }
 
     return created;
+  }
+
+  /** createMany wrapper: skipDuplicates isn't supported on SQLite, so we catch P2002. */
+  private async safeCreateMany(rows: Prisma.JobMatchCreateManyInput[]): Promise<number> {
+    if (!this.prisma.isSQLite) {
+      return (await this.prisma.jobMatch.createMany({ data: rows, skipDuplicates: true })).count;
+    }
+    let count = 0;
+    for (const row of rows) {
+      try {
+        await this.prisma.jobMatch.create({ data: row });
+        count++;
+      } catch (e: any) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') continue;
+        throw e;
+      }
+    }
+    return count;
   }
 
   private toMatchData(r: MatchResult) {
@@ -320,10 +338,10 @@ export class MatchingService extends MatchingEngine {
       employmentScore: emp.weight * emp.fraction,
       freshnessScore: fresh.weight * fresh.fraction,
       salaryScore: sal.weight * sal.fraction,
-      matchedSkills: r.matchedSkills,
-      relatedSkills: r.relatedSkills,
-      missingSkills: r.missingSkills,
-      reasons: r.reasons,
+      matchedSkills: this.prisma.isSQLite ? JSON.stringify(r.matchedSkills) : r.matchedSkills as any,
+      relatedSkills: this.prisma.isSQLite ? JSON.stringify(r.relatedSkills) : r.relatedSkills as any,
+      missingSkills: this.prisma.isSQLite ? JSON.stringify(r.missingSkills) : r.missingSkills as any,
+      reasons: this.prisma.isSQLite ? JSON.stringify(r.reasons) : r.reasons as any,
       summary: r.summary,
     };
   }

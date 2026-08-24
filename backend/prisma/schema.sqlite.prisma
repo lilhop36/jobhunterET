@@ -200,8 +200,10 @@ model Job {
   applyUrlRaw          String?
   descriptionFetchedAt DateTime?
   descriptionQuality   Int?
-  descriptionSource    String?
-  finalUrl             String?
+  descriptionSource    String?  finalUrl             String?
+  // Classification tags: JSON string array in SQLite ["ethiopian","tech",...]
+  tags                 String?        @default("[]")
+
   apps                 Application[]
   source               JobSource          @relation(fields: [sourceId], references: [id])
   matches              JobMatch[]

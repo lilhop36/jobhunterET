@@ -23,3 +23,11 @@ node_modules/
 backend/coverage/
 backend/.dev-logs-backend.log
 backend/.swcrc
+
+# Build output
+dist/
+
+# SQLite dev database
+*.db
+*.db-journal
+*.bak

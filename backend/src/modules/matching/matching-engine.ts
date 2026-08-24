@@ -1,183 +1,19 @@
 /* Matching engine — ported from the SRS prototype (FR-018/019/019a/019b/020).
- * Deterministic, rule-based, explainable. Each JobMatch stores the breakdown. */
+ * Deterministic, rule-based, explainable. Each JobMatch stores the breakdown.
+ *
+ * Knowledge base (skills, aliases, graph, role synonyms) lives in
+ * knowledge-base.json — edit that file to add/remove/rename skills.
+ */
 
-export const SKILL_DICT = [
-  // ── Core Web ──────────────────────────────────────────
-  'Node.js', 'TypeScript', 'JavaScript', 'HTML', 'CSS', 'React', 'Next.js',
-  'Vue', 'Nuxt.js', 'Angular', 'Svelte', 'Redux', 'Tailwind CSS', 'SASS',
-  'REST API', 'GraphQL', 'WebSocket', 'gRPC',
-  // ── Backend Frameworks ─────────────────────────────────
-  'NestJS', 'Express', 'Fastify', 'AdonisJS', 'Koa',
-  'Django', 'Flask', 'FastAPI', 'Rails', 'Laravel', 'Spring Boot',
-  // ── Languages ──────────────────────────────────────────
-  'Python', 'Java', 'C#', 'Go', 'Rust', 'PHP', 'Ruby', 'Swift', 'Kotlin',
-  // ── Databases ──────────────────────────────────────────
-  'PostgreSQL', 'MySQL', 'MongoDB', 'SQL', 'Redis', 'SQLite',
-  'Elasticsearch', 'DynamoDB', 'Cassandra', 'Neo4j', 'Prisma', 'Sequelize',
-  // ── DevOps / Cloud ─────────────────────────────────────
-  'Docker', 'Kubernetes', 'CI/CD', 'Linux', 'AWS', 'Azure', 'GCP',
-  'Terraform', 'Ansible', 'Nginx', 'Apache', 'Jenkins', 'GitHub Actions',
-  'Vercel', 'Netlify', 'Cloudflare',
-  // ── Data / ML / AI ─────────────────────────────────────
-  'Pandas', 'NumPy', 'TensorFlow', 'PyTorch', 'Scikit-learn',
-  'Apache Spark', 'Airflow', 'ETL', 'Data Analysis', 'Machine Learning',
-  'NLP', 'Computer Vision', 'LLM', 'OpenAI API',
-  // ── Mobile ─────────────────────────────────────────────
-  'React Native', 'Flutter', 'iOS', 'Android', 'Expo',
-  // ── Testing ────────────────────────────────────────────
-  'Jest', 'Playwright', 'Cypress', 'Selenium', 'Testing', 'QA', 'TDD',
-  // ── Design / UX ────────────────────────────────────────
-  'Figma', 'Adobe XD', 'UI Design', 'UX Research', 'Accessibility',
-  // ── PM / Business ──────────────────────────────────────
-  'Agile', 'Scrum', 'Jira', 'Confluence', 'Project Management',
-  // ── IT / Infra ─────────────────────────────────────────
-  'Networking', 'IT Support', 'Systems Administration', 'Microservices',
-  'WordPress', 'Shopify', 'SEO', 'Digital Marketing',
-];
+import * as fs from 'fs';
+import * as path from 'path';
+const kb: { skills: string[]; aliases: Record<string, string>; graph: Record<string, string[]>; experienceYears: Record<string, number>; roleSynonyms: Record<string, string[]> } = JSON.parse(fs.readFileSync(path.join(__dirname, 'knowledge-base.json'), 'utf-8'));
 
-export const SKILL_ALIAS: Record<string, string> = {
-  // ── JS ecosystem ───────────────────────────────────────
-  node: 'Node.js', nodejs: 'Node.js', 'node.js': 'Node.js',
-  ts: 'TypeScript', typescript: 'TypeScript',
-  js: 'JavaScript', javascript: 'JavaScript',
-  reactjs: 'React',
-  nextjs: 'Next.js', 'next.js': 'Next.js',
-  vuejs: 'Vue', 'vue.js': 'Vue',
-  'vue 3': 'Vue',
-  nuxtjs: 'Nuxt.js', 'nuxt.js': 'Nuxt.js',
-  angularjs: 'Angular', 'angular.js': 'Angular',
-  tailwind: 'Tailwind CSS', 'tailwindcss': 'Tailwind CSS',
-  reduxjs: 'Redux',
-  // ── Python ecosystem ───────────────────────────────────
-  'python3': 'Python', 'python 3': 'Python',
-  django: 'Django', 'django rest framework': 'Django',
-  flask: 'Flask', fastapi: 'FastAPI',
-  pandas: 'Pandas', numpy: 'NumPy',
-  tensorflow: 'TensorFlow', pytorch: 'PyTorch',
-  'scikit learn': 'Scikit-learn', sklearn: 'Scikit-learn',
-  // ── Java ecosystem ─────────────────────────────────────
-  java: 'Java', spring: 'Spring Boot', 'spring boot': 'Spring Boot',
-  'spring boot 3': 'Spring Boot',
-  // ── PHP ecosystem ──────────────────────────────────────
-  php: 'PHP', laravel: 'Laravel', wordpress: 'WordPress',
-  // ── Ruby ───────────────────────────────────────────────
-  ruby: 'Ruby', rails: 'Rails', 'ruby on rails': 'Rails',
-  // ── Databases ──────────────────────────────────────────
-  postgres: 'PostgreSQL', postgresql: 'PostgreSQL', pg: 'PostgreSQL',
-  psql: 'PostgreSQL',
-  mysql: 'MySQL', mongo: 'MongoDB', mongodb: 'MongoDB',
-  redis: 'Redis', sqlite: 'SQLite',
-  elasticsearch: 'Elasticsearch', elastic: 'Elasticsearch',
-  prisma: 'Prisma', sequelize: 'Sequelize',
-  // ── DevOps / Cloud ─────────────────────────────────────
-  docker: 'Docker', k8s: 'Kubernetes', kubernetes: 'Kubernetes',
-  cicd: 'CI/CD', 'ci/cd': 'CI/CD',
-  linux: 'Linux', ubuntu: 'Linux',
-  aws: 'AWS', 'amazon web services': 'AWS',
-  azure: 'Azure', gcp: 'GCP', 'google cloud': 'GCP',
-  terraform: 'Terraform', ansible: 'Ansible',
-  nginx: 'Nginx', apache: 'Apache',
-  jenkins: 'Jenkins', 'github actions': 'GitHub Actions',
-  vercel: 'Vercel', netlify: 'Netlify',
-  // ── APIs / Protocols ───────────────────────────────────
-  rest: 'REST API', 'rest apis': 'REST API', 'restful': 'REST API',
-  'rest api': 'REST API',
-  graphql: 'GraphQL', gql: 'GraphQL',
-  websocket: 'WebSocket',
-  grpc: 'gRPC',
-  // ── Mobile ─────────────────────────────────────────────
-  'react native': 'React Native', rn: 'React Native',
-  flutter: 'Flutter', expo: 'Expo',
-  ios: 'iOS', android: 'Android',
-  // ── Testing ────────────────────────────────────────────
-  jest: 'Jest', playwright: 'Playwright',
-  cypress: 'Cypress', selenium: 'Selenium',
-  tdd: 'TDD', 'test driven': 'TDD',
-  // ── Design ─────────────────────────────────────────────
-  figma: 'Figma', 'adobe xd': 'Adobe XD',
-  'ui design': 'UI Design', ux: 'UX Research',
-  // ── PM / Business ──────────────────────────────────────
-  scrum: 'Scrum', agile: 'Agile', jira: 'Jira',
-  // ── Other ──────────────────────────────────────────────
-  'machine learning': 'Machine Learning', ml: 'Machine Learning',
-  'data analysis': 'Data Analysis', nlp: 'NLP',
-  seo: 'SEO', 'digital marketing': 'Digital Marketing',
-  shopify: 'Shopify',
-};
-
-export const SKILL_GRAPH: Record<string, string[]> = {
-  // ── JS / TS ecosystem ──────────────────────────────────
-  JavaScript: ['TypeScript', 'Node.js', 'React', 'Vue', 'Angular', 'HTML', 'CSS'],
-  TypeScript: ['JavaScript', 'Node.js', 'React', 'Next.js', 'NestJS', 'Angular'],
-  'Node.js': ['Express', 'NestJS', 'Fastify', 'GraphQL', 'TypeScript', 'JavaScript'],
-  React: ['Next.js', 'Redux', 'React Native', 'TypeScript', 'Tailwind CSS'],
-  'Next.js': ['React', 'TypeScript', 'Tailwind CSS', 'Vercel'],
-  Vue: ['Nuxt.js', 'TypeScript', 'JavaScript'],
-  Angular: ['TypeScript', 'JavaScript'],
-  'Tailwind CSS': ['CSS', 'HTML', 'React', 'Next.js'],
-  // ── Python ecosystem ───────────────────────────────────
-  Python: ['Django', 'Flask', 'FastAPI', 'Pandas', 'NumPy', 'SQL'],
-  Django: ['Python', 'PostgreSQL', 'REST API', 'Docker'],
-  Flask: ['Python', 'REST API', 'Docker'],
-  FastAPI: ['Python', 'REST API', 'Docker', 'GraphQL'],
-  Pandas: ['Python', 'NumPy', 'Data Analysis', 'SQL'],
-  'Machine Learning': ['Python', 'TensorFlow', 'PyTorch', 'Scikit-learn', 'NumPy', 'Pandas'],
-  TensorFlow: ['Python', 'Machine Learning', 'NumPy'],
-  PyTorch: ['Python', 'Machine Learning', 'NumPy'],
-  'Scikit-learn': ['Python', 'Machine Learning', 'Pandas', 'NumPy'],
-  'Data Analysis': ['Python', 'SQL', 'Pandas', 'Excel'],
-  // ── Java ecosystem ─────────────────────────────────────
-  Java: ['Spring Boot', 'Maven', 'Gradle', 'SQL', 'Docker'],
-  'Spring Boot': ['Java', 'SQL', 'Docker', 'REST API', 'Microservices'],
-  // ── PHP ecosystem ──────────────────────────────────────
-  PHP: ['Laravel', 'WordPress', 'MySQL', 'HTML', 'CSS'],
-  Laravel: ['PHP', 'MySQL', 'REST API', 'Docker'],
-  WordPress: ['PHP', 'MySQL', 'HTML', 'CSS', 'SEO'],
-  // ── Ruby ───────────────────────────────────────────────
-  Ruby: ['Rails', 'PostgreSQL', 'REST API'],
-  Rails: ['Ruby', 'PostgreSQL', 'REST API', 'Docker'],
-  // ── Databases ──────────────────────────────────────────
-  PostgreSQL: ['SQL', 'MySQL', 'Redis', 'Prisma', 'Docker'],
-  MySQL: ['SQL', 'PostgreSQL', 'PHP', 'Docker'],
-  MongoDB: ['JavaScript', 'Node.js', 'TypeScript'],
-  Redis: ['Node.js', 'Docker', 'Microservices'],
-  SQL: ['PostgreSQL', 'MySQL', 'Data Analysis'],
-  Elasticsearch: ['Docker', 'Node.js', 'Python'],
-  // ── DevOps / Cloud ─────────────────────────────────────
-  Docker: ['Kubernetes', 'CI/CD', 'AWS', 'Azure', 'GCP', 'Linux'],
-  Kubernetes: ['Docker', 'AWS', 'GCP', 'Terraform', 'Linux'],
-  AWS: ['Docker', 'Kubernetes', 'Terraform', 'Linux', 'Python', 'Node.js'],
-  Azure: ['Docker', 'Kubernetes', 'CI/CD', 'Terraform'],
-  GCP: ['Docker', 'Kubernetes', 'Terraform', 'Python'],
-  Terraform: ['AWS', 'Azure', 'GCP', 'Kubernetes', 'Linux'],
-  Linux: ['Docker', 'Nginx', 'AWS', 'Bash', 'CI/CD'],
-  'CI/CD': ['Docker', 'GitHub Actions', 'Jenkins', 'Git'],
-  // ── API / Protocol ─────────────────────────────────────
-  'REST API': ['GraphQL', 'Node.js', 'Express', 'NestJS', 'FastAPI'],
-  GraphQL: ['REST API', 'Node.js', 'React', 'Apollo'],
-  // ── Mobile ─────────────────────────────────────────────
-  'React Native': ['React', 'TypeScript', 'JavaScript', 'Expo'],
-  Flutter: ['Dart', 'Android', 'iOS'],
-  // ── Testing ────────────────────────────────────────────
-  Jest: ['Node.js', 'TypeScript', 'React', 'TDD'],
-  Playwright: ['TypeScript', 'JavaScript', 'Testing', 'CI/CD'],
-  Cypress: ['JavaScript', 'TypeScript', 'React', 'Testing'],
-  // ── Design / UX ────────────────────────────────────────
-  Figma: ['UI Design', 'UX Research', 'Tailwind CSS'],
-  'UI Design': ['Figma', 'HTML', 'CSS', 'Accessibility'],
-  // ── PM / Business ──────────────────────────────────────
-  Agile: ['Scrum', 'Jira', 'Project Management'],
-  Scrum: ['Agile', 'Jira', 'Project Management'],
-  // ── IT / Infra ─────────────────────────────────────────
-  Networking: ['Linux', 'AWS', 'Systems Administration'],
-  'Systems Administration': ['Linux', 'Networking', 'Docker'],
-  Microservices: ['Docker', 'Kubernetes', 'REST API', 'GraphQL', 'Node.js'],
-  SEO: ['WordPress', 'Digital Marketing', 'HTML', 'Google Analytics'],
-};
-
-export const EXP_YEARS: Record<string, number> = {
-  INTERN: 0, ENTRY: 1, MID: 3, SENIOR: 5, LEAD: 7,
-};
+export const SKILL_DICT: string[] = kb.skills;
+export const SKILL_ALIAS: Record<string, string> = kb.aliases;
+export const SKILL_GRAPH: Record<string, string[]> = kb.graph;
+export const EXP_YEARS: Record<string, number> = kb.experienceYears;
+const ROLE_SYNONYMS: Record<string, string[]> = kb.roleSynonyms;
 
 export function normalizeSkill(raw: string): string {
   const t = String(raw).trim();
@@ -197,59 +33,7 @@ export function roleSimilarity(jobTitle: string, targetRole: string): number {
   const tr = targetRole.toLowerCase();
   if (t.includes(tr)) return 1;
 
-  // Bidirectional synonym map: each key maps to terms that should score highly
-  const syn: Record<string, string[]> = {
-    // ── Software Engineering ──────────────────────────────
-    'backend developer': ['backend', 'back-end', 'back end', 'api', 'node', 'server-side', 'server side', 'server-side developer'],
-    'back-end developer': ['backend', 'back-end', 'api', 'node', 'server'],
-    'frontend developer': ['frontend', 'front-end', 'front end', 'ui developer', 'react', 'web developer', 'client-side', 'client side'],
-    'front-end developer': ['frontend', 'front-end', 'ui developer', 'react', 'web developer'],
-    'full stack developer': ['full stack', 'fullstack', 'full-stack', 'full stack developer', 'software engineer', 'web developer', 'software developer'],
-    'full-stack developer': ['full stack', 'fullstack', 'full-stack', 'software engineer', 'web developer'],
-    'software engineer': ['software engineer', 'software developer', 'developer', 'full stack', 'fullstack', 'full-stack', 'web developer', 'programmer', 'swe'],
-    'software developer': ['software engineer', 'software developer', 'developer', 'full stack', 'programmer'],
-    'web developer': ['web developer', 'frontend', 'frontend developer', 'full stack', 'full stack developer', 'react', 'node'],
-    'mobile developer': ['mobile', 'mobile developer', 'ios developer', 'android developer', 'react native', 'flutter'],
-    'ios developer': ['ios', 'ios developer', 'mobile', 'swift', 'react native'],
-    'android developer': ['android', 'android developer', 'mobile', 'kotlin', 'flutter'],
-    // ── Data / ML ─────────────────────────────────────────
-    'data engineer': ['data engineer', 'etl', 'analytics engineer', 'data pipeline', 'data platform'],
-    'data analyst': ['data analyst', 'analytics', 'data analysis', 'business intelligence', 'bi'],
-    'data scientist': ['data scientist', 'machine learning', 'ml engineer', 'ai engineer'],
-    'machine learning engineer': ['machine learning', 'ml engineer', 'ai engineer', 'data scientist'],
-    'ml engineer': ['machine learning', 'ml', 'ai engineer', 'data scientist'],
-    'ai engineer': ['ai', 'artificial intelligence', 'machine learning', 'ml engineer', 'llm'],
-    // ── DevOps / Infra ────────────────────────────────────
-    'devops engineer': ['devops', 'sre', 'platform engineer', 'cloud', 'infrastructure', 'infrastructure engineer', 'devsecops'],
-    'site reliability engineer': ['sre', 'devops', 'platform engineer', 'infrastructure'],
-    'platform engineer': ['platform', 'devops', 'sre', 'infrastructure', 'cloud'],
-    'cloud engineer': ['cloud', 'aws', 'azure', 'gcp', 'devops', 'infrastructure'],
-    'infrastructure engineer': ['infrastructure', 'devops', 'sre', 'platform', 'cloud'],
-    'systems engineer': ['systems', 'infrastructure', 'linux', 'networking', 'devops'],
-    // ── QA / Testing ──────────────────────────────────────
-    'qa engineer': ['qa', 'quality assurance', 'testing', 'test engineer', 'sdet', 'quality engineer'],
-    'quality assurance': ['qa', 'quality assurance', 'testing', 'test engineer'],
-    'test engineer': ['qa', 'testing', 'sdet', 'quality assurance'],
-    'sdet': ['qa', 'testing', 'automation engineer', 'test engineer', 'quality assurance'],
-    // ── Design ────────────────────────────────────────────
-    'ui designer': ['ui', 'ui designer', 'ui developer', 'frontend', 'web designer', 'visual designer'],
-    'ux designer': ['ux', 'ux designer', 'user experience', 'product designer'],
-    'product designer': ['product designer', 'ux designer', 'ui designer', 'ux/ui'],
-    // ── PM / Business ─────────────────────────────────────
-    'project manager': ['project manager', 'pm', 'program manager', 'delivery manager'],
-    'product manager': ['product manager', 'pm', 'product owner', 'po'],
-    'scrum master': ['scrum master', 'agile coach', 'delivery manager'],
-    // ── Security ──────────────────────────────────────────
-    'security engineer': ['security', 'infosec', 'cybersecurity', 'application security', 'appsec'],
-    // ── Database ──────────────────────────────────────────
-    'database administrator': ['dba', 'database', 'database engineer', 'data engineer'],
-    'database engineer': ['dba', 'database', 'data engineer', 'database administrator'],
-    // ── Generic ───────────────────────────────────────────
-    developer: ['developer', 'engineer', 'programmer', 'coder'],
-    engineer: ['engineer', 'developer', 'programmer'],
-  };
-
-  const words = syn[tr] || [tr];
+  const words = ROLE_SYNONYMS[tr] || [tr];
   let s = 0;
   for (const w of words) if (t.includes(w)) s = Math.max(s, 0.75);
 

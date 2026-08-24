@@ -36,6 +36,15 @@ export default function ProfilePage() {
   const load = async () => {
     try {
       const [p, c] = await Promise.all([api('/api/profile'), api('/api/profile/cv')]);
+      // SQLite compat: employmentTypes may be a JSON string, booleans may be 0/1
+      if (p) {
+        if (typeof p.employmentTypes === 'string') {
+          try { p.employmentTypes = JSON.parse(p.employmentTypes); } catch { p.employmentTypes = []; }
+        }
+        p.remote = !!p.remote;
+        p.excludeOnsite = !!p.excludeOnsite;
+        p.onboardDone = !!p.onboardDone;
+      }
       setProfile(p);
       setCv(c);
       setErr(null);

@@ -114,14 +114,12 @@ export class LifecycleTasks {
     });
   }
 
-  @Interval(collectIntervalMs()) // FR-035: scheduled collection (JOB_COLLECTION_INTERVAL, default 30 min)
+  @Interval(collectIntervalMs()) // FR-035: scheduled collection via queue (JOB_COLLECTION_INTERVAL, default 30 min)
   async collect() {
     await this.runExclusive('collect', async () => {
       try {
-        const sources = await this.sources.listActive();
-        for (const s of sources) {
-          await this.sources.collectWithFallback(s.id);
-        }
+        const result = this.sources.collectAll();
+        this.logger.log(`Scheduled collection: enqueued ${result.enqueued} sources`);
       } catch (e) {
         this.logger.error('Scheduled collection failed', e);
       }

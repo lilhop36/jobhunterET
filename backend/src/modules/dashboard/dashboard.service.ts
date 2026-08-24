@@ -73,8 +73,8 @@ export class DashboardService {
               jobsCollected: latestDigest.jobsCollected,
               newJobs: latestDigest.newJobs,
               strongMatches: latestDigest.strongMatches,
-              topMatches: latestDigest.topMatches,
-              searches: latestDigest.searches,
+              topMatches: this.prisma.isSQLite && typeof latestDigest.topMatches === 'string' ? (() => { try { return JSON.parse(latestDigest.topMatches); } catch { return []; } })() : latestDigest.topMatches,
+              searches: this.prisma.isSQLite && typeof latestDigest.searches === 'string' ? (() => { try { return JSON.parse(latestDigest.searches); } catch { return []; } })() : latestDigest.searches,
             }
           : null,
       };

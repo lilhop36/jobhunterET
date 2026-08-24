@@ -95,7 +95,8 @@ export default function OnboardingPage() {
         setSkills(p.skills ?? []);
         setLocTiers(p.locationTiers ?? []);
         setRemote(!!p.remote);
-        if (p.employmentTypes?.length) setEmploymentTypes(p.employmentTypes);
+        const et = typeof p.employmentTypes === 'string' ? (() => { try { return JSON.parse(p.employmentTypes); } catch { return []; } })() : p.employmentTypes;
+        if (et?.length) setEmploymentTypes(et);
       })
       .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps

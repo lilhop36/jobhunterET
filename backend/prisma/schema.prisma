@@ -3,24 +3,32 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
+
+// ══════════════════════════════════════════════════════════════
+// SQLite-compatible schema — same models as schema.prisma but
+// with PostgreSQL-specific types replaced:
+//   - String[]  →  String (JSON-encoded array)
+//   - Json      →  String (raw JSON string)
+// Use `scripts/switch-db.sh` to copy the right schema.
+// ══════════════════════════════════════════════════════════════
 
 model User {
   id                  String               @id @default(cuid())
   email               String               @unique
   passwordHash        String
-  role                Role                 @default(USER)
+  role                String               @default("USER")
   locale              String               @default("en")
-  notificationsPaused Boolean              @default(false)
+  notificationsPaused Int                  @default(0)
   matchThreshold      Int                  @default(75)
   pausedUntil         DateTime?
   createdAt           DateTime             @default(now())
-  digestEnabled       Boolean              @default(true)
+  digestEnabled       Int                  @default(1)
   emailVerifiedAt     DateTime?
   lastActiveAt        DateTime?
-  status              UserStatus           @default(ACTIVE)
+  status              String               @default("ACTIVE")
   tokenInvalidatedAt  DateTime?
   applications        Application[]
   profile             CandidateProfile?
@@ -43,11 +51,12 @@ model CandidateProfile {
   title           String?
   summary         String?
   years           Int      @default(0)
-  remote          Boolean  @default(false)
+  remote          Int      @default(0)
   minSalary       Int      @default(0)
-  excludeOnsite   Boolean  @default(false)
-  employmentTypes String[] @default([])
-  onboardDone     Boolean  @default(false)
+  excludeOnsite   Int      @default(0)
+  // SQLite: employmentTypes stored as JSON array string
+  employmentTypes String   @default("[]")
+  onboardDone     Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -60,19 +69,19 @@ model CvFile {
   originalName String
   sizeBytes    Int
   uploadedAt   DateTime @default(now())
-  active       Boolean  @default(true)
+  active       Int      @default(1)
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model TelegramLink {
-  id       String             @id @default(cuid())
-  userId   String             @unique
-  chatId   String             @unique
-  linkedAt DateTime           @default(now())
-  status   TelegramLinkStatus @default(ACTIVE)
-  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id       String   @id @default(cuid())
+  userId   String   @unique
+  chatId   String   @unique
+  linkedAt DateTime @default(now())
+  status   String   @default("ACTIVE")
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Skill {
@@ -96,18 +105,18 @@ model TargetRole {
   id       String   @id @default(cuid())
   userId   String
   role     String
-  priority Priority
+  priority String
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model LocationPreference {
-  id     String   @id @default(cuid())
+  id     String @id @default(cuid())
   userId String
   region String
-  tier   Priority
-  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tier   String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, region])
 }
@@ -115,17 +124,16 @@ model LocationPreference {
 model JobSource {
   id                  String       @id @default(cuid())
   name                String
-  type                SourceType
+  type                String
   baseUrl             String
-  status              SourceStatus @default(ACTIVE)
-  priorityTier        SourceTier
+  status              String       @default("ACTIVE")
+  priorityTier        String
   collectionFrequency String       @default("30 min")
   lastSuccessfulRun   DateTime?
   lastFailedRun       DateTime?
   lastError           String?
   createdAt           DateTime     @default(now())
   consecutiveFailures Int          @default(0)
-  // Source Resilience: per-source health scoring (last 10 runs)
   healthScore         Float?       @map("health_score")
   lastHealthCheckAt   DateTime?    @map("last_health_check_at")
   jobs                Job[]
@@ -160,10 +168,10 @@ model Job {
   description          String?
   company              String
   location             String
-  workPlace            Workplace          @default(ONSITE)
-  locationClass        LocationClass
-  employmentType       EmploymentType
-  experienceLevel      ExperienceLevel
+  workPlace            String             @default("ONSITE")
+  locationClass        String
+  employmentType       String
+  experienceLevel      String
   salary               Int?
   currency             String             @default("USD")
   url                  String
@@ -174,25 +182,28 @@ model Job {
   firstSeenAt          DateTime           @default(now())
   lastSeenAt           DateTime           @default(now())
   missedCycles         Int                @default(0)
-  status               JobStatus          @default(ACTIVE)
+  status               String             @default("ACTIVE")
   statusChangedAt      DateTime?
   parseConfidence      Int                @default(85)
   archivedAt           DateTime?
   fingerprint          String?
-  rawData              Json?
+  // SQLite: rawData stored as JSON string
+  rawData              String?
   country              String?
   createdAt            DateTime           @default(now())
   matchedAt            DateTime?
   urlCheckedAt         DateTime?
   urlStatus            String?
   applyEmail           String?
-  applyMethod          ApplyMethod        @default(ONLINE_URL)
+  applyMethod          String             @default("ONLINE_URL")
   applyUrl             String?
   applyUrlRaw          String?
   descriptionFetchedAt DateTime?
   descriptionQuality   Int?
-  descriptionSource    DescriptionSource?
+  descriptionSource    String?
   finalUrl             String?
+  // Classification tags: JSON string array ["ethiopian","tech",...]
+  tags                 String?        @default("[]")
   apps                 Application[]
   source               JobSource          @relation(fields: [sourceId], references: [id])
   matches              JobMatch[]
@@ -229,10 +240,11 @@ model JobMatch {
   employmentScore Float
   freshnessScore  Float
   salaryScore     Float
-  matchedSkills   String[]
-  relatedSkills   String[]
-  missingSkills   String[]
-  reasons         String[]
+  // SQLite: arrays stored as JSON strings
+  matchedSkills   String   @default("[]")
+  relatedSkills   String   @default("[]")
+  missingSkills   String   @default("[]")
+  reasons         String   @default("[]")
   summary         String?
   matcherVersion  String   @default("v2.2-rules")
   createdAt       DateTime @default(now())
@@ -246,15 +258,15 @@ model JobMatch {
 }
 
 model Application {
-  id          String                  @id @default(cuid())
+  id          String   @id @default(cuid())
   userId      String
   jobId       String
-  stage       ApplicationStage        @default(APPLIED)
-  stageSince  DateTime                @default(now())
+  stage       String   @default("APPLIED")
+  stageSince  DateTime @default(now())
   followUp    DateTime?
-  version     Int                     @default(1)
-  job         Job                     @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version     Int      @default(1)
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   transitions ApplicationTransition[]
 
   @@unique([userId, jobId])
@@ -263,28 +275,28 @@ model Application {
 }
 
 model ApplicationTransition {
-  id             String            @id @default(cuid())
+  id             String    @id @default(cuid())
   applicationId  String
-  fromStage      ApplicationStage?
-  toStage        ApplicationStage
-  transitionedAt DateTime          @default(now())
-  application    Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fromStage      String?
+  toStage        String
+  transitionedAt DateTime  @default(now())
+  application    Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   @@index([applicationId, transitionedAt])
 }
 
 model Notification {
-  id        String              @id @default(cuid())
+  id        String   @id @default(cuid())
   userId    String
   jobId     String
-  channel   NotificationChannel
-  status    NotificationStatus  @default(UNREAD_WEB)
+  channel   String
+  status    String   @default("UNREAD_WEB")
   score     Int
   summary   String?
-  createdAt DateTime            @default(now())
+  createdAt DateTime @default(now())
   sentAt    DateTime?
-  job       Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, jobId])
   @@index([userId, channel, status])
@@ -296,7 +308,7 @@ model SearchProfile {
   name      String
   q         String?
   tier      String   @default("ALL")
-  remote    Boolean  @default(false)
+  remote    Int      @default(0)
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -310,8 +322,9 @@ model Digest {
   jobsCollected Int
   newJobs       Int
   strongMatches Int
-  topMatches    Json
-  searches      Json
+  // SQLite: JSON stored as string
+  topMatches    String
+  searches      String
   deliveredTo   String   @default("WEB")
   status        String   @default("SENT")
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -347,122 +360,4 @@ model BotState {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
-}
-
-enum Role {
-  USER
-  ADMIN
-}
-
-enum UserStatus {
-  ACTIVE
-  DORMANT
-  DISABLED
-  DELETED
-}
-
-enum EmploymentType {
-  FULL_TIME
-  CONTRACT
-  PART_TIME
-  INTERNSHIP
-}
-
-enum ExperienceLevel {
-  INTERN
-  ENTRY
-  MID
-  SENIOR
-  LEAD
-}
-
-enum LocationClass {
-  ETHIOPIA_LOCAL
-  ETHIOPIA_REMOTE
-  INTERNATIONAL_REMOTE
-  INTERNATIONAL_ONSITE
-  INTERNATIONAL_HYBRID
-}
-
-enum Workplace {
-  ONSITE
-  REMOTE
-  HYBRID
-}
-
-enum JobStatus {
-  ACTIVE
-  EXPIRED
-  REMOVED
-}
-
-enum NotificationChannel {
-  TELEGRAM
-  WEB
-}
-
-enum NotificationStatus {
-  PENDING
-  SENT
-  FAILED
-  UNREAD_WEB
-  READ
-}
-
-enum ApplicationStage {
-  DISCOVERED
-  SAVED
-  APPLIED
-  ASSESSMENT
-  INTERVIEW
-  OFFER
-  REJECTED
-  WITHDRAWN
-}
-
-enum SourceStatus {
-  ACTIVE
-  ERROR
-  DISABLED
-}
-
-enum SourceTier {
-  ETHIOPIA
-  REMOTE
-  INTERNATIONAL
-}
-
-enum TelegramLinkStatus {
-  ACTIVE
-  UNREACHABLE
-}
-
-enum ApplyMethod {
-  ONLINE_URL
-  EMAIL
-  IN_PERSON
-  SOURCE_ACCOUNT
-  PDF_FORM
-}
-
-enum DescriptionSource {
-  API
-  LIST
-  DETAIL
-  PDF
-}
-
-enum SourceType {
-  API
-  RSS
-  JSON
-  HTML
-  COMPANY_CAREER_PAGE
-  TELEGRAM
-}
-
-enum Priority {
-  HIGH
-  MEDIUM
-  LOW
 }

@@ -16,6 +16,7 @@ export interface JobFilter {
   type?: string;
   workplace?: string;
   source?: string;
+  tag?: string;
   sort?: 'newest' | 'deadline';
   showDead?: boolean;
   userId?: string;
@@ -41,6 +42,7 @@ export class JobsService {
     if (f.workplace === 'REMOTE') where.locationClass = { contains: 'REMOTE' };
     if (f.workplace === 'ONSITE') where.locationClass = { not: { contains: 'REMOTE' } };
     if (f.tier && f.tier !== 'ALL') where.source = { priorityTier: f.tier };
+    if (f.tag) where.tags = { contains: f.tag };
     if (f.q) {
       const q = f.q.toLowerCase();
       where.OR = [
@@ -102,6 +104,13 @@ export class JobsService {
     return this.serialize(job);
   }
 
+  /** Parse JSON string fields back to arrays (SQLite compat). */
+  private pj(v: any): any[] {
+    if (Array.isArray(v)) return v;
+    if (typeof v === 'string') { try { return JSON.parse(v); } catch { return []; } }
+    return [];
+  }
+
   private serialize(j: any) {
     const match = j.matches && j.matches.length ? j.matches[0] : null;
     return {
@@ -110,6 +119,7 @@ export class JobsService {
       company: j.company,
       location: j.location,
       locationClass: j.locationClass,
+      tags: (() => { const t = j.tags; if (Array.isArray(t)) return t; if (typeof t === 'string') { try { return JSON.parse(t); } catch { return []; } } return []; })(),
       workPlace: j.workPlace,
       employmentType: j.employmentType,
       experienceLevel: j.experienceLevel,
@@ -142,10 +152,10 @@ export class JobsService {
       match: match
         ? {
             score: match.score,
-            matchedSkills: match.matchedSkills,
-            relatedSkills: match.relatedSkills,
-            missingSkills: match.missingSkills,
-            reasons: match.reasons,
+            matchedSkills: this.pj(match.matchedSkills),
+            relatedSkills: this.pj(match.relatedSkills),
+            missingSkills: this.pj(match.missingSkills),
+            reasons: this.pj(match.reasons),
             summary: match.summary,
             parts: {
               role: match.roleScore,

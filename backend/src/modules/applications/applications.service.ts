@@ -1,6 +1,7 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { ApplicationStage } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EventsService } from '../events/events.service';
 
 // FR-031a: allowed transitions per stage.
 export const VALID_TRANSITIONS: Record<ApplicationStage, ApplicationStage[]> = {
@@ -18,7 +19,10 @@ const FOLLOW_UP_STAGES: ApplicationStage[] = ['APPLIED', 'ASSESSMENT', 'INTERVIE
 
 @Injectable()
 export class ApplicationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() @Inject(EventsService) private readonly events?: EventsService,
+  ) {}
 
   allowedTransitions(stage: ApplicationStage | null): ApplicationStage[] {
     return VALID_TRANSITIONS[stage ?? 'DISCOVERED'];
@@ -145,6 +149,28 @@ export class ApplicationsService {
       return tx.application.findUniqueOrThrow({ where: { id: existing.id } });
     });
 
+    // SSE: notify the connected client of the stage change.
+    this.emitApplicationEvent(userId, jobId, from, to);
+
     return this.view(application);
+  }
+
+  private emitApplicationEvent(userId: string, jobId: string, from: string, to: string) {
+    if (!this.events) return;
+    this.prisma.job
+      .findUnique({ where: { id: jobId }, select: { title: true, company: true } })
+      .then((job) => {
+        if (!job) return;
+        this.events!.pushToUser(userId, {
+          type: 'application',
+          jobId,
+          title: job.title,
+          company: job.company,
+          from,
+          to,
+          createdAt: new Date().toISOString(),
+        });
+      })
+      .catch(() => {});
   }
 }
