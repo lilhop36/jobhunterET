@@ -118,8 +118,11 @@ export class LifecycleTasks {
   async collect() {
     await this.runExclusive('collect', async () => {
       try {
-        const result = this.sources.collectAll();
-        this.logger.log(`Scheduled collection: enqueued ${result.enqueued} sources`);
+        // Frequency-aware: only collects sources whose configured interval has elapsed
+        const result = await this.sources.collectDue();
+        if (result.enqueued > 0) {
+          this.logger.log(`Scheduled collection: ${result.enqueued} sources due [${result.due.join(', ')}]`);
+        }
       } catch (e) {
         this.logger.error('Scheduled collection failed', e);
       }

@@ -69,8 +69,8 @@ export class NotificationsController {
   ) {
     const data: any = {};
     if (body.matchThreshold !== undefined) data.matchThreshold = body.matchThreshold;
-    if (body.notificationsPaused !== undefined) data.notificationsPaused = body.notificationsPaused;
-    if (body.digestEnabled !== undefined) data.digestEnabled = body.digestEnabled;
+    if (body.notificationsPaused !== undefined) data.notificationsPaused = this.prisma.bool(body.notificationsPaused);
+    if (body.digestEnabled !== undefined) data.digestEnabled = this.prisma.bool(body.digestEnabled);
     return this.prisma.user.update({ where: { id: user.id }, data });
   }
 }

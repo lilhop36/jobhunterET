@@ -15,6 +15,7 @@ import { JobicyAdapter } from './adapters/jobicy.adapter';
 import { RemoteOKAdapter } from './adapters/remoteok.adapter';
 import { LandingJobsAdapter } from './adapters/landingjobs.adapter';
 import { EtcareersAdapter } from './adapters/etcareers.adapter';
+import { HagereJobsAdapter } from './adapters/hagerejobs.adapter';
 import { TELEGRAM_ADAPTERS } from './adapters/telegram-tokens';
 import { EventsService } from '../events/events.service';
 import { CollectionQueue, QueueResult } from './collection-queue';
@@ -51,10 +52,11 @@ export class SourcesService implements OnModuleInit {
     remoteok: RemoteOKAdapter,
     landingjobs: LandingJobsAdapter,
     etcareers: EtcareersAdapter,
+    hagerejobs: HagereJobsAdapter,
     @Inject(TELEGRAM_ADAPTERS) telegramAdapters: JobSourceAdapter[],
   ) {
     this.adapters = {};
-    for (const a of [reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs, jobicy, remoteok, landingjobs, etcareers]) {
+    for (const a of [reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs, jobicy, remoteok, landingjobs, etcareers, hagerejobs]) {
       this.adapters[a.sourceId] = a;
     }
     // FR-008: register dynamically-configured Telegram channel adapters
@@ -87,6 +89,9 @@ export class SourcesService implements OnModuleInit {
 
     // Auto-create Telegram source rows if missing
     await this.ensureTelegramSources();
+
+    // Auto-create config-driven sources that don't exist yet
+    await this.ensureConfigDrivenSources();
   }
 
   /** Create JobSource rows for dynamically-registered Telegram channels. */
@@ -107,6 +112,27 @@ export class SourcesService implements OnModuleInit {
           },
         });
         this.logger.log(`[CONFIG] Auto-created Telegram source: ${id}`);
+      }
+    }
+  }
+
+  /** Create JobSource rows for config-driven sources that don't exist yet. */
+  private async ensureConfigDrivenSources() {
+    for (const cfg of (sourceConfigs as any).sources ?? []) {
+      const exists = await this.prisma.jobSource.findUnique({ where: { id: cfg.id } });
+      if (!exists) {
+        await this.prisma.jobSource.create({
+          data: {
+            id: cfg.id,
+            name: cfg.name,
+            type: cfg.type ?? 'HTML',
+            baseUrl: cfg.baseUrl,
+            status: 'ACTIVE',
+            priorityTier: cfg.priorityTier ?? 'ETHIOPIA',
+            collectionFrequency: `${cfg.frequency ?? 60} min`,
+          },
+        });
+        this.logger.log(`[CONFIG] Auto-created source: ${cfg.id} (${cfg.name})`);
       }
     }
   }
@@ -597,6 +623,64 @@ export class SourcesService implements OnModuleInit {
     const count = this.queue.enqueueAll(activeSources);
     this.logger.log(`[QUEUE] Enqueued ${count} sources for collection`);
     return { enqueued: count, sources: activeSources.map((s) => s.id) };
+  }
+
+  /**
+   * FR-035: frequency-aware collection — only enqueue sources whose configured
+   * interval has elapsed since their last successful run. This prevents
+   * low-frequency sources (e.g. RemoteOK every 120min) from being hammered
+   * by a 30-minute scheduler tick.
+   */
+  async collectDue(): Promise<{ enqueued: number; skipped: string[]; due: string[] }> {
+    const now = Date.now();
+    const sources = await this.prisma.jobSource.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true, lastRunAt: true },
+    });
+
+    const dueIds: string[] = [];
+    const skippedIds: string[] = [];
+
+    for (const src of sources) {
+      if (!this.adapters[src.id]) continue;
+
+      // Get configured frequency (minutes) from source config
+      const freqMinutes = this.sourceConfigMap[src.id]?.frequency ?? 60;
+      const freqMs = freqMinutes * 60_000;
+
+      // If never collected, it's due
+      if (!src.lastRunAt) {
+        dueIds.push(src.id);
+        continue;
+      }
+
+      const elapsed = now - src.lastRunAt.getTime();
+      if (elapsed >= freqMs) {
+        dueIds.push(src.id);
+      } else {
+        skippedIds.push(src.id);
+      }
+    }
+
+    if (dueIds.length === 0) {
+      this.logger.log(`[SCHEDULER] No sources due for collection (all within frequency window)`);
+      return { enqueued: 0, skipped: skippedIds, due: [] };
+    }
+
+    // Enqueue only due sources, prioritized by tier
+    const activeSources = dueIds.map((id) => ({
+      id,
+      priorityTier: this.sourceConfigMap[id]?.priorityTier ?? 'INTERNATIONAL',
+      execute: () => this.collectWithFallback(id),
+    }));
+
+    const count = this.queue.enqueueAll(activeSources);
+    this.logger.log(
+      `[SCHEDULER] Enqueued ${count}/${sources.length} due sources: [${dueIds.join(', ')}]` +
+      (skippedIds.length ? ` — skipped: [${skippedIds.join(', ')}]` : ''),
+    );
+
+    return { enqueued: count, skipped: skippedIds, due: dueIds };
   }
 
   /** Get current queue statistics. */

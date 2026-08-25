@@ -94,13 +94,18 @@ export class ProfileService {
       if (dto.targetRoles) {
         await tx.targetRole.deleteMany({ where: { userId } });
         for (const tr of dto.targetRoles) {
-          await tx.targetRole.create({ data: { userId, role: tr.role, priority: tr.priority } });
+          // Accept both string[] and {role, priority}[] from the frontend
+          const role = typeof tr === 'string' ? tr : tr.role;
+          const priority = typeof tr === 'string' ? 'MEDIUM' : (tr.priority ?? 'MEDIUM');
+          await tx.targetRole.create({ data: { userId, role, priority } });
         }
       }
       if (dto.locationTiers) {
         await tx.locationPreference.deleteMany({ where: { userId } });
         for (const lt of dto.locationTiers) {
-          await tx.locationPreference.create({ data: { userId, region: lt.region, tier: lt.tier } });
+          const region = typeof lt === 'string' ? lt : lt.region;
+          const tier = typeof lt === 'string' ? 'MEDIUM' : (lt.tier ?? 'MEDIUM');
+          await tx.locationPreference.create({ data: { userId, region, tier } });
         }
       }
     });

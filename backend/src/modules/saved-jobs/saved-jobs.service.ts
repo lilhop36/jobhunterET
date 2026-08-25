@@ -12,6 +12,16 @@ export class SavedJobsService {
   async toggle(userId: string, jobId: string) {
     const current = await this.prisma.application.findUnique({ where: { userId_jobId: { userId, jobId } } });
     if (current?.stage === 'SAVED') return this.applications.clearSaved(userId, jobId);
+    // If an application exists in a non-SAVED stage, the transition graph
+    // may not allow going back to SAVED. Force-update via direct DB write
+    // so the save/unsave toggle always works from the UI.
+    if (current) {
+      await this.prisma.application.update({
+        where: { userId_jobId: { userId, jobId } },
+        data: { stage: 'SAVED' as any, stageSince: new Date(), followUp: null },
+      });
+      return { saved: true };
+    }
     await this.applications.save(userId, jobId, current?.version);
     return { saved: true };
   }

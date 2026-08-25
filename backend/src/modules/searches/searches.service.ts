@@ -11,7 +11,7 @@ export class SearchesService {
 
   create(userId: string, dto: { name: string; q?: string; tier?: string; remote?: boolean }) {
     return this.prisma.searchProfile.create({
-      data: { userId, name: dto.name, q: dto.q, tier: dto.tier || 'ALL', remote: dto.remote || false },
+      data: { userId, name: dto.name, q: dto.q, tier: dto.tier || 'ALL', remote: this.prisma.bool(dto.remote ?? false) as any },
     });
   }
 

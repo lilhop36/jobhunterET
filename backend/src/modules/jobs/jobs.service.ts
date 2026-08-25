@@ -45,11 +45,13 @@ export class JobsService {
     if (f.tag) where.tags = { contains: f.tag };
     if (f.q) {
       const q = f.q.toLowerCase();
+      // NOTE: mode 'insensitive' is PostgreSQL-only. SQLite uses case-insensitive
+      // LIKE by default on ASCII, so lowercase q works for most matches.
       where.OR = [
-        { title: { contains: q, mode: 'insensitive' } },
-        { company: { contains: q, mode: 'insensitive' } },
-        { description: { contains: q, mode: 'insensitive' } },
-        { skills: { some: { skill: { name: { contains: q, mode: 'insensitive' } } } } },
+        { title: { contains: q } },
+        { company: { contains: q } },
+        { description: { contains: q } },
+        { skills: { some: { skill: { name: { contains: q } } } } },
       ];
     }
 

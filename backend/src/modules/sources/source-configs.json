@@ -119,6 +119,18 @@
       "defaultLocationClass": "INTERNATIONAL_REMOTE",
       "defaultTags": ["remote", "international", "tech"],
       "fetchTimeout": 30000
+    },
+    {
+      "id": "hagerejobs",
+      "name": "Hagere Jobs",
+      "adapter": "hagerejobs",
+      "type": "HTML",
+      "baseUrl": "https://hagerejobs.com/ethiopia-job/",
+      "frequency": 60,
+      "priorityTier": "ETHIOPIA",
+      "defaultLocationClass": "ETHIOPIA_LOCAL",
+      "defaultTags": ["ethiopian"],
+      "fetchTimeout": 30000
     }
   ],
   "fallbackChains": {
