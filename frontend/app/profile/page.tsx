@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Download, FileText, History, Settings, ShieldCheck, Trash2 } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
@@ -21,6 +21,16 @@ interface Profile {
   completion: number;
 }
 
+/** Parse a "Role, PRIORITY" or "Region, TIER" line — last comma-separated part is the priority/tier. */
+function parsePrioLine(line: string, fallback: string): { value: string; priority: string } {
+  const parts = line.split(',').map((s) => s.trim()).filter(Boolean);
+  if (parts.length > 1) {
+    const priority = parts.pop()!.toUpperCase();
+    return { value: parts.join(', ') || line, priority };
+  }
+  return { value: parts[0] || line, priority: fallback };
+}
+
 export default function ProfilePage() {
   const { api, user, token } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -31,7 +41,19 @@ export default function ProfilePage() {
   const [cv, setCv] = useState<{ id: string; originalName: string; sizeBytes: number; uploadedAt: string; downloadUrl: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [deletingCv, setDeletingCv] = useState(false);
   const [cvMsg, setCvMsg] = useState<string | null>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
+
+  // Cleanup XHR on unmount (fix #7)
+  useEffect(() => {
+    return () => {
+      if (xhrRef.current) {
+        xhrRef.current.abort();
+        xhrRef.current = null;
+      }
+    };
+  }, []);
 
   const load = async () => {
     try {
@@ -109,6 +131,7 @@ export default function ProfilePage() {
     fd.append('file', file);
     await new Promise<void>((resolve) => {
       const xhr = new XMLHttpRequest();
+      xhrRef.current = xhr;
       xhr.open('POST', '/api/profile/cv');
       if (token) xhr.setRequestHeader('authorization', `Bearer ${token}`);
       xhr.upload.onprogress = (ev) => {
@@ -118,6 +141,8 @@ export default function ProfilePage() {
         if (xhr.status >= 200 && xhr.status < 300) {
           setCv(JSON.parse(xhr.responseText));
           setCvMsg(`Uploaded ${file.name}.`);
+          // FIX #1: Do NOT call load() here — it would overwrite unsaved profile edits.
+          // CV state is already updated directly above. Completion meter will refresh on next save.
         } else {
           try {
             setCvMsg(JSON.parse(xhr.responseText).message || 'Upload failed.');
@@ -125,30 +150,42 @@ export default function ProfilePage() {
             setCvMsg('Upload failed.');
           }
         }
+        xhrRef.current = null;
         resolve();
       };
       xhr.onerror = () => {
         setCvMsg('Upload failed — network error.');
+        xhrRef.current = null;
         resolve();
       };
       xhr.send(fd);
     });
     setUploading(false);
-    load(); // refresh CV metadata + completion meter
   };
 
+  /** FIX #2: deleteCv with confirmation, loading state, and error handling. */
   const deleteCv = async () => {
-    await api('/api/profile/cv', { method: 'DELETE' });
-    setCv(null);
-    setCvMsg('CV removed.');
+    if (!window.confirm('Are you sure you want to remove your CV? This will lower your profile completion score.')) return;
+    setDeletingCv(true);
+    setCvMsg(null);
+    try {
+      await api('/api/profile/cv', { method: 'DELETE' });
+      setCv(null);
+      setCvMsg('CV removed.');
+    } catch (e: any) {
+      setCvMsg(`Error removing CV: ${e.message}`);
+    } finally {
+      setDeletingCv(false);
+    }
   };
 
   return (
     <RequireAuth>
       <h1>Profile</h1>
       <p className="subtitle">Your career data drives every match (FR-003).</p>
-      {err && <ErrorBox msg={err} />}
-      {ok && <div className="ok-box">{ok}</div>}
+      {/* FIX #5: Hide messages during async operations */}
+      {err && !loading && !saving && !uploading && !deletingCv && <ErrorBox msg={err} />}
+      {ok && !loading && !saving && !uploading && <div className="ok-box">{ok}</div>}
       {loading && <Loading />}
 
       {profile && (
@@ -160,7 +197,15 @@ export default function ProfilePage() {
                 {profile.completion}%
               </span>
             </h2>
-            <div className="progress">
+            {/* FIX #6: ARIA attributes for screen readers */}
+            <div
+              className="progress"
+              role="progressbar"
+              aria-valuenow={profile.completion}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Profile completion: ${profile.completion}%`}
+            >
               <div style={{ width: `${profile.completion}%` }} />
             </div>
             {!profile.onboardDone && profile.completion < 100 && (
@@ -189,8 +234,9 @@ export default function ProfilePage() {
                 <a className="btn ghost small" href={cv.downloadUrl}>
                   <Download className="h-4 w-4" /> Download
                 </a>
-                <button className="btn danger small" onClick={deleteCv}>
-                  <Trash2 className="h-4 w-4" /> Remove
+                {/* FIX #2: Button uses deletingCv state */}
+                <button className="btn danger small" onClick={deleteCv} disabled={deletingCv}>
+                  <Trash2 className="h-4 w-4" /> {deletingCv ? 'Removing…' : 'Remove'}
                 </button>
               </div>
             ) : (
@@ -226,115 +272,121 @@ export default function ProfilePage() {
             )}
           </div>
 
-          <div className="grid grid-2">
-            <div className="card">
-              <h2>Basics</h2>
-              <label htmlFor="profile-title">Professional title</label>
-              <input id="profile-title" name="title" value={profile.title ?? ''} onChange={(e) => set('title', e.target.value)} />
-              <label htmlFor="profile-summary">Summary</label>
-              <textarea id="profile-summary" name="summary" rows={3} value={profile.summary ?? ''} onChange={(e) => set('summary', e.target.value)} />
-              <div className="grid grid-2">
-                <div>
-                  <label htmlFor="profile-years">Years of experience</label>
-                  <input
-                    id="profile-years"
-                    name="years"
-                    type="number"
-                    value={profile.years}
-                    onChange={(e) => set('years', Number(e.target.value))}
-                  />
+          {/* FIX #4: Wrapped in <form> for Enter-key submission */}
+          <form onSubmit={(e) => { e.preventDefault(); save(); }}>
+            <div className="grid grid-2">
+              <div className="card">
+                <h2>Basics</h2>
+                <label htmlFor="profile-title">Professional title</label>
+                <input id="profile-title" name="title" value={profile.title ?? ''} onChange={(e) => set('title', e.target.value)} />
+                <label htmlFor="profile-summary">Summary</label>
+                <textarea id="profile-summary" name="summary" rows={3} value={profile.summary ?? ''} onChange={(e) => set('summary', e.target.value)} />
+                <div className="grid grid-2">
+                  <div>
+                    <label htmlFor="profile-years">Years of experience</label>
+                    <input
+                      id="profile-years"
+                      name="years"
+                      type="number"
+                      value={profile.years}
+                      onChange={(e) => set('years', Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="profile-salary">Min salary (USD)</label>
+                    <input
+                      id="profile-salary"
+                      name="minSalary"
+                      type="number"
+                      value={profile.minSalary}
+                      onChange={(e) => set('minSalary', Number(e.target.value))}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label htmlFor="profile-salary">Min salary (USD)</label>
+                <label className="checkbox-line">
+                  <input type="checkbox" checked={profile.remote} onChange={(e) => set('remote', e.target.checked)} />
+                  Open to remote work
+                </label>
+                <label className="checkbox-line">
                   <input
-                    id="profile-salary"
-                    name="minSalary"
-                    type="number"
-                    value={profile.minSalary}
-                    onChange={(e) => set('minSalary', Number(e.target.value))}
+                    type="checkbox"
+                    checked={profile.excludeOnsite}
+                    onChange={(e) => set('excludeOnsite', e.target.checked)}
                   />
-                </div>
+                  Exclude on-site roles outside Ethiopia
+                </label>
               </div>
-              <label className="checkbox-line">
-                <input type="checkbox" checked={profile.remote} onChange={(e) => set('remote', e.target.checked)} />
-                Open to remote work
-              </label>
-              <label className="checkbox-line">
+
+              <div className="card">
+                <h2>Skills, roles & locations</h2>
+                <label htmlFor="profile-skills">Skills (comma separated)</label>
                 <input
-                  type="checkbox"
-                  checked={profile.excludeOnsite}
-                  onChange={(e) => set('excludeOnsite', e.target.checked)}
+                  id="profile-skills"
+                  name="skills"
+                  value={profile.skills.join(', ')}
+                  onChange={(e) =>
+                    set('skills', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))
+                  }
                 />
-                Exclude on-site roles outside Ethiopia
-              </label>
+                <label htmlFor="profile-roles">Target roles — one per line: Role, PRIORITY</label>
+                <textarea
+                  id="profile-roles"
+                  name="targetRoles"
+                  rows={3}
+                  value={profile.targetRoles.map((t) => `${t.role}, ${t.priority}`).join('\n')}
+                  onChange={(e) =>
+                    set(
+                      'targetRoles',
+                      e.target.value
+                        .split('\n')
+                        .map((line) => line.trim())
+                        .filter(Boolean)
+                        .map((line) => {
+                          // FIX #3: Pop last part as priority, join remaining as role
+                          const { value: role, priority } = parsePrioLine(line, 'MEDIUM');
+                          return { role, priority };
+                        }),
+                    )
+                  }
+                />
+                <label htmlFor="profile-locations">Location tiers — one per line: Region, PRIORITY</label>
+                <textarea
+                  id="profile-locations"
+                  name="locationTiers"
+                  rows={2}
+                  value={profile.locationTiers.map((l) => `${l.region}, ${l.tier}`).join('\n')}
+                  onChange={(e) =>
+                    set(
+                      'locationTiers',
+                      e.target.value
+                        .split('\n')
+                        .map((line) => line.trim())
+                        .filter(Boolean)
+                        .map((line) => {
+                          // FIX #3: Pop last part as tier, join remaining as region
+                          const { value: region, priority: tier } = parsePrioLine(line, 'MEDIUM');
+                          return { region, tier };
+                        }),
+                    )
+                  }
+                />
+                <label htmlFor="profile-employment">Employment types (comma separated)</label>
+                <input
+                  id="profile-employment"
+                  name="employmentTypes"
+                  value={profile.employmentTypes.join(', ')}
+                  onChange={(e) =>
+                    set('employmentTypes', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))
+                  }
+                />
+              </div>
             </div>
 
-            <div className="card">
-              <h2>Skills, roles & locations</h2>
-              <label htmlFor="profile-skills">Skills (comma separated)</label>
-              <input
-                id="profile-skills"
-                name="skills"
-                value={profile.skills.join(', ')}
-                onChange={(e) =>
-                  set('skills', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))
-                }
-              />
-              <label htmlFor="profile-roles">Target roles — one per line: Role, PRIORITY</label>
-              <textarea
-                id="profile-roles"
-                name="targetRoles"
-                rows={3}
-                value={profile.targetRoles.map((t) => `${t.role}, ${t.priority}`).join('\n')}
-                onChange={(e) =>
-                  set(
-                    'targetRoles',
-                    e.target.value
-                      .split('\n')
-                      .map((line) => line.trim())
-                      .filter(Boolean)
-                      .map((line) => {
-                        const [role, prio] = line.split(',').map((s) => s.trim());
-                        return { role: role || line, priority: (prio || 'MEDIUM').toUpperCase() };
-                      }),
-                  )
-                }
-              />
-              <label htmlFor="profile-locations">Location tiers — one per line: Region, PRIORITY</label>
-              <textarea
-                id="profile-locations"
-                name="locationTiers"
-                rows={2}
-                value={profile.locationTiers.map((l) => `${l.region}, ${l.tier}`).join('\n')}
-                onChange={(e) =>
-                  set(
-                    'locationTiers',
-                    e.target.value
-                      .split('\n')
-                      .map((line) => line.trim())
-                      .filter(Boolean)
-                      .map((line) => {
-                        const [region, tier] = line.split(',').map((s) => s.trim());
-                        return { region: region || line, tier: (tier || 'MEDIUM').toUpperCase() };
-                      }),
-                  )
-                }
-              />
-              <label htmlFor="profile-employment">Employment types (comma separated)</label>
-              <input
-                id="profile-employment"
-                name="employmentTypes"
-                value={profile.employmentTypes.join(', ')}
-                onChange={(e) =>
-                  set('employmentTypes', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))
-                }
-              />
-            </div>
-          </div>
-
-          <button className="btn" disabled={saving} onClick={save}>
-            {saving ? 'Saving…' : 'Save profile'}
-          </button>
+            {/* FIX #4: type="submit" for form Enter-key support */}
+            <button type="submit" className="btn" disabled={saving}>
+              {saving ? 'Saving…' : 'Save profile'}
+            </button>
+          </form>
 
           <div className="card mt-4">
             <h2>More</h2>

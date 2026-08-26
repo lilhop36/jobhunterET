@@ -7,7 +7,7 @@
  * listing page only. */
 
 import { Injectable } from '@nestjs/common';
-import { JobSourceAdapter, RawJob, deriveExperience, FETCH_TIMEOUT_MS } from './job-source.adapter';
+import { JobSourceAdapter, RawJob, LocationClass, EmploymentType, deriveExperience, FETCH_TIMEOUT_MS } from './job-source.adapter';
 
 const LISTING_URLS = [
   'https://hagerejobs.com/ethiopia-job/',
@@ -122,8 +122,8 @@ export class HagereJobsAdapter implements JobSourceAdapter {
       title,
       company,
       location,
-      locationClass: isInternational ? 'INTERNATIONAL' : 'ETHIOPIA_LOCAL',
-      employmentType: this.mapEmploymentType(empType),
+      locationClass: (isInternational ? 'INTERNATIONAL_ONSITE' : 'ETHIOPIA_LOCAL') as LocationClass,
+      employmentType: this.mapEmploymentType(empType) as EmploymentType,
       experienceLevel: deriveExperience(expText || title),
       workPlace: 'ONSITE',
       salary: undefined,

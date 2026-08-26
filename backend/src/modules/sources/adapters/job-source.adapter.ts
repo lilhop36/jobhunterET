@@ -2,7 +2,10 @@
  * core pipeline. Adapters only fetch raw postings; normalization, validation,
  * deduplication and ghost-detection reconciliation happen in SourcesService. */
 
-import { LocationClass, EmploymentType, ExperienceLevel, Workplace } from '.prisma/client';
+export type LocationClass = 'ETHIOPIA_LOCAL' | 'ETHIOPIA_REMOTE' | 'INTERNATIONAL_REMOTE' | 'INTERNATIONAL_ONSITE' | 'INTERNATIONAL_HYBRID';
+export type EmploymentType = 'FULL_TIME' | 'CONTRACT' | 'PART_TIME' | 'INTERNSHIP';
+export type ExperienceLevel = 'INTERN' | 'ENTRY' | 'MID' | 'SENIOR' | 'LEAD';
+export type Workplace = 'ONSITE' | 'REMOTE' | 'HYBRID';
 
 export interface RawJob {
   title: string;
@@ -23,6 +26,48 @@ export interface RawJob {
   country?: string;
   parseConfidence?: number;
   rawData?: unknown;
+  /** Raw category labels/ids as the source expressed them. */
+  sourceCategories?: string[];
+  /** Which sweep surfaced this job: 'latest' or a source category id. */
+  discoveredVia?: string;
+}
+
+export type CollectionMode = 'FAST' | 'DEEP';
+
+export interface CollectionRequest {
+  mode: CollectionMode;
+  /** Freshness boundary — pagination stops once postings are older than this. */
+  since: Date;
+  /** Source category ids/slugs to sweep (already validated against the source). */
+  categories?: string[];
+  /** Hard ceilings so a source can never be hammered. */
+  maxPages?: number;
+  maxRequests?: number;
+  requestDelayMs?: number;
+  /** Lets an adapter skip detail-page fetches for jobs already stored. */
+  knownSourceJobIds?: ReadonlySet<string>;
+}
+
+export type StopReason =
+  | 'FRESHNESS_BOUNDARY' | 'LAST_PAGE' | 'EMPTY_PAGE'
+  | 'MAX_PAGES' | 'REQUEST_BUDGET' | 'ERROR';
+
+export interface CategoryCollectionStat {
+  /** 'latest' for the main feed, otherwise the source's own category id/slug. */
+  category: string;
+  categoryLabel?: string;
+  pagesFetched: number;
+  jobsFetched: number;
+  errors: number;
+  stoppedReason: StopReason;
+}
+
+export interface CollectionResult {
+  jobs: RawJob[];
+  pagesFetched: number;
+  requestsMade: number;
+  categories: CategoryCollectionStat[];
+  errors: string[];
 }
 
 export interface JobSourceAdapter {
@@ -35,6 +80,8 @@ export interface JobSourceAdapter {
   readonly selectorVersion?: string;
   /** Fetch raw postings. `since` may be used to limit to recent postings. */
   fetchJobs(options?: { since?: Date }): Promise<RawJob[]>;
+  /** Optional capability. When present, SourcesService prefers it. */
+  collect?(request: CollectionRequest): Promise<CollectionResult>;
 }
 
 /** SEC-007: hard cap on every upstream fetch — a hung source can't stall the scheduler. */

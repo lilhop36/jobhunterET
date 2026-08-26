@@ -83,8 +83,8 @@ export class NotificationsService {
         const text = this.telegram.buildMatchText({
           score: match.score,
           summary: match.summary,
-          matchedSkills: match.matchedSkills,
-          missingSkills: match.missingSkills,
+          matchedSkills: this.prisma.parseJson(match.matchedSkills),
+          missingSkills: this.prisma.parseJson(match.missingSkills),
           job: {
             title: jobFull.title,
             company: jobFull.company,

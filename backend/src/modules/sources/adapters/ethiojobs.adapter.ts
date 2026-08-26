@@ -3,10 +3,10 @@
  * The old client-side API (/ethiojobs/api/job-board/jobs) returns 404.
  * Instead, we fetch the /jobs page and extract the __NEXT_DATA__ JSON payload,
  * which contains the full job list with company info, location, description, etc.
- * Paginated: 12 jobs per page, up to 90+ pages (1,000+ jobs total). */
+ * Paginated: 12 jobs per page, up to 79+ pages (947+ jobs total). */
 
 import { Injectable } from '@nestjs/common';
-import { JobSourceAdapter, RawJob, deriveExperience, mapEmployment, FETCH_TIMEOUT_MS } from './job-source.adapter';
+import { JobSourceAdapter, RawJob, CollectionRequest, CollectionResult, StopReason, CategoryCollectionStat, deriveExperience, mapEmployment, FETCH_TIMEOUT_MS } from './job-source.adapter';
 
 interface EjCompany {
   name: string;
@@ -34,84 +34,185 @@ interface EjJob {
   application_email: string | null;
 }
 
-interface EjPageProps {
-  jobs: {
-    data: EjJob[];
-    meta: { pageNumber: number; lastPage: number; total: number };
-  };
+interface EjPagePropsJobs {
+  jobs: { data: EjJob[]; meta: { pageNumber: number; lastPage: number; total: number } };
 }
 
+interface EjPagePropsCategory {
+  initialData: EjJob[];
+  meta: { slugName: string; [key: string]: any };
+}
+
+type EjPageProps = EjPagePropsJobs | EjPagePropsCategory;
+
 const BASE = 'https://ethiojobs.net';
-const MAX_PAGES = 5; // polite bounded crawl — up to 60 jobs per run
 
 @Injectable()
 export class EthiojobsAdapter implements JobSourceAdapter {
   readonly sourceId = 'ethiojobs';
-  readonly selectorVersion = 'html:__NEXT_DATA__:v1.0';
+  readonly selectorVersion = 'html:__NEXT_DATA__:v2.0';
 
   async fetchJobs(options?: { since?: Date }): Promise<RawJob[]> {
     const since = options?.since ?? new Date(Date.now() - 30 * 86_400_000);
-    const jobs: RawJob[] = [];
+    const result = await this.collect({
+      mode: 'FAST',
+      since,
+      maxPages: 12,
+      maxRequests: 14,
+      requestDelayMs: 800,
+    });
+    if (result.errors.length) {
+      throw new Error(result.errors[0]);
+    }
+    return result.jobs;
+  }
 
-    for (let page = 1; page <= MAX_PAGES; page++) {
+  async collect(request: CollectionRequest): Promise<CollectionResult> {
+    const since = request.since;
+    const maxPages = request.maxPages ?? 12;
+    const maxRequests = request.maxRequests ?? 14;
+    const requestDelayMs = request.requestDelayMs ?? 800;
+    const categories = request.categories ?? [];
+    const knownIds = request.knownSourceJobIds;
+
+    const allStats: CategoryCollectionStat[] = [];
+    const allJobs: RawJob[] = [];
+    const allErrors: string[] = [];
+    let totalRequests = 0;
+
+    const addCategory = (stat: CategoryCollectionStat) => {
+      allStats.push(stat);
+    };
+
+    const fetchPage = async (url: string, categorySlug?: string): Promise<{ jobs: RawJob[]; stopped: StopReason; lastPage?: number }> => {
+      const res = await fetch(url, {
+        headers: {
+          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36',
+          accept: 'text/html',
+        },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      totalRequests++;
+      if (!res.ok) {
+        allErrors.push(`Ethiojobs ${url} responded ${res.status}`);
+        return { jobs: [], stopped: 'ERROR' };
+      }
+
+      const html = await res.text();
+      const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+      if (!match) {
+        allErrors.push('Ethiojobs: __NEXT_DATA__ not found — selectorVersion may be stale');
+        return { jobs: [], stopped: 'ERROR' };
+      }
+
+      let props: EjPageProps;
       try {
-        const pageJobs = await this.fetchPage(page, since);
-        if (!pageJobs.length) break;
-        jobs.push(...pageJobs);
-      } catch (err: any) {
-        // If a page fails, stop crawling but don't throw — we got some data
-        break;
+        props = JSON.parse(match[1]).props?.pageProps;
+      } catch {
+        allErrors.push('Ethiojobs: failed to parse __NEXT_DATA__ JSON');
+        return { jobs: [], stopped: 'ERROR' };
+      }
+
+      const isCategoryPage = (props as any)?.meta?.slugName === 'category';
+      let jobs: EjJob[] = [];
+      let lastPage = 1;
+
+      if (isCategoryPage) {
+        const catProps = props as EjPagePropsCategory;
+        jobs = catProps.initialData ?? [];
+        lastPage = Math.ceil((catProps.meta?.total ?? jobs.length) / 10);
+      } else {
+        const jobsProps = props as EjPagePropsJobs;
+        jobs = jobsProps.jobs?.data ?? [];
+        lastPage = jobsProps.jobs?.meta?.lastPage ?? 1;
+      }
+
+      if (!jobs.length) {
+        return { jobs: [], stopped: 'EMPTY_PAGE', lastPage };
+      }
+
+      const sourceCats = categorySlug ? [categorySlug] : (jobs[0]?.catalogs?.map((c) => c.name) ?? []);
+      const discoveredVia = categorySlug ?? 'latest';
+
+      const rawJobs: RawJob[] = jobs
+        .filter((j) => {
+          const posted = new Date(j.date_published);
+          if (Number.isNaN(posted.getTime())) return false;
+          if (knownIds?.has(j.slug)) return false;
+          return posted >= since;
+        })
+        .map((j) => this.toRaw(j, sourceCats, discoveredVia))
+        .filter((j): j is RawJob => !!j);
+
+      return { jobs: rawJobs, stopped: 'LAST_PAGE', lastPage };
+    };
+
+    const runCategory = async (categorySlug?: string): Promise<CategoryCollectionStat> => {
+      const catLabel = categorySlug ?? 'latest';
+      const stat: CategoryCollectionStat = {
+        category: catLabel,
+        pagesFetched: 0,
+        jobsFetched: 0,
+        errors: 0,
+        stoppedReason: 'ERROR',
+      };
+
+      for (let page = 1; page <= maxPages && totalRequests < maxRequests; page++) {
+        const url = categorySlug
+          ? `${BASE}/jobs/category/${categorySlug}${page > 1 ? `?page=${page}` : ''}`
+          : page === 1
+            ? `${BASE}/jobs`
+            : `${BASE}/jobs?page=${page}`;
+
+        const { jobs, stopped, lastPage } = await fetchPage(url, categorySlug);
+        stat.pagesFetched = page;
+        stat.jobsFetched += jobs.length;
+        stat.stoppedReason = stopped;
+
+        if (stopped === 'ERROR') {
+          stat.errors++;
+          continue;
+        }
+
+        for (const job of jobs) {
+          const existing = allJobs.find((j) => j.sourceJobId === job.sourceJobId);
+          if (existing) {
+            existing.sourceCategories = [...new Set([...(existing.sourceCategories ?? []), ...(job.sourceCategories ?? [])])];
+            existing.discoveredVia = [...new Set([...(existing.discoveredVia ?? []), ...(job.discoveredVia ?? [])])].join(',');
+          } else {
+            allJobs.push(job);
+          }
+        }
+
+        if (stopped === 'EMPTY_PAGE' || stopped === 'LAST_PAGE') break;
+        if (lastPage && page >= lastPage) break;
+        await new Promise((r) => setTimeout(r, requestDelayMs));
+      }
+
+      return stat;
+    };
+
+    const latestStat = await runCategory();
+    addCategory(latestStat);
+
+    if (categories.length && request.mode === 'DEEP') {
+      for (const catSlug of categories) {
+        if (totalRequests >= maxRequests) break;
+        const catStat = await runCategory(catSlug);
+        addCategory(catStat);
       }
     }
 
-    if (!jobs.length) throw new Error('Ethiojobs returned no parseable jobs from __NEXT_DATA__');
-    return jobs;
+    return {
+      jobs: allJobs,
+      pagesFetched: allStats.reduce((s, c) => s + c.pagesFetched, 0),
+      requestsMade: totalRequests,
+      categories: allStats,
+      errors: allErrors,
+    };
   }
 
-  private async fetchPage(page: number, since: Date): Promise<RawJob[]> {
-    const url = page === 1 ? `${BASE}/jobs` : `${BASE}/jobs?page=${page}`;
-    const res = await fetch(url, {
-      headers: {
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36',
-        accept: 'text/html',
-      },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!res.ok) throw new Error(`Ethiojobs page ${page} responded ${res.status}`);
-
-    const html = await res.text();
-    const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-    if (!match) {
-      throw new Error(
-        'Ethiojobs: __NEXT_DATA__ not found in HTML — selectorVersion html:__NEXT_DATA__:v1.0 may be stale. '
-        + 'Check if ethiojobs.net migrated away from Next.js or changed their page structure. '
-        + 'Update selectorVersion and the extraction regex in EthiojobsAdapter.',
-      );
-    }
-
-    let props: EjPageProps;
-    try {
-      props = JSON.parse(match[1]).props?.pageProps;
-    } catch {
-      throw new Error(
-        'Ethiojobs: failed to parse __NEXT_DATA__ JSON — the script tag exists but contains invalid JSON. '
-        + 'Possible injection or encoding change on the upstream page.',
-      );
-    }
-
-    const data = props?.jobs?.data;
-    if (!data?.length) return [];
-
-    return data
-      .filter((j) => {
-        const posted = new Date(j.date_published);
-        return !Number.isNaN(posted.getTime()) && posted >= since;
-      })
-      .map((j) => this.toRaw(j))
-      .filter((j): j is RawJob => !!j);
-  }
-
-  private toRaw(j: EjJob): RawJob | null {
+  private toRaw(j: EjJob, sourceCategories: string[] = [], discoveredVia = 'latest'): RawJob | null {
     if (!j.title || !j.slug) return null;
 
     const location = j.state || 'Ethiopia';
@@ -135,13 +236,13 @@ export class EthiojobsAdapter implements JobSourceAdapter {
       country: 'Ethiopia',
       parseConfidence: 75,
       rawData: { api: 'ethiojobs-nextdata', id: j.id, slug: j.slug },
+      sourceCategories,
+      discoveredVia,
     };
   }
 
   /** Map Ethiojobs numeric type to employment type string. */
   private mapJobType(type: number): string | null {
-    // Type mapping from Ethiojobs (common values):
-    // 1=Full Time, 2=Part Time, 3=Contract, 4=Internship, 5=Temporary, 8=unknown (default full-time)
     switch (type) {
       case 1: return 'Full Time';
       case 2: return 'Part Time';

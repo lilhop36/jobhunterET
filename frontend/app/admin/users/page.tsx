@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../../lib/auth';
 import { RequireAuth, ErrorBox, Loading, StatusPill, fmtDate } from '../../../lib/ui';
 
@@ -18,7 +18,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busyIds, setBusyIds] = useState<string[]>([]);
   const [result, setResult] = useState<string | null>(null);
   const [resetTarget, setResetTarget] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
@@ -36,12 +36,14 @@ export default function AdminUsersPage() {
     }
   };
 
-  // Load on mount
-  if (!users && !err && loading) {
-    load();
-  }
+  useEffect(() => {
+    if (user?.role === 'ADMIN') {
+      load();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role]);
 
-  if (user?.role !== 'ADMIN') {
+  if (user && user.role !== 'ADMIN') {
     return (
       <RequireAuth>
         <h1>Admin — Users</h1>
@@ -52,7 +54,7 @@ export default function AdminUsersPage() {
 
   const toggleStatus = async (u: UserRow) => {
     const next = u.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
-    setBusyId(u.id);
+    setBusyIds(prev => [...prev, u.id]);
     setResult(null);
     try {
       await api(`/api/admin/users/${u.id}`, {
@@ -64,12 +66,12 @@ export default function AdminUsersPage() {
     } catch (e: any) {
       setResult(`Error: ${e.message}`);
     } finally {
-      setBusyId(null);
+      setBusyIds(prev => prev.filter(id => id !== u.id));
     }
   };
 
   const changeRole = async (u: UserRow, newRole: string) => {
-    setBusyId(u.id);
+    setBusyIds(prev => [...prev, u.id]);
     setResult(null);
     try {
       await api(`/api/admin/users/${u.id}`, {
@@ -81,12 +83,12 @@ export default function AdminUsersPage() {
     } catch (e: any) {
       setResult(`Error: ${e.message}`);
     } finally {
-      setBusyId(null);
+      setBusyIds(prev => prev.filter(id => id !== u.id));
     }
   };
 
   const resetPassword = async (u: UserRow) => {
-    setBusyId(u.id);
+    setBusyIds(prev => [...prev, u.id]);
     setTempPassword(null);
     setResult(null);
     try {
@@ -97,7 +99,7 @@ export default function AdminUsersPage() {
     } catch (e: any) {
       setResult(`Error: ${e.message}`);
     } finally {
-      setBusyId(null);
+      setBusyIds(prev => prev.filter(id => id !== u.id));
     }
   };
 
@@ -111,7 +113,7 @@ export default function AdminUsersPage() {
       <p className="subtitle">User metadata only — never CV contents, matches, or notifications (FR-002f).</p>
 
       {result && <div className={result.startsWith('Error') ? 'error-box' : 'ok-box'}>{result}</div>}
-      {err && <ErrorBox msg={err} onRetry={load} />}
+      {err && !loading && <ErrorBox msg={err} onRetry={load} />}
       {loading && <Loading />}
 
       {tempPassword && resetTarget && (
@@ -151,7 +153,7 @@ export default function AdminUsersPage() {
                 <div>
                   <select
                     value={u.role}
-                    disabled={busyId === u.id || u.id === user?.id}
+                    disabled={busyIds.includes(u.id) || u.id === user?.id}
                     onChange={(e) => changeRole(u, e.target.value)}
                     style={{ fontSize: 12, padding: '2px 4px' }}
                   >
@@ -170,14 +172,14 @@ export default function AdminUsersPage() {
                     <>
                       <button
                         className="btn ghost small"
-                        disabled={busyId === u.id}
+                        disabled={busyIds.includes(u.id)}
                         onClick={() => toggleStatus(u)}
                       >
                         {u.status === 'ACTIVE' ? 'Disable' : 'Enable'}
                       </button>
                       <button
                         className="btn ghost small"
-                        disabled={busyId === u.id}
+                        disabled={busyIds.includes(u.id)}
                         onClick={() => resetPassword(u)}
                       >
                         Reset PW

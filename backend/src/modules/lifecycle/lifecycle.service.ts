@@ -55,7 +55,7 @@ export class LifecycleService {
     if (candidates.length) {
       await this.prisma.job.updateMany({
         where: { id: { in: candidates.map((c) => c.id) } },
-        data: { archivedAt: new Date(), rawData: Prisma.DbNull, description: null },
+        data: { archivedAt: new Date(), rawData: null, description: null },
       });
       this.logger.log(`[RETENTION] Archived ${candidates.length} orphaned job(s) (purged rawData/description)`);
     }

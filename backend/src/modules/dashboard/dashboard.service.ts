@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ProfileService } from '../profile/profile.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -14,39 +14,96 @@ export class DashboardService {
   ) {}
 
   async summary(userId: string) {
+    const oneDayAgo = new Date(Date.now() - 86_400_000);
+
     try {
-      const [matches, saved, apps, unread, profileView, latestCycle, latestDigest] = await Promise.all([
-        this.prisma.jobMatch.findMany({ where: { userId } }),
-        this.prisma.application.count({ where: { userId, stage: 'SAVED' } }),
-        this.prisma.application.findMany({ where: { userId } }),
+      // FIX #1: Use DB-level count() instead of fetching all rows into memory.
+      // FIX #5: Moved telegramLink query into Promise.all (was a sequential 8th query).
+      const [
+        new24h,
+        above,
+        saved,
+        inFlight,
+        unread,
+        profileView,
+        latestCycle,
+        latestDigest,
+        telegramLink,
+        recentNotifications,
+        applications,
+      ] = await Promise.all([
+        // 1. DB-level count for new matches (24h)
+        this.prisma.jobMatch.count({
+          where: { userId, createdAt: { gte: oneDayAgo } },
+        }),
+        // 2. DB-level count for strong matches (score >= 70)
+        this.prisma.jobMatch.count({
+          where: { userId, score: { gte: 70 } },
+        }),
+        // 3. DB-level count for saved apps
+        this.prisma.application.count({
+          where: { userId, stage: 'SAVED' },
+        }),
+        // 4. DB-level count for in-flight apps
+        this.prisma.application.count({
+          where: { userId, stage: { in: ['APPLIED', 'ASSESSMENT', 'INTERVIEW'] } },
+        }),
+        // 5. Unread notifications
         this.notifications.unreadCount(userId),
+        // 6. User profile
         this.profile.getProfile(userId),
-        this.prisma.matchCycle.findFirst({ orderBy: { startedAt: 'desc' } }),
-        this.prisma.digest.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+        // 7. Latest global match cycle (only needed fields)
+        this.prisma.matchCycle.findFirst({
+          orderBy: { startedAt: 'desc' },
+          select: {
+            jobsEvaluated: true,
+            matchesCreated: true,
+            aboveThreshold: true,
+            toInbox: true,
+            notificationsSent: true,
+            startedAt: true,
+          },
+        }),
+        // 8. Latest user digest
+        this.prisma.digest.findFirst({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+        }),
+        // 9. Telegram link status (moved into parallel query)
+        this.prisma.telegramLink.findUnique({ where: { userId } }),
+        // 10. Recent notifications (only needed fields)
+        this.prisma.notification.findMany({
+          where: { userId, channel: 'WEB' },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            jobId: true,
+            score: true,
+            status: true,
+            createdAt: true,
+            job: { select: { title: true, company: true } },
+          },
+        }),
+        // 11. Applications (only needed fields)
+        this.prisma.application.findMany({
+          where: { userId },
+          select: { jobId: true, stage: true },
+        }),
       ]);
 
-      const new24h = matches.filter(
-        (m) => Date.now() - m.createdAt.getTime() < 86_400_000,
-      ).length;
-      const above = matches.filter((m) => m.score >= 70).length;
-      const inFlight = apps.filter((a) =>
-        ['APPLIED', 'ASSESSMENT', 'INTERVIEW'].includes(a.stage),
-      ).length;
-      const recent = await this.prisma.notification.findMany({
-        where: { userId, channel: 'WEB' },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        include: { job: { select: { title: true, company: true } } },
-      });
+      // FIX #3: Safely parse SQLite JSON fields and always return arrays
+      const parseJson = (val: any): any[] => Array.isArray(val) ? val : this.prisma.parseJson(val) ?? [];
 
       return {
         greeting: 'Selam',
-        completion: profileView.completion,
-        onboardDone: profileView.onboardDone,
-        telegramLinked: !!(await this.prisma.telegramLink.findUnique({ where: { userId } })),
+        // FIX #2: Optional chaining — profile may be null for new users
+        completion: profileView?.completion ?? 0,
+        onboardDone: profileView?.onboardDone ?? false,
+        telegramLinked: !!telegramLink,
         counts: { new24h, above, saved, inFlight, unread },
-        applications: apps.map((a) => ({ jobId: a.jobId, stage: a.stage })),
-        recentNotifications: recent.map((n) => ({
+        applications: applications.map((a) => ({ jobId: a.jobId, stage: a.stage })),
+        recentNotifications: recentNotifications.map((n) => ({
           id: n.id,
           jobId: n.jobId,
           title: n.job?.title,
@@ -73,25 +130,18 @@ export class DashboardService {
               jobsCollected: latestDigest.jobsCollected,
               newJobs: latestDigest.newJobs,
               strongMatches: latestDigest.strongMatches,
-              topMatches: this.prisma.isSQLite && typeof latestDigest.topMatches === 'string' ? (() => { try { return JSON.parse(latestDigest.topMatches); } catch { return []; } })() : latestDigest.topMatches,
-              searches: this.prisma.isSQLite && typeof latestDigest.searches === 'string' ? (() => { try { return JSON.parse(latestDigest.searches); } catch { return []; } })() : latestDigest.searches,
+              topMatches: parseJson(latestDigest.topMatches),
+              searches: parseJson(latestDigest.searches),
             }
           : null,
       };
     } catch (err: any) {
-      this.logger.warn(`[DASHBOARD] Summary failed for userId=${userId}: ${err.message}`);
-      // Return empty defaults so the frontend renders instead of showing 500
-      return {
-        greeting: 'Selam',
-        completion: 0,
-        onboardDone: false,
-        telegramLinked: false,
-        counts: { new24h: 0, above: 0, saved: 0, inFlight: 0, unread: 0 },
-        applications: [],
-        recentNotifications: [],
-        lastCycle: null,
-        digest: null,
-      };
+      // FIX #4: Log with stack trace and throw HTTP 500 so frontend <ErrorBox onRetry> works
+      this.logger.error(
+        `[DASHBOARD] Summary failed for userId=${userId}: ${err.message}`,
+        err.stack,
+      );
+      throw new InternalServerErrorException('Failed to load dashboard summary.');
     }
   }
 }

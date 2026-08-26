@@ -157,9 +157,33 @@ model SourceRun {
   descriptionFailures   Int       @default(0)
   linkChecks            Int       @default(0)
   linkFailures          Int       @default(0)
+  mode                  String    @default("FAST")
+  pagesFetched          Int       @default(0)
+  categoriesSearched    Int       @default(0)
+  crossCategoryDuplicates Int     @default(0)
+  unmappedCategories    Int       @default(0)
+  categoryStats         SourceRunCategory[]
   source                JobSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
   @@index([sourceId])
+}
+
+model SourceRunCategory {
+  id            String    @id @default(cuid())
+  runId         String
+  sourceId      String
+  category      String
+  categoryLabel String?
+  pagesFetched  Int       @default(0)
+  jobsFetched   Int       @default(0)
+  newJobs       Int       @default(0)
+  duplicates    Int       @default(0)
+  errors        Int       @default(0)
+  stoppedReason String?
+  run           SourceRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId, category])
+  @@index([runId])
 }
 
 model Job {
@@ -204,6 +228,8 @@ model Job {
   finalUrl             String?
   // Classification tags: JSON string array ["ethiopian","tech",...]
   tags                 String?        @default("[]")
+  // Canonical categories: JSON string array ["software-engineering",...]
+  categories            String?        @default("[]")
   apps                 Application[]
   source               JobSource          @relation(fields: [sourceId], references: [id])
   matches              JobMatch[]

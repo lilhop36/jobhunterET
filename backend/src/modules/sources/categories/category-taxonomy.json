@@ -1,0 +1,268 @@
+{
+  "software-engineering": {
+    "id": "software-engineering",
+    "label": "Software Engineering",
+    "parent": null,
+    "aliases": ["software", "sw engineering", "it", "information technology"],
+    "keywords": ["developer", "engineer", "programmer", "software"]
+  },
+  "software-engineering.backend": {
+    "id": "software-engineering.backend",
+    "label": "Backend Development",
+    "parent": "software-engineering",
+    "aliases": ["backend", "server-side", "api", "database"],
+    "keywords": ["node", "java", "python", "php", ".net", "go", "golang", "spring", "django", "laravel"]
+  },
+  "software-engineering.frontend": {
+    "id": "software-engineering.frontend",
+    "label": "Frontend Development",
+    "parent": "software-engineering",
+    "aliases": ["frontend", "client-side", "ui", "ux", "web"],
+    "keywords": ["react", "angular", "vue", "nextjs", "next.js", "javascript", "typescript", "html", "css", "website"]
+  },
+  "software-engineering.mobile": {
+    "id": "software-engineering.mobile",
+    "label": "Mobile Development",
+    "parent": "software-engineering",
+    "aliases": ["mobile", "ios", "android", "cross-platform"],
+    "keywords": ["android", "ios", "flutter", "react-native", "swift", "kotlin", "mobile developer"]
+  },
+  "software-engineering.qa": {
+    "id": "software-engineering.qa",
+    "label": "QA / Testing",
+    "parent": "software-engineering",
+    "aliases": ["qa", "testing", "quality assurance", "test"],
+    "keywords": ["qa", "test", "testing", "automation", "manual test", "selenium", "cypress"]
+  },
+  "software-engineering.devops": {
+    "id": "software-engineering.devops",
+    "label": "DevOps",
+    "parent": "software-engineering",
+    "aliases": ["devops", "ci/cd", "infrastructure", "sre"],
+    "keywords": ["devops", "sre", "infrastructure", "ci/cd", "terraform", "kubernetes", "k8s", "docker"]
+  },
+  "software-engineering.cloud": {
+    "id": "software-engineering.cloud",
+    "label": "Cloud",
+    "parent": "software-engineering",
+    "aliases": ["cloud", "aws", "azure", "gcp"],
+    "keywords": ["cloud", "aws", "azure", "gcp", "google cloud", "amazon web services"]
+  },
+  "software-engineering.data": {
+    "id": "software-engineering.data",
+    "label": "Data Engineering & Analytics",
+    "parent": "software-engineering",
+    "aliases": ["data", "analytics", "bi", "business intelligence"],
+    "keywords": ["data engineer", "data analyst", "bi", "business intelligence", "etl", "sql", "spark"]
+  },
+  "software-engineering.ai-ml": {
+    "id": "software-engineering.ai-ml",
+    "label": "AI / Machine Learning",
+    "parent": "software-engineering",
+    "aliases": ["ai", "ml", "machine learning", "artificial intelligence"],
+    "keywords": ["machine learning", "ml", "ai ", "artificial intelligence", "deep learning", "nlp", "llm"]
+  },
+  "software-engineering.cybersecurity": {
+    "id": "software-engineering.cybersecurity",
+    "label": "Cybersecurity",
+    "parent": "software-engineering",
+    "aliases": ["security", "cybersecurity", "infosec"],
+    "keywords": ["security", "cybersecurity", "infosec", "penetration test", "vulnerability", "siem"]
+  },
+  "software-engineering.it-support": {
+    "id": "software-engineering.it-support",
+    "label": "IT Support",
+    "parent": "software-engineering",
+    "aliases": ["it support", "helpdesk", "sysadmin", "networking"],
+    "keywords": ["sysadmin", "helpdesk", "it support", "networking", "network engineer", "system administrator"]
+  },
+  "engineering": {
+    "id": "engineering",
+    "label": "Engineering (non-software)",
+    "parent": null,
+    "aliases": ["engineer", "engineering"],
+    "keywords": ["civil engineer", "mechanical engineer", "electrical engineer", "industrial engineer"]
+  },
+  "engineering.civil": {
+    "id": "engineering.civil",
+    "label": "Civil Engineering",
+    "parent": "engineering",
+    "aliases": ["civil"],
+    "keywords": ["civil engineer", "structural", "construction", "building"]
+  },
+  "engineering.mechanical": {
+    "id": "engineering.mechanical",
+    "label": "Mechanical Engineering",
+    "parent": "engineering",
+    "aliases": ["mechanical"],
+    "keywords": ["mechanical engineer", "automotive", "manufacturing", "hvac"]
+  },
+  "engineering.electrical": {
+    "id": "engineering.electrical",
+    "label": "Electrical Engineering",
+    "parent": "engineering",
+    "aliases": ["electrical"],
+    "keywords": ["electrical engineer", "electronics", "power", "telecommunications"]
+  },
+  "engineering.industrial": {
+    "id": "engineering.industrial",
+    "label": "Industrial Engineering",
+    "parent": "engineering",
+    "aliases": ["industrial"],
+    "keywords": ["industrial engineer", "production", "quality control", "lean"]
+  },
+  "finance-accounting": {
+    "id": "finance-accounting",
+    "label": "Finance & Accounting",
+    "parent": null,
+    "aliases": ["finance", "accounting", "audit"],
+    "keywords": ["accountant", "finance", "auditor", "bookkeeper", "cpa", "tax"]
+  },
+  "finance-accounting.banking-insurance": {
+    "id": "finance-accounting.banking-insurance",
+    "label": "Banking & Insurance",
+    "parent": "finance-accounting",
+    "aliases": ["banking", "insurance"],
+    "keywords": ["bank", "insurance", "financial services", "loan", "microfinance"]
+  },
+  "sales-marketing": {
+    "id": "sales-marketing",
+    "label": "Sales & Marketing",
+    "parent": null,
+    "aliases": ["sales", "marketing", "business development"],
+    "keywords": ["sales", "marketing", "business development", "bd ", "account manager", "digital marketing"]
+  },
+  "business-development": {
+    "id": "business-development",
+    "label": "Business Development",
+    "parent": null,
+    "aliases": ["bizdev", "bd", "partnerships"],
+    "keywords": ["business development", "partnerships", "strategic accounts", "growth"]
+  },
+  "project-management": {
+    "id": "project-management",
+    "label": "Project Management",
+    "parent": null,
+    "aliases": ["pm", "project manager", "program management"],
+    "keywords": ["project manager", "program manager", "scrum master", "agile", "pmp"]
+  },
+  "admin-operations": {
+    "id": "admin-operations",
+    "label": "Administration & Operations",
+    "parent": null,
+    "aliases": ["admin", "operations", "oa"],
+    "keywords": ["administrator", "operations", "office manager", "executive assistant", "receptionist"]
+  },
+  "hr": {
+    "id": "hr",
+    "label": "Human Resources",
+    "parent": null,
+    "aliases": ["human resources", "hr ", "people"],
+    "keywords": ["human resources", "hr ", "recruiter", "talent acquisition", "people operations"]
+  },
+  "legal": {
+    "id": "legal",
+    "label": "Legal & Compliance",
+    "parent": null,
+    "aliases": ["legal", "compliance", "law"],
+    "keywords": ["lawyer", "legal", "compliance", "contract", "paralegal", "counsel"]
+  },
+  "health-medical": {
+    "id": "health-medical",
+    "label": "Health & Medical",
+    "parent": null,
+    "aliases": ["health", "medical", "healthcare"],
+    "keywords": ["doctor", "nurse", "medical", "health", "pharmacy", "laboratory", "public health"]
+  },
+  "pharmaceutical": {
+    "id": "pharmaceutical",
+    "label": "Pharmaceutical",
+    "parent": null,
+    "aliases": ["pharma", "pharmaceutical"],
+    "keywords": ["pharmaceutical", "pharma", "drug", "clinical", "regulatory affairs"]
+  },
+  "education": {
+    "id": "education",
+    "label": "Education",
+    "parent": null,
+    "aliases": ["education", "teaching", "academic"],
+    "keywords": ["teacher", "lecturer", "instructor", "trainer", "academic", "professor", "tutor"]
+  },
+  "ngo-development": {
+    "id": "ngo-development",
+    "label": "NGO & Development",
+    "parent": null,
+    "aliases": ["ngo", "development", "humanitarian", "non-profit"],
+    "keywords": ["ngo", "development", "humanitarian", "program officer", "project coordinator", "un ", "unicef", "undp", "wfp"]
+  },
+  "agriculture": {
+    "id": "agriculture",
+    "label": "Agriculture & Environment",
+    "parent": null,
+    "aliases": ["agriculture", "agri", "environment", "natural resources"],
+    "keywords": ["agriculture", "agronomist", "environment", "natural resources", "farming", "horticulture"]
+  },
+  "logistics-supply-chain": {
+    "id": "logistics-supply-chain",
+    "label": "Logistics & Supply Chain",
+    "parent": null,
+    "aliases": ["logistics", "supply chain", "procurement", "warehouse"],
+    "keywords": ["logistics", "supply chain", "procurement", "warehouse", "transport", "fleet", "inventory"]
+  },
+  "procurement": {
+    "id": "procurement",
+    "label": "Procurement & Supply",
+    "parent": null,
+    "aliases": ["procurement", "supply", "purchasing"],
+    "keywords": ["procurement", "purchasing", "supply officer", "vendor", "tender"]
+  },
+  "customer-service": {
+    "id": "customer-service",
+    "label": "Customer Service",
+    "parent": null,
+    "aliases": ["customer service", "call center", "support"],
+    "keywords": ["customer service", "call center", "client services", "customer support"]
+  },
+  "media-communications": {
+    "id": "media-communications",
+    "label": "Media & Communications",
+    "parent": null,
+    "aliases": ["media", "communications", "journalism"],
+    "keywords": ["journalist", "communications", "media", "content writer", "reporter", "pr "]
+  },
+  "hospitality-tourism": {
+    "id": "hospitality-tourism",
+    "label": "Hospitality & Tourism",
+    "parent": null,
+    "aliases": ["hospitality", "tourism", "hotel"],
+    "keywords": ["hotel", "tourism", "hospitality", "restaurant", "chef", "catering"]
+  },
+  "security": {
+    "id": "security",
+    "label": "Security & Safety",
+    "parent": null,
+    "aliases": ["security", "safety", "protection"],
+    "keywords": ["security guard", "security officer", "safety", "protection", "surveillance"]
+  },
+  "construction-architecture": {
+    "id": "construction-architecture",
+    "label": "Construction & Architecture",
+    "parent": null,
+    "aliases": ["construction", "architecture", "building"],
+    "keywords": ["construction", "architect", "builder", "site engineer", "quantity surveyor"]
+  },
+  "science-research": {
+    "id": "science-research",
+    "label": "Science & Research",
+    "parent": null,
+    "aliases": ["science", "research", "lab"],
+    "keywords": ["researcher", "scientist", "lab", "research", "laboratory", "rn", "lna"]
+  },
+  "other": {
+    "id": "other",
+    "label": "Other",
+    "parent": null,
+    "aliases": ["other", "miscellaneous"],
+    "keywords": []
+  }
+}

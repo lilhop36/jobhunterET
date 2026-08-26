@@ -33,6 +33,24 @@ export class SourcesController {
     return this.sources.enqueueCollect(id);
   }
 
+  /** Enqueue deep collection for a single source (non-blocking). */
+  @Post(':id/collect-deep')
+  collectDeep(@Param('id') id: string) {
+    return this.sources.enqueueCollect(id);
+  }
+
+  /** Enqueue deep collection for ALL active sources. */
+  @Post('collect-deep-all')
+  collectDeepAll() {
+    return this.sources.collectAll();
+  }
+
+  /** Get coverage report per source × category. */
+  @Get('coverage')
+  coverage() {
+    return this.sources.getCoverageReport();
+  }
+
   /** Source Resilience: per-source health scoring endpoint. */
   @Get('health')
   healthSummary() {

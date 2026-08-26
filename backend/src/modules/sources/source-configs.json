@@ -10,7 +10,12 @@
       "priorityTier": "ETHIOPIA",
       "defaultLocationClass": "ETHIOPIA_LOCAL",
       "defaultTags": ["ethiopian", "ngo", "humanitarian"],
-      "fetchTimeout": 30000
+      "fetchTimeout": 30000,
+      "categories": [],
+      "freshnessWindowDays": 30,
+      "deepSweep": {
+        "enabled": false
+      }
     },
     {
       "id": "remotive",
@@ -22,7 +27,12 @@
       "priorityTier": "INTERNATIONAL",
       "defaultLocationClass": "INTERNATIONAL_REMOTE",
       "defaultTags": ["remote", "international", "tech"],
-      "fetchTimeout": 30000
+      "fetchTimeout": 30000,
+      "categories": [],
+      "freshnessWindowDays": 14,
+      "deepSweep": {
+        "enabled": false
+      }
     },
     {
       "id": "arbeitnow",
@@ -34,7 +44,26 @@
       "priorityTier": "INTERNATIONAL",
       "defaultLocationClass": "INTERNATIONAL_REMOTE",
       "defaultTags": ["remote", "international"],
-      "fetchTimeout": 30000
+      "fetchTimeout": 30000,
+      "categories": [],
+      "freshnessWindowDays": 14,
+      "collection": {
+        "supportsCategories": false,
+        "supportsPagination": true,
+        "requestDelayMs": 500,
+        "fast": { "freshnessHours": 48, "maxPages": 5, "maxRequests": 6, "categories": [] },
+        "deep": {
+          "everyMinutes": 720,
+          "freshnessDays": 30,
+          "maxPages": 10,
+          "maxRequests": 12,
+          "maxPagesPerCategory": 1,
+          "categories": []
+        }
+      },
+      "deepSweep": {
+        "enabled": false
+      }
     },
     {
       "id": "ethiojobs",
@@ -46,7 +75,49 @@
       "priorityTier": "ETHIOPIA",
       "defaultLocationClass": "ETHIOPIA_LOCAL",
       "defaultTags": ["ethiopian"],
-      "fetchTimeout": 45000
+      "fetchTimeout": 45000,
+      "categories": [
+        "it-computer-science-and-software-engineering",
+        "engineering"
+      ],
+      "freshnessWindowDays": 30,
+      "pagination": {
+        "maxPagesFast": 10,
+        "maxPagesDeep": 50,
+        "stopOnOlderThanDays": 14,
+        "delayBetweenRequestsMs": 1500
+      },
+      "collection": {
+        "supportsCategories": true,
+        "supportsPagination": true,
+        "requestDelayMs": 800,
+        "fast": { "freshnessHours": 48, "maxPages": 12, "maxRequests": 14, "categories": [] },
+        "deep": {
+          "everyMinutes": 720,
+          "freshnessDays": 14,
+          "maxPages": 55,
+          "maxRequests": 60,
+          "maxPagesPerCategory": 8,
+          "categories": [
+            "it-computer-science-and-software-engineering",
+            "technology",
+            "engineering",
+            "telecommunications"
+          ]
+        }
+      },
+      "deepSweep": {
+        "enabled": true,
+        "frequencyHours": 6,
+        "maxPagesDeep": 100,
+        "categories": [
+          "it-computer-science-and-software-engineering",
+          "engineering",
+          "architecture-and-construction",
+          "business-and-administration",
+          "accounting-and-finance"
+        ]
+      }
     },
     {
       "id": "ethiongojobs",
@@ -58,7 +129,26 @@
       "priorityTier": "ETHIOPIA",
       "defaultLocationClass": "ETHIOPIA_LOCAL",
       "defaultTags": ["ethiopian", "ngo"],
-      "fetchTimeout": 45000
+      "fetchTimeout": 45000,
+      "categories": [],
+      "freshnessWindowDays": 30,
+      "collection": {
+        "supportsCategories": true,
+        "supportsPagination": true,
+        "requestDelayMs": 500,
+        "fast": { "freshnessHours": 48, "maxPages": 5, "maxRequests": 6, "categories": [] },
+        "deep": {
+          "everyMinutes": 720,
+          "freshnessDays": 14,
+          "maxPages": 20,
+          "maxRequests": 25,
+          "maxPagesPerCategory": 5,
+          "categories": ["146", "133", "7", "3"]
+        }
+      },
+      "deepSweep": {
+        "enabled": false
+      }
     },
     {
       "id": "geez",
@@ -70,7 +160,26 @@
       "priorityTier": "ETHIOPIA",
       "defaultLocationClass": "ETHIOPIA_LOCAL",
       "defaultTags": ["ethiopian"],
-      "fetchTimeout": 45000
+      "fetchTimeout": 45000,
+      "categories": [],
+      "freshnessWindowDays": 30,
+      "collection": {
+        "supportsCategories": true,
+        "supportsPagination": false,
+        "requestDelayMs": 700,
+        "fast": { "freshnessHours": 48, "maxPages": 1, "maxRequests": 1, "categories": [] },
+        "deep": {
+          "everyMinutes": 720,
+          "freshnessDays": 30,
+          "maxPages": 1,
+          "maxRequests": 1,
+          "maxPagesPerCategory": 1,
+          "categories": []
+        }
+      },
+      "deepSweep": {
+        "enabled": false
+      }
     },
     {
       "id": "etcareers",
@@ -82,7 +191,26 @@
       "priorityTier": "ETHIOPIA",
       "defaultLocationClass": "ETHIOPIA_LOCAL",
       "defaultTags": ["ethiopian", "tech"],
-      "fetchTimeout": 45000
+      "fetchTimeout": 45000,
+      "categories": [],
+      "freshnessWindowDays": 30,
+      "collection": {
+        "supportsCategories": false,
+        "supportsPagination": false,
+        "requestDelayMs": 500,
+        "fast": { "freshnessHours": 48, "maxPages": 1, "maxRequests": 1, "categories": [] },
+        "deep": {
+          "everyMinutes": 720,
+          "freshnessDays": 30,
+          "maxPages": 1,
+          "maxRequests": 1,
+          "maxPagesPerCategory": 1,
+          "categories": []
+        }
+      },
+      "deepSweep": {
+        "enabled": false
+      }
     },
     {
       "id": "jobicy",
@@ -94,7 +222,26 @@
       "priorityTier": "INTERNATIONAL",
       "defaultLocationClass": "INTERNATIONAL_REMOTE",
       "defaultTags": ["remote", "international", "tech"],
-      "fetchTimeout": 30000
+      "fetchTimeout": 30000,
+      "categories": [],
+      "freshnessWindowDays": 14,
+      "collection": {
+        "supportsCategories": true,
+        "supportsPagination": false,
+        "requestDelayMs": 3600000,
+        "fast": { "freshnessHours": 48, "maxPages": 1, "maxRequests": 1, "categories": [] },
+        "deep": {
+          "everyMinutes": 720,
+          "freshnessDays": 30,
+          "maxPages": 1,
+          "maxRequests": 1,
+          "maxPagesPerCategory": 1,
+          "categories": ["engineering", "admin", "data-science", "cybersecurity", "qa-testing", "web-app-design", "technical-support", "management", "project-management", "sales", "marketing", "design", "finance", "hr", "customer-service", "legal", "writing", "translator", "virtual-assistant", "consultant", "product", "devops"]
+        }
+      },
+      "deepSweep": {
+        "enabled": false
+      }
     },
     {
       "id": "remoteok",
@@ -106,7 +253,12 @@
       "priorityTier": "INTERNATIONAL",
       "defaultLocationClass": "INTERNATIONAL_REMOTE",
       "defaultTags": ["remote", "international", "tech"],
-      "fetchTimeout": 30000
+      "fetchTimeout": 30000,
+      "categories": [],
+      "freshnessWindowDays": 14,
+      "deepSweep": {
+        "enabled": false
+      }
     },
     {
       "id": "landingjobs",
@@ -118,7 +270,12 @@
       "priorityTier": "INTERNATIONAL",
       "defaultLocationClass": "INTERNATIONAL_REMOTE",
       "defaultTags": ["remote", "international", "tech"],
-      "fetchTimeout": 30000
+      "fetchTimeout": 30000,
+      "categories": [],
+      "freshnessWindowDays": 14,
+      "deepSweep": {
+        "enabled": false
+      }
     },
     {
       "id": "hagerejobs",
@@ -130,7 +287,12 @@
       "priorityTier": "ETHIOPIA",
       "defaultLocationClass": "ETHIOPIA_LOCAL",
       "defaultTags": ["ethiopian"],
-      "fetchTimeout": 30000
+      "fetchTimeout": 30000,
+      "categories": [],
+      "freshnessWindowDays": 30,
+      "deepSweep": {
+        "enabled": false
+      }
     }
   ],
   "fallbackChains": {

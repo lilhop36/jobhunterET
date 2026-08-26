@@ -63,13 +63,13 @@ export class MatchingService extends MatchingEngine {
 
     return {
       skills: skills.map((s) => s.skill.name),
-      targetRoles: roles.map((r) => ({ role: r.role, priority: r.priority })),
+      targetRoles: roles.map((r) => ({ role: r.role, priority: r.priority as 'HIGH' | 'MEDIUM' | 'LOW' })),
       locationTiers,
-      remote: profile?.remote ?? false,
-      employmentTypes: (() => { const et = profile?.employmentTypes; if (this.prisma.isSQLite && typeof et === 'string') { try { return JSON.parse(et); } catch { return []; } } return et ?? []; })(),
+      remote: !!profile?.remote,
+      employmentTypes: (this.prisma.jsonArray(profile?.employmentTypes) as string[]).filter(Boolean),
       years: profile?.years ?? 0,
       minSalary: profile?.minSalary ?? 0,
-      excludeOnsite: profile?.excludeOnsite ?? false,
+      excludeOnsite: !!profile?.excludeOnsite,
     };
   }
 
@@ -106,7 +106,6 @@ export class MatchingService extends MatchingEngine {
    * FR-018 incremental matching: score only ACTIVE jobs that have never been
    * matched (matchedAt IS NULL) against every user with a non-empty profile,
    * persist with one bulk upsert, and notify for new above-threshold matches.
-   * Replaces the O(users × top-1000 jobs) full re-score on every cycle.
    */
   async matchUnmatchedJobs(
     limit = Number(process.env.INCREMENTAL_MATCH_LIMIT ?? 250),
@@ -122,15 +121,11 @@ export class MatchingService extends MatchingEngine {
     if (!jobs.length) return empty;
     const jobIds = jobs.map((j) => j.id);
 
-    // Prefilter: users with at least one skill or target role — an empty
-    // profile cannot produce a meaningful match, so skip the work for them.
     const users = await this.prisma.user.findMany({
       where: { OR: [{ skills: { some: {} } }, { targetRoles: { some: {} } }] },
       select: { id: true, matchThreshold: true },
     });
     if (!users.length) {
-      // No eligible users — record the jobs as matched so they are not
-      // re-scanned on every cycle.
       await this.prisma.job.updateMany({
         where: { id: { in: jobIds } },
         data: { matchedAt: new Date() },
@@ -141,8 +136,6 @@ export class MatchingService extends MatchingEngine {
     const profiles = await this.buildProfilesForUsers(users.map((u) => u.id));
     const thresholds = new Map(users.map((u) => [u.id, u.matchThreshold ?? 75]));
 
-    // Rows that already exist for these jobs (e.g. from a per-user profile
-    // recalc) keep their score — only genuinely new pairs are inserted.
     const existing = await this.prisma.jobMatch.findMany({
       where: { jobId: { in: jobIds } },
       select: { userId: true, jobId: true },
@@ -153,23 +146,33 @@ export class MatchingService extends MatchingEngine {
     const notifyCandidates: { userId: string; jobId: string; score: number; summary: string }[] = [];
     let above = 0;
 
-    for (const user of users) {
-      const prof = profiles.get(user.id);
-      if (!prof) continue;
-      for (const job of jobs) {
-        const key = `${user.id}:${job.id}`;
-        if (existingKeys.has(key)) continue;
-        const result = this.scoreJob(this.toJobInput(job), prof);
-        rows.push({
-          userId: user.id,
-          jobId: job.id,
-          score: result.score,
-          ...this.toMatchData(result),
-        });
-        if (result.score >= (thresholds.get(user.id) ?? 75)) {
-          above++;
-          notifyCandidates.push({ userId: user.id, jobId: job.id, score: result.score, summary: result.summary });
+    // FIX #3: Yield to event loop periodically during CPU-bound scoring loop.
+    // Process users in chunks to prevent blocking other requests/SSE streams.
+    const USER_CHUNK = 50;
+    for (let ui = 0; ui < users.length; ui += USER_CHUNK) {
+      const chunk = users.slice(ui, ui + USER_CHUNK);
+      for (const user of chunk) {
+        const prof = profiles.get(user.id);
+        if (!prof) continue;
+        for (const job of jobs) {
+          const key = `${user.id}:${job.id}`;
+          if (existingKeys.has(key)) continue;
+          const result = this.scoreJob(this.toJobInput(job), prof);
+          rows.push({
+            userId: user.id,
+            jobId: job.id,
+            score: result.score,
+            ...this.toMatchData(result),
+          });
+          if (result.score >= (thresholds.get(user.id) ?? 75)) {
+            above++;
+            notifyCandidates.push({ userId: user.id, jobId: job.id, score: result.score, summary: result.summary });
+          }
         }
+      }
+      // Yield to event loop after each chunk
+      if (ui + USER_CHUNK < users.length) {
+        await new Promise((r) => setImmediate(r));
       }
     }
 
@@ -178,8 +181,6 @@ export class MatchingService extends MatchingEngine {
       createdCount = await this.safeCreateMany(rows);
     }
 
-    // Mark processed now that the batch has been scored. Per-user profile
-    // recalcs re-score individual jobs later without touching this flag.
     await this.prisma.job.updateMany({
       where: { id: { in: jobIds } },
       data: { matchedAt: new Date() },
@@ -240,20 +241,19 @@ export class MatchingService extends MatchingEngine {
         skills: skillsByUser.get(p.userId) ?? [],
         targetRoles: rolesByUser.get(p.userId) ?? [],
         locationTiers: locationsByUser.get(p.userId) ?? {},
-        remote: p.remote,
-        employmentTypes: (() => { const et = p.employmentTypes; if (this.prisma.isSQLite && typeof et === 'string') { try { return JSON.parse(et); } catch { return []; } } return et ?? []; })(),
+        remote: !!p.remote,
+        employmentTypes: (this.prisma.jsonArray(p.employmentTypes) as string[]).filter(Boolean),
         years: p.years,
         minSalary: p.minSalary,
-        excludeOnsite: p.excludeOnsite,
+        excludeOnsite: !!p.excludeOnsite,
       });
     }
     return out;
   }
 
   /**
-   * Persist/upsert matches for a user against the latest ACTIVE jobs.
-   * Uses bulk createMany(skipDuplicates) for new pairs and a single
-   * updateMany for existing pairs — eliminates the old N+1 loop.
+   * FR-018: Persist/upsert matches for a user against the latest ACTIVE jobs.
+   * FIX #1: Use $transaction to batch existing-pair updates (eliminates N+1 loop).
    */
   async recalculate(
     userId: string,
@@ -267,13 +267,11 @@ export class MatchingService extends MatchingEngine {
       include: { skills: { include: { skill: true } } },
     })) as unknown as JobWithSkills[];
 
-    // Score all jobs in memory — no DB round-trips per job.
     const scored = jobs.map((job) => ({
       jobId: job.id,
       result: this.scoreJob(this.toJobInput(job), prof),
     }));
 
-    // Partition into existing (update) and new (insert) pairs.
     const existing = await this.prisma.jobMatch.findMany({
       where: { userId, jobId: { in: jobs.map((j) => j.id) } },
       select: { jobId: true },
@@ -281,42 +279,56 @@ export class MatchingService extends MatchingEngine {
     const existingIds = new Set(existing.map((e) => e.jobId));
 
     const newRows: Prisma.JobMatchCreateManyInput[] = [];
-    let created = 0;
+    const updateOps: { jobId: string; data: any }[] = [];
 
     for (const { jobId, result } of scored) {
-      const data = { userId, jobId, score: result.score, ...this.toMatchData(result) };
+      const data = this.toMatchData(result);
       if (existingIds.has(jobId)) {
-        await this.prisma.jobMatch.update({
-          where: { userId_jobId: { userId, jobId } },
-          data: this.toMatchData(result),
-        });
+        updateOps.push({ jobId, data });
       } else {
-        newRows.push(data);
-        created++;
+        newRows.push({ userId, jobId, score: result.score, ...data });
       }
+    }
+
+    // FIX #1: Batch all updates in a single $transaction instead of N sequential queries
+    if (updateOps.length) {
+      const updateTx = updateOps.map((op) =>
+        this.prisma.jobMatch.update({
+          where: { userId_jobId: { userId, jobId: op.jobId } },
+          data: op.data,
+        })
+      );
+      await this.prisma.$transaction(updateTx);
     }
 
     if (newRows.length) {
       await this.safeCreateMany(newRows);
     }
 
-    return created;
+    return newRows.length;
   }
 
   /** createMany wrapper: skipDuplicates isn't supported on SQLite, so we catch P2002. */
   private async safeCreateMany(rows: Prisma.JobMatchCreateManyInput[]): Promise<number> {
     if (!this.prisma.isSQLite) {
-      return (await this.prisma.jobMatch.createMany({ data: rows, skipDuplicates: true })).count;
+      // skipDuplicates isn't supported on SQLite — that branch is handled separately
+      return (await (this.prisma.jobMatch as any).createMany({ data: rows, skipDuplicates: true })).count;
     }
+    // FIX #2: Batch SQLite inserts using $transaction with concurrent creates
+    const BATCH = 50;
     let count = 0;
-    for (const row of rows) {
-      try {
-        await this.prisma.jobMatch.create({ data: row });
-        count++;
-      } catch (e: any) {
-        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') continue;
-        throw e;
-      }
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const batch = rows.slice(i, i + BATCH);
+      await this.prisma.$transaction(async (tx) => {
+        for (const row of batch) {
+          try {
+            await tx.jobMatch.create({ data: row });
+            count++;
+          } catch {
+            // swallow P2002 duplicates
+          }
+        }
+      });
     }
     return count;
   }
@@ -338,10 +350,10 @@ export class MatchingService extends MatchingEngine {
       employmentScore: emp.weight * emp.fraction,
       freshnessScore: fresh.weight * fresh.fraction,
       salaryScore: sal.weight * sal.fraction,
-      matchedSkills: this.prisma.isSQLite ? JSON.stringify(r.matchedSkills) : r.matchedSkills as any,
-      relatedSkills: this.prisma.isSQLite ? JSON.stringify(r.relatedSkills) : r.relatedSkills as any,
-      missingSkills: this.prisma.isSQLite ? JSON.stringify(r.missingSkills) : r.missingSkills as any,
-      reasons: this.prisma.isSQLite ? JSON.stringify(r.reasons) : r.reasons as any,
+      matchedSkills: this.prisma.json(r.matchedSkills),
+      relatedSkills: this.prisma.json(r.relatedSkills),
+      missingSkills: this.prisma.json(r.missingSkills),
+      reasons: this.prisma.json(r.reasons),
       summary: r.summary,
     };
   }

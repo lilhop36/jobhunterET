@@ -118,11 +118,11 @@ export function useEventStream(enabled = true): StreamState {
   }, []);
 
   const connect = useCallback(() => {
-    if (!token || !enabled) return;
+    if (!enabled) return;
 
     esRef.current?.close();
 
-    const url = `/api/events/stream?token=${encodeURIComponent(token)}`;
+    const url = '/api/events/stream';
     const es = new EventSource(url);
     esRef.current = es;
 

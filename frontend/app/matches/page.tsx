@@ -38,10 +38,29 @@ export default function MatchesPage() {
   const { api } = useAuth();
   const [filter, setFilter] = useState('ALL');
   const [recalcMsg, setRecalcMsg] = useState<string | null>(null);
+  const [isRecalculating, setIsRecalculating] = useState(false);
   const { data, err, loading, reload } = useApi<MatchPage>(`/api/matches?filter=${filter}`);
-  const items = data?.items ?? [];
+  const [allItems, setAllItems] = useState<Match[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (data?.items) {
+      setAllItems(data.items);
+      setCursor(data.nextCursor);
+    }
+  }, [data?.items?.length, data?.nextCursor]);
+
+  const hasMore = !!cursor;
+
+  const loadMore = async () => {
+    if (!cursor) return;
+    const nextPage = await api(`/api/matches?filter=${filter}&cursor=${cursor}`);
+    setAllItems(prev => [...prev, ...(nextPage.items ?? [])]);
+    setCursor(nextPage.nextCursor ?? null);
+  };
 
   const recalc = async () => {
+    setIsRecalculating(true);
     setRecalcMsg(null);
     try {
       const r = await api('/api/matches/recalculate', { method: 'POST' });
@@ -49,6 +68,8 @@ export default function MatchesPage() {
       reload();
     } catch (e: any) {
       setRecalcMsg(e.message);
+    } finally {
+      setIsRecalculating(false);
     }
   };
 
@@ -63,21 +84,22 @@ export default function MatchesPage() {
             key={f}
             className={`btn ghost small ${filter === f ? 'active-filter' : ''}`}
             onClick={() => setFilter(f)}
+            aria-pressed={filter === f}
             style={filter === f ? { background: 'hsl(var(--primary) / 0.1)', borderColor: 'hsl(var(--primary) / 0.3)' } : {}}
           >
             {f}
           </button>
         ))}
-        <button className="btn small" style={{ marginLeft: 'auto' }} onClick={recalc}>
-          Recalculate now
+        <button className="btn small" style={{ marginLeft: 'auto' }} onClick={recalc} disabled={isRecalculating}>
+          {isRecalculating ? 'Recalculating...' : 'Recalculate now'}
         </button>
       </div>
       {recalcMsg && <div className={recalcMsg.startsWith('Recalculated') ? 'ok-box' : 'error-box'} aria-live="polite">{recalcMsg}</div>}
-      {err && <ErrorBox msg={err} onRetry={reload} />}
+      {err && !loading && <ErrorBox msg={err} onRetry={reload} />}
       {loading && <Loading />}
 
       <div className="card">
-        {data && items.length === 0 && (
+        {data && allItems.length === 0 && (
           <EmptyState
             icon="🎯"
             title={filter === 'UNSEEN' ? 'Nothing unseen' : 'No matches here yet'}
@@ -88,9 +110,10 @@ export default function MatchesPage() {
             }
             action={filter === 'UNSEEN' ? 'Browse all matches' : 'Recalculate now'}
             actionHref={filter === 'UNSEEN' ? '/matches' : undefined}
+            onClick={filter !== 'UNSEEN' ? recalc : undefined}
           />
         )}
-        {items.map((m) => (
+        {allItems.map((m) => (
           <Link key={m.jobId} href={`/jobs/${m.jobId}`} className="job-row" style={{ alignItems: 'flex-start' }}>
             <ScoreBadge score={m.score} />
             <div className="info">
@@ -100,12 +123,17 @@ export default function MatchesPage() {
               </div>
               <ul className="clean" style={{ marginTop: 6 }}>
                 {m.reasons.slice(0, 3).map((r, i) => (
-                  <li key={i}>{r}</li>
+                  <li key={`${m.jobId}-reason-${i}`}>{r}</li>
                 ))}
               </ul>
             </div>
           </Link>
         ))}
+        {hasMore && (
+          <button className="btn ghost" style={{ width: '100%', marginTop: 12 }} onClick={loadMore}>
+            Load more matches
+          </button>
+        )}
       </div>
     </RequireAuth>
   );

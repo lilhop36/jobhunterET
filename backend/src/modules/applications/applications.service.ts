@@ -1,7 +1,8 @@
 import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { ApplicationStage } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsService } from '../events/events.service';
+
+export type ApplicationStage = 'DISCOVERED' | 'SAVED' | 'APPLIED' | 'ASSESSMENT' | 'INTERVIEW' | 'OFFER' | 'REJECTED' | 'WITHDRAWN';
 
 // FR-031a: allowed transitions per stage.
 export const VALID_TRANSITIONS: Record<ApplicationStage, ApplicationStage[]> = {
@@ -112,7 +113,7 @@ export class ApplicationsService {
     const from = existing?.stage ?? 'DISCOVERED';
 
     if (from === to) return this.view(existing);
-    if (!this.allowedTransitions(existing?.stage ?? null).includes(to)) {
+    if (!this.allowedTransitions((existing?.stage as ApplicationStage) ?? null).includes(to)) {
       throw new ConflictException(`Illegal transition: ${from} → ${to}`);
     }
     if (expectedVersion !== undefined && existing && expectedVersion !== existing.version) {

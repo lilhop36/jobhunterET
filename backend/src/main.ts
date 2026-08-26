@@ -2,14 +2,18 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { parsePort } from './common/utils/parse-port';
-import * as helmet from 'helmet';
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   // SEC-001: Helmet security headers (X-Content-Type-Options, X-Frame-Options, etc.)
-  app.use(helmet.default());
+  app.use(helmet());
+
+  // SEC-011: parse cookies for SSE token auth
+  app.use(cookieParser());
 
   // SEC-002: CORS — restrict to known origins in production, allow all in dev.
   const corsOrigin = process.env.CORS_ORIGIN;

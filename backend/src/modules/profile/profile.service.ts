@@ -47,7 +47,7 @@ export class ProfileService {
       remote: p.remote,
       minSalary: p.minSalary,
       excludeOnsite: p.excludeOnsite,
-      employmentTypes: this.prisma.isSQLite && typeof p.employmentTypes === 'string' ? (() => { try { return JSON.parse(p.employmentTypes); } catch { return []; } })() : p.employmentTypes,
+      employmentTypes: this.prisma.jsonArray(p.employmentTypes),
       onboardDone: p.onboardDone,
       skills: skills.map((s) => s.skill.name),
       targetRoles: roles.map((r) => ({ role: r.role, priority: r.priority })),
@@ -60,12 +60,9 @@ export class ProfileService {
     const data: any = {};
     for (const k of ['title', 'summary', 'years', 'remote', 'minSalary', 'excludeOnsite', 'employmentTypes', 'onboardDone'] as const) {
       if (dto[k] !== undefined) {
-        // SQLite compat: stringify arrays and convert booleans to int
         let val = dto[k];
-        if (this.prisma.isSQLite) {
-          if (k === 'employmentTypes' && Array.isArray(val)) val = JSON.stringify(val);
-          if (typeof val === 'boolean') val = val ? 1 : 0;
-        }
+        if (k === 'employmentTypes' && Array.isArray(val)) val = this.prisma.json(val);
+        else if (typeof val === 'boolean') val = this.prisma.bool(val);
         data[k] = val;
       }
     }
@@ -137,7 +134,7 @@ export class ProfileService {
     v += Math.min(15, skillCount * 5);
     v += Math.min(20, roleCount * 7);
     if (locCount) v += 15;
-    const et = this.prisma.isSQLite && typeof p.employmentTypes === 'string' ? (() => { try { return JSON.parse(p.employmentTypes); } catch { return []; } })() : p.employmentTypes;
+    const et = this.prisma.jsonArray(p.employmentTypes);
     if (et.length) v += 10;
     if (p.years > 0) v += 5;
     if (p.minSalary > 0) v += 5;

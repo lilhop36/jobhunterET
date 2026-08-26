@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { MatchingService } from '../matching/matching.service';
 import { normalizeSkill } from '../matching/matching-engine';
 import { runFidelityPipeline } from '../jobs/job-fidelity';
-import { JobSourceAdapter, RawJob } from './adapters/job-source.adapter';
+import { JobSourceAdapter, RawJob, CollectionResult } from './adapters/job-source.adapter';
 import { ReliefWebAdapter } from './adapters/reliefweb.adapter';
 import { RemotiveAdapter } from './adapters/remotive.adapter';
 import { ArbeitnowAdapter } from './adapters/arbeitnow.adapter';
@@ -19,13 +19,15 @@ import { HagereJobsAdapter } from './adapters/hagerejobs.adapter';
 import { TELEGRAM_ADAPTERS } from './adapters/telegram-tokens';
 import { EventsService } from '../events/events.service';
 import { CollectionQueue, QueueResult } from './collection-queue';
-import { classifyJob, getAllTags, type SourceConfig } from './source-classifier';
-import * as sourceConfigs from './source-configs.json';
+import { classifyJob, getAllTags } from './source-classifier';
+import { mapSourceCategories } from './categories/category-mapper';
+import sourceConfigs from './source-configs.json';
+import { SourceConfigs, SourceDefinition, QueueConfig } from './source-configs.types';
 
 const BACKOFF_THRESHOLD = Math.max(1, Number(process.env.SOURCE_BACKOFF_THRESHOLD ?? 3));
 
 /** Config-driven fallback chain (from source-configs.json). */
-const FALLBACK_CHAIN: Record<string, string[]> = (sourceConfigs as any).fallbackChains ?? {};
+const FALLBACK_CHAIN: Record<string, string[]> = (sourceConfigs as SourceConfigs).fallbackChains ?? {};
 
 /** Health score: percentage of successful runs over the last HEALTH_WINDOW runs. */
 const HEALTH_WINDOW = 10;
@@ -36,7 +38,7 @@ export class SourcesService implements OnModuleInit {
   private readonly logger = new Logger(SourcesService.name);
   private readonly adapters: Record<string, JobSourceAdapter>;
   private readonly queue: CollectionQueue;
-  private readonly sourceConfigMap: Record<string, SourceConfig> = {};
+  private readonly sourceConfigMap: Record<string, SourceDefinition> = {};
 
   constructor(
     private readonly prisma: PrismaService,
@@ -66,7 +68,7 @@ export class SourcesService implements OnModuleInit {
     }
 
     // Load config-driven source definitions
-    const cfg = (sourceConfigs as any).queue ?? {};
+    const cfg = (sourceConfigs as SourceConfigs).queue ?? {};
     this.queue = new CollectionQueue(
       cfg.concurrency ?? 3,
       cfg.maxRetries ?? 2,
@@ -74,7 +76,7 @@ export class SourcesService implements OnModuleInit {
       cfg.backoffMultiplier ?? 2,
       cfg.maxBackoffMs ?? 600000,
     );
-    for (const src of (sourceConfigs as any).sources ?? []) {
+    for (const src of (sourceConfigs as SourceConfigs).sources ?? []) {
       this.sourceConfigMap[src.id] = src;
     }
   }
@@ -84,7 +86,7 @@ export class SourcesService implements OnModuleInit {
     this.queue.on('batch:completed', (stats) => {
       this.logger.log(`[QUEUE] Batch completed: ${stats.completed} OK, ${stats.failed} failed`);
     });
-    this.logger.log(`[QUEUE] Initialized with concurrency=${(sourceConfigs as any).queue?.concurrency ?? 3}`);
+    this.logger.log(`[QUEUE] Initialized with concurrency=${(sourceConfigs as SourceConfigs).queue?.concurrency ?? 3}`);
     this.logger.log(`[CONFIG] Loaded ${Object.keys(this.sourceConfigMap).length} source configs`);
 
     // Auto-create Telegram source rows if missing
@@ -118,7 +120,8 @@ export class SourcesService implements OnModuleInit {
 
   /** Create JobSource rows for config-driven sources that don't exist yet. */
   private async ensureConfigDrivenSources() {
-    for (const cfg of (sourceConfigs as any).sources ?? []) {
+    const configs = (sourceConfigs as SourceConfigs).sources ?? [];
+    for (const cfg of configs) {
       const exists = await this.prisma.jobSource.findUnique({ where: { id: cfg.id } });
       if (!exists) {
         await this.prisma.jobSource.create({
@@ -148,7 +151,7 @@ export class SourcesService implements OnModuleInit {
     return this.prisma.jobSource.findMany({ where: { status: 'ACTIVE' } });
   }
 
-  async create(dto: any) {
+  async create(dto: Prisma.JobSourceCreateInput) {
     try {
       return await this.prisma.jobSource.create({ data: dto });
     } catch (e) {
@@ -159,7 +162,7 @@ export class SourcesService implements OnModuleInit {
     }
   }
 
-  async update(id: string, dto: any) {
+  async update(id: string, dto: Prisma.JobSourceUpdateInput) {
     try {
       return await this.prisma.jobSource.update({ where: { id }, data: dto });
     } catch (e) {
@@ -182,13 +185,21 @@ export class SourcesService implements OnModuleInit {
   }
 
   /** FR-009/010: connect → fetch → validate → normalize → dedupe → store, then reconcile ghosts (FR-015). */
-  async collect(id: string) {
+  async collect(id: string, opts: { mode?: 'FAST' | 'DEEP' } = {}): Promise<{
+    status: 'OK' | 'FAIL' | 'SKIPPED';
+    reason?: string;
+    message?: string;
+    jobsFetched?: number;
+    jobsCreated?: number;
+    duplicates?: number;
+    delivered?: number;
+  }> {
+    const mode = opts.mode ?? 'FAST';
     const source = await this.prisma.jobSource.findUnique({ where: { id } });
     if (!source) throw new NotFoundException('Source not found');
     if (source.status !== 'ACTIVE') throw new BadRequestException('Source is not ACTIVE');
 
-    // SEC-006: skip this cycle while the source is in backoff (scheduler keeps
-    // polling, so a recovered source resumes automatically on the next window).
+    // SEC-006: skip this cycle while the source is in backoff.
     const failures = source.consecutiveFailures ?? 0;
     if (failures >= BACKOFF_THRESHOLD && source.lastFailedRun) {
       const waitedMs = Date.now() - source.lastFailedRun.getTime();
@@ -200,10 +211,6 @@ export class SourcesService implements OnModuleInit {
     const startedAt = new Date();
     const adapter = this.adapters[source.id];
 
-    // A source without a registered adapter is a configuration gap, not an
-    // upstream failure (FR-008): record the run for traceability but do NOT
-    // accumulate a transient failure streak — nothing to retry, so backoff
-    // and the "will retry" alarm would be misleading.
     if (!adapter) {
       const message = 'No adapter registered for this source — add one in SourcesService (FR-008)';
       await this.prisma.jobSource.update({
@@ -211,34 +218,59 @@ export class SourcesService implements OnModuleInit {
         data: { lastError: message, lastFailedRun: new Date() },
       });
       await this.prisma.sourceRun.create({
-        data: { sourceId: id, startedAt, finishedAt: new Date(), status: 'FAIL', jobsFetched: 0, errors: 1, errorMessage: message },
+        data: { sourceId: id, startedAt, finishedAt: new Date(), status: 'FAIL', jobsFetched: 0, errors: 1, errorMessage: message, mode },
       });
       this.logger.warn(`[COLLECTOR] ${source.name} has no registered adapter (FR-008)`);
       return { status: 'FAIL', message };
     }
 
-    let raw: RawJob[];
+    const cfg = this.sourceConfigMap[source.id];
+    const collectionCfg = cfg?.collection;
+    const since = this.resolveSince(cfg, mode);
+    const maxPages = collectionCfg?.[mode.toLowerCase() as 'fast' | 'deep']?.maxPages;
+    const maxRequests = collectionCfg?.[mode.toLowerCase() as 'fast' | 'deep']?.maxRequests;
+    const requestDelayMs = collectionCfg?.requestDelayMs;
+    const categories = collectionCfg?.[mode.toLowerCase() as 'fast' | 'deep']?.categories ?? [];
+    const knownSourceJobIds = mode === 'DEEP' ? await this.getKnownSourceJobIds(source.id) : undefined;
+
+    let result: CollectionResult;
     try {
-      raw = await adapter.fetchJobs({ since: new Date(Date.now() - 14 * 86_400_000) });
+      if (adapter.collect) {
+        result = await adapter.collect({
+          mode,
+          since,
+          categories: categories.length ? categories : undefined,
+          maxPages,
+          maxRequests,
+          requestDelayMs,
+          knownSourceJobIds,
+        });
+      } else {
+        const raw = await adapter.fetchJobs({ since });
+        result = {
+          jobs: raw,
+          pagesFetched: 1,
+          requestsMade: 1,
+          categories: [{ category: 'latest', pagesFetched: 1, jobsFetched: raw.length, errors: 0, stoppedReason: 'LAST_PAGE' }],
+          errors: [],
+        };
+      }
     } catch (err: any) {
-      /* FR-036 + SEC-006: the failure is isolated (never blocks other sources or
-       * matching) and transient — the source stays ACTIVE so the next scheduled
-       * cycle can retry it. The counter drives backoff, not a permanent ERROR. */
       const message = String(err?.message ?? err).slice(0, 500);
       await this.prisma.jobSource.update({
         where: { id },
         data: { consecutiveFailures: { increment: 1 }, lastFailedRun: new Date(), lastError: message },
       });
       await this.prisma.sourceRun.create({
-        data: { sourceId: id, startedAt, finishedAt: new Date(), status: 'FAIL', jobsFetched: 0, errors: 1, errorMessage: message },
+        data: { sourceId: id, startedAt, finishedAt: new Date(), status: 'FAIL', jobsFetched: 0, errors: 1, errorMessage: message, mode },
       });
       this.logger.warn(`[COLLECTOR] ${source.name} failed (transient, will retry): ${message}`);
       return { status: 'FAIL', message: 'Source failed (transient — will retry on the next cycle).' };
     }
 
-    /* FR-013: invalid postings never enter the primary table. */
-    const valid = raw.filter((j) => j.title && j.company && j.url);
-    const invalid = raw.length - valid.length;
+    /* Within-run deduplication: first occurrence wins, merge sourceCategories/discoveredVia. */
+    const { unique: valid, crossCategoryDuplicates } = this.dedupeWithinRun(result.jobs);
+    const invalid = result.jobs.length - valid.length;
 
     let created = 0;
     let duplicates = 0;
@@ -249,24 +281,35 @@ export class SourcesService implements OnModuleInit {
     const seenIds = new Set<string>();
     for (const j of valid) {
       seenIds.add(j.sourceJobId);
-      const result = await this.persist(source.id, j, source.baseUrl);
-      if (result.status === 'CREATED') created++;
+      const persistResult = await this.persist(source.id, j, source.baseUrl);
+      if (persistResult.status === 'CREATED') created++;
       else duplicates++;
-      if (result.descQuality !== null) totalDescQuality += result.descQuality;
-      if (result.descQuality !== null && result.descQuality < 40) descFailures++;
-      if (result.linkChecked) linkChecks++;
-      if (result.urlStatus === 'NOT_FOUND') linkFailures++;
+      if (persistResult.descQuality !== null) totalDescQuality += persistResult.descQuality;
+      if (persistResult.descQuality !== null && persistResult.descQuality < 40) descFailures++;
+      if (persistResult.linkChecked) linkChecks++;
+      if (persistResult.urlStatus === 'NOT_FOUND') linkFailures++;
     }
 
-    /* FR-015: jobs absent from the latest fetch accrue missedCycles; >= 3 → REMOVED. */
-    await this.reconcileGhosts(id, seenIds);
+    /* FR-015: coverage-aware ghost reconciliation. */
+    const complete = result.categories.every((c) => c.stoppedReason === 'LAST_PAGE' || c.stoppedReason === 'EMPTY_PAGE');
+    await this.reconcileGhosts(id, seenIds, { since, complete });
 
-    // SEC-006: a successful run clears the failure streak so backoff restarts fresh.
     const avgDescQuality = created > 0 ? totalDescQuality / created : null;
     await this.prisma.jobSource.update({
       where: { id },
       data: { status: 'ACTIVE', consecutiveFailures: 0, lastSuccessfulRun: new Date(), lastError: null },
     });
+
+    const categoryStatsData = result.categories.map((c) => ({
+      sourceId: id,
+      category: c.category,
+      categoryLabel: c.categoryLabel,
+      pagesFetched: c.pagesFetched,
+      jobsFetched: c.jobsFetched,
+      errors: c.errors,
+      stoppedReason: c.stoppedReason,
+    }));
+
     await this.prisma.sourceRun.create({
       data: {
         sourceId: id,
@@ -276,16 +319,22 @@ export class SourcesService implements OnModuleInit {
         jobsFetched: valid.length,
         jobsCreated: created,
         duplicates,
-        errors: invalid,
+        errors: invalid + result.errors.length,
         descriptionFailures: descFailures,
         avgDescriptionQuality: avgDescQuality,
         linkChecks,
         linkFailures,
+        mode,
+        pagesFetched: result.pagesFetched,
+        categoriesSearched: result.categories.length,
+        crossCategoryDuplicates,
+        unmappedCategories: 0,
+        categoryStats: { create: categoryStatsData },
       },
     });
-    this.logger.log(`[COLLECTOR] Source: ${source.name} — Retrieved: ${valid.length} (created ${created}, dupes ${duplicates})`);
 
-    // Push collection event to all connected SSE clients
+    this.logger.log(`[COLLECTOR] Source: ${source.name} — Retrieved: ${valid.length} (created ${created}, dupes ${duplicates}, cross-cat ${crossCategoryDuplicates})`);
+
     if (created > 0) {
       const users = await this.prisma.user.findMany({ select: { id: true } });
       const duration = Date.now() - startedAt.getTime();
@@ -304,8 +353,6 @@ export class SourcesService implements OnModuleInit {
       }
     }
 
-    // FR-018: score the newly created jobs against every user's profile once
-    // (incremental pass — no full re-score of the pool on every cycle).
     let delivered = 0;
     if (created > 0) {
       const outcome = await this.matching.matchUnmatchedJobs();
@@ -370,7 +417,6 @@ export class SourcesService implements OnModuleInit {
         title: fidelity.title,
         company: fidelity.company,
         location: fidelity.location,
-        locationClass: j.locationClass,
         employmentType: j.employmentType,
         experienceLevel: j.experienceLevel,
         workPlace: j.workPlace,
@@ -385,7 +431,7 @@ export class SourcesService implements OnModuleInit {
         lastSeenAt: new Date(),
         status: 'ACTIVE',
         parseConfidence: j.parseConfidence ?? 80,
-        rawData: this.prisma.isSQLite ? JSON.stringify(j.rawData ?? null) : j.rawData as any,
+        rawData: this.prisma.json(j.rawData ?? null),
         country: j.country ?? null,
         description: fidelity.description,
         // FR-012d/e: description provenance
@@ -401,6 +447,8 @@ export class SourcesService implements OnModuleInit {
         finalUrl: fidelity.finalUrl,
         // FR-014: fingerprint for dedup
         fingerprint: fidelity.fingerprint,
+        // Canonical categories
+        categories: this.prisma.json(mapSourceCategories(sourceId, j.sourceCategories ?? [], j)),
         // Classification: auto-tag based on source config + job attributes
         ...this.classifySourceJob(sourceId, j),
         skills: skillIds.length ? { create: skillIds.map((skillId) => ({ skillId })) } : undefined,
@@ -430,8 +478,50 @@ export class SourcesService implements OnModuleInit {
     });
     return {
       locationClass: result.locationClass,
-      tags: this.prisma.isSQLite ? JSON.stringify(result.tags) : result.tags as any,
+      tags: this.prisma.json(result.tags),
     };
+  }
+
+  /** Resolve the `since` boundary from the source's collection config for a given mode. */
+  private resolveSince(cfg: SourceDefinition | undefined, mode: 'FAST' | 'DEEP'): Date {
+    const collection = cfg?.collection;
+    if (!collection) {
+      return new Date(Date.now() - (cfg?.freshnessWindowDays ?? 14) * 86_400_000);
+    }
+    const modeCfg = collection[mode.toLowerCase() as 'fast' | 'deep'];
+    if (mode === 'FAST' && 'freshnessHours' in modeCfg) {
+      return new Date(Date.now() - modeCfg.freshnessHours * 60 * 60 * 1000);
+    }
+    if (mode === 'DEEP' && 'freshnessDays' in modeCfg) {
+      return new Date(Date.now() - modeCfg.freshnessDays * 86_400_000);
+    }
+    return new Date(Date.now() - (cfg?.freshnessWindowDays ?? 14) * 86_400_000);
+  }
+
+  /** Within-run deduplication: first occurrence wins, merge sourceCategories + discoveredVia. */
+  private dedupeWithinRun(jobs: RawJob[]): { unique: RawJob[]; crossCategoryDuplicates: number } {
+    const seen = new Map<string, RawJob>();
+    let crossCategoryDuplicates = 0;
+    for (const j of jobs) {
+      const existing = seen.get(j.sourceJobId);
+      if (existing) {
+        crossCategoryDuplicates++;
+        existing.sourceCategories = [...new Set([...(existing.sourceCategories ?? []), ...(j.sourceCategories ?? [])])];
+        existing.discoveredVia = [...new Set([...(existing.discoveredVia ?? []), ...(j.discoveredVia ?? [])])].join(',');
+      } else {
+        seen.set(j.sourceJobId, { ...j });
+      }
+    }
+    return { unique: [...seen.values()], crossCategoryDuplicates };
+  }
+
+  /** Build a Set of known sourceJobIds for a source — used by DEEP sweeps to skip detail fetches. */
+  private async getKnownSourceJobIds(sourceId: string): Promise<Set<string>> {
+    const jobs = await this.prisma.job.findMany({
+      where: { sourceId },
+      select: { sourceJobId: true },
+    });
+    return new Set(jobs.map((j) => j.sourceJobId).filter((id): id is string => id !== null));
   }
 
   // ── Source Resilience: health scoring ──────────────────────────────────────
@@ -458,15 +548,15 @@ export class SourcesService implements OnModuleInit {
       data: { healthScore: score, lastHealthCheckAt: new Date() },
     });
 
-    // Auto-disable sources below threshold (skip Telegram channel adapters
-    // — those are dynamically configured and shouldn't be auto-disabled)
-    if (score < HEALTH_AUTO_DISABLE_THRESHOLD && !sourceId.startsWith('telegram:')) {
+    // Only auto-disable when we have a full window AND zero successes — a
+    // partial sample must not kill a source that demonstrably works.
+    if (runs.length >= HEALTH_WINDOW && okCount === 0 && !sourceId.startsWith('telegram:')) {
       this.logger.warn(
-        `[HEALTH] Source ${sourceId} health score ${score}% < ${HEALTH_AUTO_DISABLE_THRESHOLD}% — auto-disabling`,
+        `[HEALTH] Source ${sourceId} health score ${score}% — ${runs.length} consecutive failures, auto-disabling`,
       );
       await this.prisma.jobSource.update({
         where: { id: sourceId },
-        data: { status: 'DISABLED', lastError: `Auto-disabled: health score ${score}% below ${HEALTH_AUTO_DISABLE_THRESHOLD}%` },
+        data: { status: 'DISABLED', lastError: `Auto-disabled: ${runs.length} consecutive failures` },
       });
     }
 
@@ -572,9 +662,17 @@ export class SourcesService implements OnModuleInit {
   }
 
   /** FR-015 ghost detection: increment missedCycles for unseen ACTIVE jobs; REMOVE at the limit. */
-  private async reconcileGhosts(sourceId: string, seenIds: Set<string>) {
+  private async reconcileGhosts(
+    sourceId: string,
+    seenIds: Set<string>,
+    coverage: { since: Date; complete: boolean },
+  ) {
+    const where: any = { sourceId, status: 'ACTIVE', sourceJobId: { not: null } };
+    if (!coverage.complete) {
+      where.postedDate = { gte: coverage.since };
+    }
     const stored = await this.prisma.job.findMany({
-      where: { sourceId, status: 'ACTIVE', sourceJobId: { not: null } },
+      where,
       select: { id: true, sourceJobId: true, missedCycles: true },
     });
     const unseen = stored.filter((j) => !seenIds.has(j.sourceJobId!));
@@ -597,7 +695,7 @@ export class SourcesService implements OnModuleInit {
   // ── Config-driven collection ──────────────────────────────────────────────
 
   /** Get the config for a source (from source-configs.json). */
-  getSourceConfig(sourceId: string): SourceConfig | undefined {
+  getSourceConfig(sourceId: string): SourceDefinition | undefined {
     return this.sourceConfigMap[sourceId];
   }
 
@@ -635,7 +733,7 @@ export class SourcesService implements OnModuleInit {
     const now = Date.now();
     const sources = await this.prisma.jobSource.findMany({
       where: { status: 'ACTIVE' },
-      select: { id: true, lastRunAt: true },
+      select: { id: true, lastSuccessfulRun: true },
     });
 
     const dueIds: string[] = [];
@@ -649,12 +747,12 @@ export class SourcesService implements OnModuleInit {
       const freqMs = freqMinutes * 60_000;
 
       // If never collected, it's due
-      if (!src.lastRunAt) {
+      if (!src.lastSuccessfulRun) {
         dueIds.push(src.id);
         continue;
       }
 
-      const elapsed = now - src.lastRunAt.getTime();
+      const elapsed = now - src.lastSuccessfulRun.getTime();
       if (elapsed >= freqMs) {
         dueIds.push(src.id);
       } else {
@@ -690,12 +788,12 @@ export class SourcesService implements OnModuleInit {
 
   /** Get all source configs (for frontend category management). */
   getAllSourceConfigs() {
-    return (sourceConfigs as any).sources ?? [];
+    return (sourceConfigs as SourceConfigs).sources ?? [];
   }
 
   /** Get classification tag definitions (for frontend category filter). */
   getClassificationTags() {
-    return (sourceConfigs as any).classification?.tags ?? {};
+    return (sourceConfigs as SourceConfigs).classification?.tags ?? {};
   }
 
   /** Get all tags with job counts for the category browsing page. */
@@ -718,6 +816,98 @@ export class SourcesService implements OnModuleInit {
       ...t,
       count: tagCounts[t.id] ?? 0,
     })).sort((a, b) => b.count - a.count);
+  }
+
+  /** Collect deep sweeps for sources whose deep interval has elapsed. */
+  async collectDeepDue(): Promise<{ enqueued: number; skipped: string[]; due: string[] }> {
+    const now = Date.now();
+    const sources = await this.prisma.jobSource.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true, lastSuccessfulRun: true },
+    });
+
+    const dueIds: string[] = [];
+    const skippedIds: string[] = [];
+
+    for (const src of sources) {
+      if (!this.adapters[src.id]) continue;
+      const cfg = this.sourceConfigMap[src.id];
+      const deepCfg = cfg?.collection?.deep;
+      if (!deepCfg?.everyMinutes) continue;
+
+      const freqMs = deepCfg.everyMinutes * 60_000;
+      const lastDeepRun = await this.prisma.sourceRun.findFirst({
+        where: { sourceId: src.id, mode: 'DEEP' },
+        orderBy: { startedAt: 'desc' },
+        select: { startedAt: true },
+      });
+
+      if (!lastDeepRun) {
+        dueIds.push(src.id);
+        continue;
+      }
+
+      const elapsed = now - lastDeepRun.startedAt.getTime();
+      if (elapsed >= freqMs) {
+        dueIds.push(src.id);
+      } else {
+        skippedIds.push(src.id);
+      }
+    }
+
+    if (dueIds.length === 0) {
+      return { enqueued: 0, skipped: skippedIds, due: [] };
+    }
+
+    const activeSources = dueIds.map((id) => ({
+      id,
+      priorityTier: 'DEEP',
+      execute: () => this.collectWithFallback(id),
+    }));
+
+    const count = this.queue.enqueueAll(activeSources);
+    this.logger.log(`[DEEP] Enqueued ${count} sources for deep collection: [${dueIds.join(', ')}]`);
+    return { enqueued: count, skipped: skippedIds, due: dueIds };
+  }
+
+  /** Aggregate coverage report per source × category. */
+  async getCoverageReport() {
+    const sources = await this.prisma.jobSource.findMany({
+      where: { status: 'ACTIVE' },
+      include: {
+        runs: {
+          where: { mode: 'DEEP' },
+          orderBy: { startedAt: 'desc' },
+          take: 1,
+          include: { categoryStats: true },
+        },
+      },
+    });
+
+    const report: any[] = [];
+    for (const s of sources) {
+      const activeCount = await this.prisma.job.count({
+        where: { sourceId: s.id, status: 'ACTIVE' },
+      });
+      const lastRun = s.runs[0];
+      report.push({
+        id: s.id,
+        name: s.name,
+        activeJobs: activeCount,
+        lastDeepRun: lastRun?.startedAt ?? null,
+        categories: (lastRun?.categoryStats ?? []).map((cs: any) => ({
+          category: cs.category,
+          label: cs.categoryLabel,
+          pages: cs.pagesFetched,
+          fetched: cs.jobsFetched,
+          newJobs: cs.newJobs,
+          duplicates: cs.duplicates,
+          errors: cs.errors,
+          stoppedReason: cs.stoppedReason,
+        })),
+      });
+    }
+    return report;
   }
 
 }

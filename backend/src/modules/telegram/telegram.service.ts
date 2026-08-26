@@ -359,7 +359,7 @@ export class TelegramService implements OnModuleInit {
   }
 
   private async handlePause(chatId: number, userId: string, paused: boolean) {
-    await this.prisma.user.update({ where: { id: userId }, data: { notificationsPaused: paused } });
+    await this.prisma.user.update({ where: { id: userId }, data: { notificationsPaused: paused ? 1 : 0 } });
     return this.sendMessage(
       String(chatId),
       paused ? '⏸️ Notifications paused. Send /resume to re-enable.' : '▶️ Notifications resumed.',

@@ -32,6 +32,28 @@ export class PrismaService
     return this.isSQLite ? (v ? 1 : 0) : v;
   }
 
+  /** Serialize a value for SQLite JSON columns; pass through on PostgreSQL. */
+  json<T>(value: T): any {
+    return this.isSQLite ? JSON.stringify(value) : value;
+  }
+
+  /** Deserialize a value from SQLite JSON columns; pass through on PostgreSQL. */
+  parseJson<T>(value: T): any {
+    if (this.isSQLite && typeof value === 'string') {
+      try { return JSON.parse(value); } catch { return null; }
+    }
+    return value;
+  }
+
+  /** Ensure a JSON column value is an array, parsing from string on SQLite. */
+  jsonArray<T>(value: T): T[] {
+    if (this.isSQLite && typeof value === 'string') {
+      try { return JSON.parse(value); } catch { return []; }
+    }
+    if (Array.isArray(value)) return value;
+    return [];
+  }
+
   async onModuleInit() {
     await this.$connect();
   }

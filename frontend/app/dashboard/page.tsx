@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../lib/auth';
 import { RequireAuth, useApi, ErrorBox, ScoreBadge, StatusPill, ListSkeleton, StatSkeleton } from '../../lib/ui';
@@ -41,13 +41,20 @@ export default function DashboardPage() {
 
   // ── SSE: live notifications (matches, application changes, digests) ──
   const sse = useEventStream();
+  const prevCounts = useRef({ match: 0, app: 0, digest: 0 });
   useEffect(() => {
-    if (sse.matchCount > 0 || sse.appCount > 0 || sse.digestCount > 0) {
+    const hasChanges = 
+      sse.matchCount > prevCounts.current.match ||
+      sse.appCount > prevCounts.current.app ||
+      sse.digestCount > prevCounts.current.digest;
+
+    if (hasChanges) {
       reload();
       reloadMatches();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sse.matchCount, sse.appCount, sse.digestCount]);
+
+    prevCounts.current = { match: sse.matchCount, app: sse.appCount, digest: sse.digestCount };
+  }, [sse.matchCount, sse.appCount, sse.digestCount, reload, reloadMatches]);
 
   return (
     <RequireAuth>
@@ -59,7 +66,7 @@ export default function DashboardPage() {
       </div>
       <p className="subtitle">Here&apos;s what your job search looks like today.</p>
 
-      {err && <ErrorBox msg={err} onRetry={reload} />}
+      {err && !loading && <ErrorBox msg={err} onRetry={reload} />}
 
       <MatchToastStack events={sse.events} onDismiss={sse.dismiss} />
       {data && !data.onboardDone && (

@@ -1,16 +1,18 @@
 /* GeezJobs adapter — polite HTML scraping (SRS §9.2, ETHIOPIA tier, low rate).
  *
- * GeezJobs is a server-rendered board; the homepage lists /job-detail/<slug>
- * links and each job page carries og:title / og:description with the company
- * and location. We fetch the homepage once, then the first few job pages
- * sequentially — a bounded, low-rate crawl that respects §29 (no CAPTCHA
- * bypass, no auth circumvention). */
+ * GeezJobs is a server-rendered board. The /jobs-in-ethiopia listing exposes
+ * more links than the homepage. Category hubs live under /industry/{slug}.
+ * ?page= pagination is NOT supported.
+ *
+ * Fair use: 700 ms pacing, hard request cap, known-id skip for DEEP sweeps.
+ */
 
 import { Injectable } from '@nestjs/common';
-import { JobSourceAdapter, RawJob, deriveExperience, FETCH_TIMEOUT_MS } from './job-source.adapter';
+import { JobSourceAdapter, RawJob, CollectionRequest, CollectionResult, CategoryCollectionStat, StopReason, deriveExperience, FETCH_TIMEOUT_MS } from './job-source.adapter';
 
 const HOME = 'https://geezjobs.com/';
-const MAX_JOBS = 12;
+const LISTING = 'https://geezjobs.com/jobs-in-ethiopia';
+const MAX_JOBS = 49;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 @Injectable()
@@ -18,36 +20,125 @@ export class GeezJobsAdapter implements JobSourceAdapter {
   readonly sourceId = 'geez'; // matches the seeded JobSource.id
   readonly selectorVersion = 'html:jsonld+dom:v1.0';
 
-  async fetchJobs(): Promise<RawJob[]> {
-    const res = await fetch(HOME, {
-      headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) JobHunter/1.0' },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  async fetchJobs(options?: { since?: Date }): Promise<RawJob[]> {
+    const since = options?.since;
+    const result = await this.collect({
+      mode: 'FAST',
+      since: since ?? new Date(Date.now() - 14 * 86_400_000),
+      maxPages: 1,
+      maxRequests: 10,
+      requestDelayMs: 700,
     });
-    if (!res.ok) throw new Error(`GeezJobs responded ${res.status}`);
-    const html = await res.text();
-
-    const slugs = [...new Set([...html.matchAll(/href="\/job-detail\/([a-z0-9-]+)"/gi)].map((m) => m[1]))];
-    const jobs: RawJob[] = [];
-
-    for (const slug of slugs.slice(0, MAX_JOBS)) {
-      try {
-        const page = await fetch(`https://geezjobs.com/job-detail/${slug}`, {
-          headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) JobHunter/1.0' },
-          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-        });
-        if (!page.ok) continue;
-        const j = this.parseJob(slug, await page.text());
-        if (j) jobs.push(j);
-        await sleep(700); // polite low-rate pacing (SRS §9.2: low rate)
-      } catch {
-        /* individual job-page failures are skipped — the source stays healthy */
-      }
+    if (result.errors.length) {
+      throw new Error(result.errors[0]);
     }
-    if (!jobs.length) throw new Error('GeezJobs returned no parseable job pages');
-    return jobs;
+    return result.jobs;
   }
 
-  private parseJob(slug: string, html: string): RawJob | null {
+  async collect(request: CollectionRequest): Promise<CollectionResult> {
+    const since = request.since;
+    const maxPages = request.maxPages ?? 1;
+    const maxRequests = request.maxRequests ?? 10;
+    const requestDelayMs = request.requestDelayMs ?? 700;
+    const categories = request.categories ?? [];
+    const knownIds = request.knownSourceJobIds;
+
+    const allStats: CategoryCollectionStat[] = [];
+    const allJobs: RawJob[] = [];
+    const allErrors: string[] = [];
+    let totalRequests = 0;
+
+    const addCategory = (stat: CategoryCollectionStat) => {
+      allStats.push(stat);
+    };
+
+    const fetchListing = async (url: string): Promise<{ slugs: string[]; stopped: StopReason }> => {
+      const res = await fetch(url, {
+        headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) JobHunter/1.0' },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      totalRequests++;
+      if (!res.ok) {
+        allErrors.push(`GeezJobs ${url} responded ${res.status}`);
+        return { slugs: [], stopped: 'ERROR' };
+      }
+      const html = await res.text();
+      const slugs = [...new Set([...html.matchAll(/href="\/job-detail\/([a-z0-9-]+)"/gi)].map((m) => m[1]))];
+      if (!slugs.length) return { slugs: [], stopped: 'EMPTY_PAGE' };
+      return { slugs, stopped: 'LAST_PAGE' };
+    };
+
+    const fetchJobPage = async (slug: string): Promise<RawJob | null> => {
+      const res = await fetch(`https://geezjobs.com/job-detail/${slug}`, {
+        headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) JobHunter/1.0' },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      totalRequests++;
+      if (!res.ok) return null;
+      const html = await res.text();
+      return this.parseJob(slug, html, since);
+    };
+
+    const runCategory = async (categoryUrl?: string, categoryLabel?: string): Promise<CategoryCollectionStat> => {
+      const catLabel = categoryLabel ?? 'latest';
+      const stat: CategoryCollectionStat = {
+        category: catLabel,
+        pagesFetched: 0,
+        jobsFetched: 0,
+        errors: 0,
+        stoppedReason: 'ERROR',
+      };
+
+      for (let page = 1; page <= maxPages && totalRequests < maxRequests; page++) {
+        const url = categoryUrl ?? LISTING;
+        const { slugs, stopped } = await fetchListing(url);
+        stat.pagesFetched = page;
+        stat.stoppedReason = stopped;
+
+        if (stopped === 'ERROR') {
+          stat.errors++;
+          continue;
+        }
+
+        const newSlugs = slugs.filter((s) => !knownIds?.has(s));
+        for (const slug of newSlugs.slice(0, MAX_JOBS)) {
+          if (totalRequests >= maxRequests) break;
+          const job = await fetchJobPage(slug);
+          if (job) allJobs.push(job);
+          stat.jobsFetched++;
+          await sleep(requestDelayMs);
+        }
+
+        if (stopped === 'EMPTY_PAGE' || stopped === 'LAST_PAGE') break;
+      }
+
+      return stat;
+    };
+
+    // FAST: only latest listing
+    const latestStat = await runCategory();
+    addCategory(latestStat);
+
+    // DEEP: sweep category hubs
+    if (request.mode === 'DEEP' && categories.length) {
+      for (const slug of categories) {
+        if (totalRequests >= maxRequests) break;
+        const catUrl = `https://geezjobs.com/industry/${slug}`;
+        const catStat = await runCategory(catUrl, slug);
+        addCategory(catStat);
+      }
+    }
+
+    return {
+      jobs: allJobs,
+      pagesFetched: allStats.reduce((s, c) => s + c.pagesFetched, 0),
+      requestsMade: totalRequests,
+      categories: allStats,
+      errors: allErrors,
+    };
+  }
+
+  private parseJob(slug: string, html: string, since?: Date): RawJob | null {
     // 1. Try to extract JSON-LD
     const ldMatch = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/i.exec(html);
     let ld: any = null;
@@ -69,7 +160,7 @@ export class GeezJobsAdapter implements JobSourceAdapter {
       .trim();
 
     const company = ld?.hiringOrganization?.name?.replace(/\s*\|\s*GeezJobs/i, '')?.trim() ?? 'GeezJobs';
-    
+
     // Default location fallback
     const location = ld?.jobLocation?.address?.addressLocality ?? 'Ethiopia';
 
@@ -81,8 +172,7 @@ export class GeezJobsAdapter implements JobSourceAdapter {
       description += `\n\n<h3>How to Apply</h3>\n${howToApplyMatch[1]}`;
     }
 
-    // Fallback if no description found at all (prefer the main body over the
-    // SEO meta blurb, which is a title-like summary, not the posting body)
+    // Fallback if no description found at all
     if (!description) {
       const fallbackDescMatch = /<div class="job-content">([\s\S]*?)<\/div>/i.exec(html);
       description = fallbackDescMatch
@@ -91,19 +181,15 @@ export class GeezJobsAdapter implements JobSourceAdapter {
     }
 
     // 4. Extract Sidebar Metadata (Salary, Experience)
-    // Strategy: JSON-LD first → text-based extraction → fragile <p> tag regex (last resort)
-    // The <p> tag pairing is brittle (breaks on any layout change) — text extraction
-    // is more robust per the universal-scraping-architect skill guidance.
     let salaryNum: number | undefined;
     let currency = 'ETB';
-    let sidebarConfidenceBonus = 0; // bonus when JSON-LD has structured data
+    let sidebarConfidenceBonus = 0;
 
     if (ld?.baseSalary?.value) {
       salaryNum = Number(ld.baseSalary.value);
       currency = ld.baseSalary.currency || 'ETB';
       sidebarConfidenceBonus = 5;
     } else {
-      // Fallback 1: text-based extraction (robust against layout changes)
       const sidebarText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
       const salaryTextMatch = /Salary\s+([A-Z]{2,3}\s+[\d,\s.-]+)/i.exec(sidebarText);
       if (salaryTextMatch) {
@@ -114,7 +200,6 @@ export class GeezJobsAdapter implements JobSourceAdapter {
         }
         if (/USD/i.test(rawSalary)) currency = 'USD';
       } else {
-        // Fallback 2: fragile <p> tag pairing (last resort — breaks on layout change)
         const salaryMatch = /<p[^>]*>Salary<\/p>\s*<p[^>]*>([^<]+)<\/p>/i.exec(html);
         if (salaryMatch) {
           const rawSalary = salaryMatch[1];
@@ -131,18 +216,16 @@ export class GeezJobsAdapter implements JobSourceAdapter {
     if (ld?.experienceRequirements) {
       expText = String(ld.experienceRequirements);
     } else {
-      // Fallback 1: text-based extraction
       const sidebarText2 = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
       const expTextMatch = /Experience\s+(.+?)(?=\s+Deadline|\s+Salary|\s+How|$)/i.exec(sidebarText2);
       expText = expTextMatch ? expTextMatch[1].trim() : title;
       if (!expTextMatch) {
-        // Fallback 2: fragile <p> tag pairing
         const expMatch = /<p[^>]*>Experience<\/p>\s*<p[^>]*>([^<]+)<\/p>/i.exec(html);
         if (expMatch) expText = expMatch[1];
       }
     }
 
-    // 5. Deadline from JSON-LD (structured) or the sidebar "Deadline Aug. 24, 2026"
+    // 5. Deadline from JSON-LD or sidebar
     let deadlineDate: Date | undefined;
     if (ld?.validThrough) {
       deadlineDate = this.parseDeadline(ld.validThrough);
@@ -151,6 +234,10 @@ export class GeezJobsAdapter implements JobSourceAdapter {
       const deadlineMatch = /\bDeadline\b\s*([A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4})/.exec(sidebarText);
       if (deadlineMatch) deadlineDate = this.parseDeadline(deadlineMatch[1]);
     }
+
+    // Freshness filter
+    const postedDate = ld?.datePosted ? new Date(ld.datePosted) : new Date();
+    if (since && postedDate < since) return null;
 
     return {
       title,
@@ -165,11 +252,11 @@ export class GeezJobsAdapter implements JobSourceAdapter {
       skills: [],
       url: `https://geezjobs.com/job-detail/${slug}`,
       sourceJobId: slug,
-      postedDate: ld?.datePosted ? new Date(ld.datePosted) : new Date(),
+      postedDate,
       deadline: deadlineDate,
-      description, // capped downstream by the fidelity pipeline (MAX_DESCRIPTION_CHARS)
+      description,
       country: 'Ethiopia',
-      parseConfidence: 90 + sidebarConfidenceBonus, // 90 base (JSON-LD) + 5 if salary came from structured data
+      parseConfidence: 90 + sidebarConfidenceBonus,
       rawData: { site: 'geezjobs', slug },
     };
   }

@@ -67,6 +67,18 @@ function collectIntervalMs(): number {
   return h ? Number(h[1]) * 60 * 60 * 1000 : 30 * 60 * 1000; // "2h"
 }
 
+/** FR-035b: deep collection interval in ms — reads DEEP_COLLECTION_INTERVAL (default 60m). */
+function deepCollectIntervalMs(): number {
+  const raw = process.env.DEEP_COLLECTION_INTERVAL;
+  if (!raw) return 60 * 60 * 1000;
+  const n = Number(raw);
+  if (!Number.isNaN(n)) return n; // plain milliseconds
+  const m = raw.trim().match(/^(\d+)\s*m$/);
+  if (m) return Number(m[1]) * 60 * 1000; // "60m"
+  const h = raw.trim().match(/^(\d+)\s*h$/);
+  return h ? Number(h[1]) * 60 * 60 * 1000 : 60 * 60 * 1000; // "1h"
+}
+
 @Injectable()
 export class LifecycleTasks {
   private readonly logger = new Logger(LifecycleTasks.name);
@@ -125,6 +137,20 @@ export class LifecycleTasks {
         }
       } catch (e) {
         this.logger.error('Scheduled collection failed', e);
+      }
+    });
+  }
+
+  @Interval(deepCollectIntervalMs()) // FR-035b: scheduled deep collection (DEEP_COLLECTION_INTERVAL, default 60 min)
+  async collectDeep() {
+    await this.runExclusive('collect-deep', async () => {
+      try {
+        const result = await this.sources.collectDeepDue();
+        if (result.enqueued > 0) {
+          this.logger.log(`Scheduled deep collection: ${result.enqueued} sources due [${result.due.join(', ')}]`);
+        }
+      } catch (e) {
+        this.logger.error('Scheduled deep collection failed', e);
       }
     });
   }

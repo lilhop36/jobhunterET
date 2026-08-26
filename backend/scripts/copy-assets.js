@@ -12,6 +12,16 @@ const assets = [
     dest: path.join(__dirname, '..', 'dist', 'modules', 'sources', 'source-configs.json'),
     label: 'source-configs.json',
   },
+  {
+    src: path.join(__dirname, '..', 'src', 'modules', 'sources', 'categories', 'category-taxonomy.json'),
+    dest: path.join(__dirname, '..', 'dist', 'modules', 'sources', 'categories', 'category-taxonomy.json'),
+    label: 'categories/category-taxonomy.json',
+  },
+  {
+    src: path.join(__dirname, '..', 'src', 'modules', 'sources', 'categories', 'source-categories.json'),
+    dest: path.join(__dirname, '..', 'dist', 'modules', 'sources', 'categories', 'source-categories.json'),
+    label: 'categories/source-categories.json',
+  },
 ];
 
 let ok = 0;

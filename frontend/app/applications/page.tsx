@@ -26,17 +26,25 @@ export default function ApplicationsPage() {
   const { api } = useAuth();
   const { data, err, loading, reload } = useApi<Board>('/api/applications');
   const [showTerminal, setShowTerminal] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const setStage = async (jobId: string, stage: string) => {
-    await api(`/api/applications/${jobId}/stage`, { method: 'POST', body: JSON.stringify({ stage }) });
-    reload();
+    setBusyId(jobId);
+    try {
+      await api(`/api/applications/${jobId}/stage`, { method: 'POST', body: JSON.stringify({ stage }) });
+      reload();
+    } catch (e: any) {
+      console.error('Failed to update stage:', e);
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
     <RequireAuth>
       <h1>Applications</h1>
       <p className="subtitle">Your pipeline: Discovered → Saved → Applied → … → Offer (FR-031).</p>
-      {err && <ErrorBox msg={err} onRetry={reload} />}
+      {err && !loading && <ErrorBox msg={err} onRetry={reload} />}
       {loading && <Loading />}
 
       {data && (
@@ -60,18 +68,17 @@ export default function ApplicationsPage() {
                       {a.followUp && ` · follow-up ${new Date(a.followUp).toLocaleDateString()}`}
                     </div>
                     <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
-                      {STAGES.filter((s) => s !== stage && s !== 'OFFER')
-                        .filter((s) => STAGES.indexOf(s) === STAGES.indexOf(stage) + 1 || STAGES.indexOf(s) === STAGES.indexOf(stage) - 1)
+                      {STAGES.filter((s) => Math.abs(STAGES.indexOf(s) - STAGES.indexOf(stage)) === 1)
                         .map((s) => (
-                          <button key={s} className="btn ghost small" onClick={() => setStage(a.jobId, s)}>
+                          <button key={s} className="btn ghost small" disabled={busyId === a.jobId} onClick={() => setStage(a.jobId, s)}>
                             {s}
                           </button>
                         ))}
-                      {!TERMINAL.includes(stage) && (
-                        <button className="btn danger small" onClick={() => setStage(a.jobId, 'REJECTED')}>
-                          Reject
-                        </button>
-                      )}
+                        {!TERMINAL.includes(stage) && (
+                          <button className="btn danger small" disabled={busyId === a.jobId} onClick={() => setStage(a.jobId, 'REJECTED')}>
+                            Reject
+                          </button>
+                        )}
                     </div>
                   </div>
                   );

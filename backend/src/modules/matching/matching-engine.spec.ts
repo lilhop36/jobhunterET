@@ -101,8 +101,11 @@ describe('scoreJob — skill scoring (FR-019)', () => {
     const prof = makeProfile({ skills: ['JavaScript'] });
     const job = makeJob({ title: 'Frontend Developer', skills: ['TypeScript', 'React'] });
     const r = scoreJob(job, prof);
+    // JS→TS (0.85*0.8=0.68) and JS→React (0.8*0.8=0.64) are both above 0.6
+    // transferability threshold, so they're classified as transferable (not related).
+    // relatedSkills includes both transferable and related.
     expect(r.relatedSkills).toEqual(['TypeScript', 'React']);
-    expect(findPart(r, 'Skills').fraction).toBeCloseTo(0.5, 5); // (0 + 2*0.5) / 2
+    expect(findPart(r, 'Skills').fraction).toBeCloseTo(0.66, 1); // (0.68 + 0.64) / 2
   });
 });
 

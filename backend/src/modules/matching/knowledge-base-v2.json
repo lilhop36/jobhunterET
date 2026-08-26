@@ -1,0 +1,1468 @@
+{
+  "version": "2.0.0",
+
+  "skills": {
+    "JavaScript": {
+      "category": "languages",
+      "aliases": ["js", "javascript", "ecmascript", "es6", "es2015"],
+      "related": ["TypeScript", "Node.js", "React", "Vue", "Angular"],
+      "prerequisites": [],
+      "roles": ["frontend_developer", "backend_developer", "full_stack_developer"],
+      "transferability": { "TypeScript": 0.85, "Node.js": 0.60, "React": 0.40 }
+    },
+    "TypeScript": {
+      "category": "languages",
+      "aliases": ["ts", "typescript"],
+      "related": ["JavaScript", "Node.js", "React", "Next.js", "NestJS", "Angular"],
+      "prerequisites": ["JavaScript"],
+      "roles": ["frontend_developer", "backend_developer", "full_stack_developer"],
+      "transferability": { "JavaScript": 0.95, "Node.js": 0.55, "NestJS": 0.50 }
+    },
+    "Python": {
+      "category": "languages",
+      "aliases": ["python3", "python 3", "py"],
+      "related": ["Django", "Flask", "FastAPI", "Pandas", "NumPy"],
+      "prerequisites": [],
+      "roles": ["backend_developer", "data_engineer", "data_scientist", "ml_engineer"],
+      "transferability": { "Django": 0.40, "Flask": 0.40, "FastAPI": 0.45 }
+    },
+    "Java": {
+      "category": "languages",
+      "aliases": ["java"],
+      "related": ["Spring Boot", "Maven", "Gradle", "SQL", "Docker"],
+      "prerequisites": [],
+      "roles": ["backend_developer", "android_developer", "enterprise_developer"],
+      "transferability": { "Spring Boot": 0.50, "Kotlin": 0.60, "C#": 0.55 }
+    },
+    "C#": {
+      "category": "languages",
+      "aliases": ["csharp", "c-sharp", "c sharp", ".net", "dotnet"],
+      "related": ["ASP.NET", "Entity Framework", "SQL Server", "Unity"],
+      "prerequisites": [],
+      "roles": ["backend_developer", "game_developer", "enterprise_developer"],
+      "transferability": { "Java": 0.65, "ASP.NET": 0.50 }
+    },
+    "Go": {
+      "category": "languages",
+      "aliases": ["golang", "go lang"],
+      "related": ["Docker", "Kubernetes", "gRPC", "Linux"],
+      "prerequisites": [],
+      "roles": ["backend_developer", "devops_engineer", "platform_engineer"],
+      "transferability": { "Rust": 0.40, "Node.js": 0.30 }
+    },
+    "Rust": {
+      "category": "languages",
+      "aliases": ["rust", "rustlang"],
+      "related": ["WebAssembly", "Docker", "Linux", "Systems Programming"],
+      "prerequisites": [],
+      "roles": ["backend_developer", "systems_engineer", "embedded_engineer"],
+      "transferability": { "Go": 0.40, "C++": 0.45 }
+    },
+    "PHP": {
+      "category": "languages",
+      "aliases": ["php"],
+      "related": ["Laravel", "WordPress", "MySQL", "HTML", "CSS"],
+      "prerequisites": [],
+      "roles": ["backend_developer", "web_developer"],
+      "transferability": { "Laravel": 0.45, "WordPress": 0.35 }
+    },
+    "Ruby": {
+      "category": "languages",
+      "aliases": ["ruby"],
+      "related": ["Rails", "PostgreSQL", "REST API"],
+      "prerequisites": [],
+      "roles": ["backend_developer"],
+      "transferability": { "Rails": 0.50, "Python": 0.30 }
+    },
+    "Swift": {
+      "category": "languages",
+      "aliases": ["swift", "swiftlang"],
+      "related": ["iOS", "SwiftUI", "UIKit"],
+      "prerequisites": [],
+      "roles": ["ios_developer", "mobile_developer"],
+      "transferability": { "Kotlin": 0.35, "Objective-C": 0.70 }
+    },
+    "Kotlin": {
+      "category": "languages",
+      "aliases": ["kotlin"],
+      "related": ["Android", "Java", "Spring Boot", "Jetpack Compose"],
+      "prerequisites": ["Java"],
+      "roles": ["android_developer", "backend_developer", "mobile_developer"],
+      "transferability": { "Java": 0.80, "Swift": 0.35 }
+    },
+    "SQL": {
+      "category": "databases",
+      "aliases": ["sql", "structured query language"],
+      "related": ["PostgreSQL", "MySQL", "SQLite", "Data Analysis", "Database Design"],
+      "prerequisites": [],
+      "roles": ["backend_developer", "data_engineer", "data_analyst", "dba"],
+      "transferability": { "PostgreSQL": 0.50, "MySQL": 0.50 }
+    },
+    "PostgreSQL": {
+      "category": "databases",
+      "aliases": ["postgres", "postgresql", "pg", "psql"],
+      "related": ["SQL", "MySQL", "Redis", "Prisma", "Docker"],
+      "prerequisites": ["SQL"],
+      "roles": ["backend_developer", "data_engineer", "dba"],
+      "transferability": { "MySQL": 0.85, "SQL": 0.90, "SQLite": 0.80 }
+    },
+    "MySQL": {
+      "category": "databases",
+      "aliases": ["mysql"],
+      "related": ["SQL", "PostgreSQL", "PHP", "Docker"],
+      "prerequisites": ["SQL"],
+      "roles": ["backend_developer", "dba"],
+      "transferability": { "PostgreSQL": 0.85, "SQL": 0.90, "MariaDB": 0.90 }
+    },
+    "MongoDB": {
+      "category": "databases",
+      "aliases": ["mongo", "mongodb"],
+      "related": ["JavaScript", "Node.js", "TypeScript", "Mongoose"],
+      "prerequisites": [],
+      "roles": ["backend_developer", "full_stack_developer"],
+      "transferability": { "PostgreSQL": 0.30, "Firebase": 0.35 }
+    },
+    "Redis": {
+      "category": "databases",
+      "aliases": ["redis"],
+      "related": ["Node.js", "Docker", "Microservices", "Caching"],
+      "prerequisites": [],
+      "roles": ["backend_developer", "devops_engineer"],
+      "transferability": { "Memcached": 0.70 }
+    },
+    "SQLite": {
+      "category": "databases",
+      "aliases": ["sqlite"],
+      "related": ["SQL", "Prisma"],
+      "prerequisites": ["SQL"],
+      "roles": ["mobile_developer", "backend_developer"],
+      "transferability": { "PostgreSQL": 0.50, "MySQL": 0.50 }
+    },
+    "Elasticsearch": {
+      "category": "databases",
+      "aliases": ["elastic", "elasticsearch", "elk"],
+      "related": ["Docker", "Node.js", "Python", "Kibana"],
+      "prerequisites": [],
+      "roles": ["backend_developer", "data_engineer", "devops_engineer"],
+      "transferability": { "Solr": 0.60 }
+    },
+    "Prisma": {
+      "category": "databases",
+      "aliases": ["prisma", "prisma orm"],
+      "related": ["PostgreSQL", "MySQL", "SQLite", "TypeScript", "Node.js"],
+      "prerequisites": ["SQL"],
+      "roles": ["backend_developer", "full_stack_developer"],
+      "transferability": { "TypeORM": 0.60, "Sequelize": 0.55, "Drizzle ORM": 0.70 }
+    },
+    "DynamoDB": {
+      "category": "databases",
+      "aliases": ["dynamodb", "dynamo"],
+      "related": ["AWS", "Lambda", "Node.js"],
+      "prerequisites": ["AWS"],
+      "roles": ["backend_developer", "data_engineer"],
+      "transferability": { "MongoDB": 0.30 }
+    },
+    "Supabase": {
+      "category": "databases",
+      "aliases": ["supabase"],
+      "related": ["PostgreSQL", "Firebase", "Next.js"],
+      "prerequisites": ["PostgreSQL"],
+      "roles": ["full_stack_developer", "frontend_developer"],
+      "transferability": { "Firebase": 0.60, "PostgreSQL": 0.70 }
+    },
+    "Firebase": {
+      "category": "databases",
+      "aliases": ["firebase", "google firebase"],
+      "related": ["Firestore", "React Native", "Flutter", "Angular"],
+      "prerequisites": [],
+      "roles": ["mobile_developer", "full_stack_developer"],
+      "transferability": { "Supabase": 0.60, "DynamoDB": 0.30 }
+    },
+    "React": {
+      "category": "frontend",
+      "aliases": ["reactjs", "react.js", "react js"],
+      "related": ["Next.js", "Redux", "React Native", "TypeScript", "Tailwind CSS", "JavaScript"],
+      "prerequisites": ["JavaScript"],
+      "roles": ["frontend_developer", "full_stack_developer", "mobile_developer"],
+      "transferability": { "Next.js": 0.70, "Vue": 0.55, "Angular": 0.50, "React Native": 0.75 }
+    },
+    "Next.js": {
+      "category": "frontend",
+      "aliases": ["nextjs", "next.js", "next js"],
+      "related": ["React", "TypeScript", "Tailwind CSS", "Vercel"],
+      "prerequisites": ["React", "JavaScript"],
+      "roles": ["frontend_developer", "full_stack_developer"],
+      "transferability": { "React": 0.90, "Nuxt.js": 0.55, "Remix": 0.70, "Astro": 0.50 }
+    },
+    "Vue": {
+      "category": "frontend",
+      "aliases": ["vuejs", "vue.js", "vue js", "vue 3"],
+      "related": ["Nuxt.js", "TypeScript", "JavaScript"],
+      "prerequisites": ["JavaScript"],
+      "roles": ["frontend_developer", "full_stack_developer"],
+      "transferability": { "React": 0.55, "Nuxt.js": 0.70, "Angular": 0.40 }
+    },
+    "Nuxt.js": {
+      "category": "frontend",
+      "aliases": ["nuxtjs", "nuxt.js", "nuxt"],
+      "related": ["Vue", "TypeScript", "JavaScript"],
+      "prerequisites": ["Vue", "JavaScript"],
+      "roles": ["frontend_developer", "full_stack_developer"],
+      "transferability": { "Vue": 0.90, "Next.js": 0.55 }
+    },
+    "Angular": {
+      "category": "frontend",
+      "aliases": ["angular", "angular 2+", "angular modern"],
+      "related": ["TypeScript", "JavaScript", "RxJS", "NgRx"],
+      "prerequisites": ["TypeScript", "JavaScript"],
+      "roles": ["frontend_developer", "full_stack_developer"],
+      "transferability": { "React": 0.50, "Vue": 0.40, "TypeScript": 0.70 }
+    },
+    "AngularJS": {
+      "category": "frontend",
+      "aliases": ["angularjs", "angular.js", "angular 1.x"],
+      "related": ["JavaScript"],
+      "prerequisites": ["JavaScript"],
+      "roles": ["frontend_developer"],
+      "transferability": { "Angular": 0.30, "React": 0.25, "Vue": 0.25 }
+    },
+    "Svelte": {
+      "category": "frontend",
+      "aliases": ["svelte", "sveltejs"],
+      "related": ["SvelteKit", "TypeScript", "JavaScript"],
+      "prerequisites": ["JavaScript"],
+      "roles": ["frontend_developer", "full_stack_developer"],
+      "transferability": { "React": 0.45, "Vue": 0.45 }
+    },
+    "Remix": {
+      "category": "frontend",
+      "aliases": ["remix", "remix.run"],
+      "related": ["React", "TypeScript", "Node.js"],
+      "prerequisites": ["React", "JavaScript"],
+      "roles": ["frontend_developer", "full_stack_developer"],
+      "transferability": { "Next.js": 0.80, "React": 0.85 }
+    },
+    "Astro": {
+      "category": "frontend",
+      "aliases": ["astro", "astro.build"],
+      "related": ["React", "Vue", "Svelte", "TypeScript"],
+      "prerequisites": ["HTML", "CSS"],
+      "roles": ["frontend_developer"],
+      "transferability": { "Next.js": 0.45 }
+    },
+    "HTML": {
+      "category": "fundamentals",
+      "aliases": ["html", "html5"],
+      "related": ["CSS", "JavaScript", "React", "Accessibility"],
+      "prerequisites": [],
+      "roles": ["frontend_developer", "web_developer"],
+      "transferability": {}
+    },
+    "CSS": {
+      "category": "fundamentals",
+      "aliases": ["css", "css3", "cascading style sheets"],
+      "related": ["HTML", "JavaScript", "Tailwind CSS", "SASS"],
+      "prerequisites": ["HTML"],
+      "roles": ["frontend_developer", "web_developer", "ui_designer"],
+      "transferability": { "SASS": 0.80, "Tailwind CSS": 0.60, "Styled Components": 0.70 }
+    },
+    "Tailwind CSS": {
+      "category": "frontend",
+      "aliases": ["tailwind", "tailwindcss", "tailwind css"],
+      "related": ["CSS", "HTML", "React", "Next.js"],
+      "prerequisites": ["CSS"],
+      "roles": ["frontend_developer", "full_stack_developer"],
+      "transferability": { "CSS": 0.80, "Bootstrap": 0.40 }
+    },
+    "SASS": {
+      "category": "frontend",
+      "aliases": ["sass", "scss", "sass/scss"],
+      "related": ["CSS", "HTML"],
+      "prerequisites": ["CSS"],
+      "roles": ["frontend_developer"],
+      "transferability": { "CSS": 0.90, "Less": 0.80 }
+    },
+    "Redux": {
+      "category": "frontend",
+      "aliases": ["reduxjs", "redux"],
+      "related": ["React", "JavaScript", "TypeScript"],
+      "prerequisites": ["React", "JavaScript"],
+      "roles": ["frontend_developer"],
+      "transferability": { "Zustand": 0.60, "MobX": 0.55, "Pinia": 0.50 }
+    },
+    "Zustand": {
+      "category": "frontend",
+      "aliases": ["zustand"],
+      "related": ["React", "TypeScript"],
+      "prerequisites": ["React"],
+      "roles": ["frontend_developer"],
+      "transferability": { "Redux": 0.60, "Jotai": 0.70, "Recoil": 0.65 }
+    },
+    "TanStack Query": {
+      "category": "frontend",
+      "aliases": ["react query", "tanstack query", "reactquery"],
+      "related": ["React", "TypeScript", "REST API", "GraphQL"],
+      "prerequisites": ["React"],
+      "roles": ["frontend_developer", "full_stack_developer"],
+      "transferability": { "SWR": 0.75 }
+    },
+    "React Hook Form": {
+      "category": "frontend",
+      "aliases": ["react hook form", "rhf"],
+      "related": ["React", "Zod", "TypeScript"],
+      "prerequisites": ["React"],
+      "roles": ["frontend_developer"],
+      "transferability": { "Formik": 0.70 }
+    },
+    "Vite": {
+      "category": "frontend",
+      "aliases": ["vite"],
+      "related": ["React", "Vue", "TypeScript", "ESBuild"],
+      "prerequisites": ["JavaScript"],
+      "roles": ["frontend_developer", "full_stack_developer"],
+      "transferability": { "Webpack": 0.50, "Parcel": 0.50 }
+    },
+    "REST API": {
+      "category": "architecture",
+      "aliases": ["rest", "rest apis", "restful", "rest api", "restful api"],
+      "related": ["GraphQL", "Node.js", "Express", "NestJS", "FastAPI", "HTTP"],
+      "prerequisites": [],
+      "roles": ["backend_developer", "full_stack_developer", "mobile_developer"],
+      "transferability": { "GraphQL": 0.60, "gRPC": 0.50 }
+    },
+    "GraphQL": {
+      "category": "architecture",
+      "aliases": ["gql", "graphql"],
+      "related": ["REST API", "Node.js", "React", "Apollo"],
+      "prerequisites": ["REST API"],
+      "roles": ["backend_developer", "full_stack_developer"],
+      "transferability": { "REST API": 0.70, "gRPC": 0.40 }
+    },
+    "gRPC": {
+      "category": "architecture",
+      "aliases": ["grpc", "google remote procedure call"],
+      "related": ["Protocol Buffers", "Node.js", "Go", "Microservices"],
+      "prerequisites": ["REST API"],
+      "roles": ["backend_developer", "platform_engineer"],
+      "transferability": { "REST API": 0.50, "WebSocket": 0.30 }
+    },
+    "WebSocket": {
+      "category": "architecture",
+      "aliases": ["websocket", "websockets", "ws"],
+      "related": ["Node.js", "JavaScript", "Socket.io"],
+      "prerequisites": ["HTTP"],
+      "roles": ["backend_developer", "full_stack_developer"],
+      "transferability": { "Server-Sent Events": 0.50 }
+    },
+    "Microservices": {
+      "category": "architecture",
+      "aliases": ["microservice", "microservices", "micro-service"],
+      "related": ["Docker", "Kubernetes", "REST API", "GraphQL", "Node.js", "Event-Driven"],
+      "prerequisites": ["REST API"],
+      "roles": ["backend_developer", "devops_engineer", "platform_engineer"],
+      "transferability": { "Monolith": 0.30 }
+    },
+    "Event-Driven": {
+      "category": "architecture",
+      "aliases": ["event-driven", "event driven", "event sourcing", "message queue", "pub/sub"],
+      "related": ["Kafka", "RabbitMQ", "Redis", "Microservices"],
+      "prerequisites": [],
+      "roles": ["backend_developer", "data_engineer"],
+      "transferability": {}
+    },
+    "Server-Side Rendering": {
+      "category": "architecture",
+      "aliases": ["ssr", "server-side rendering", "server side rendering"],
+      "related": ["Next.js", "Nuxt.js", "Remix"],
+      "prerequisites": ["React", "Vue"],
+      "roles": ["frontend_developer", "full_stack_developer"],
+      "transferability": { "Static Site Generation": 0.60, "Client-Side Rendering": 0.40 }
+    },
+    "NestJS": {
+      "category": "backend",
+      "aliases": ["nestjs", "nest.js", "nest js"],
+      "related": ["Node.js", "TypeScript", "Express", "GraphQL", "REST API", "Prisma"],
+      "prerequisites": ["Node.js", "TypeScript"],
+      "roles": ["backend_developer"],
+      "transferability": { "Express": 0.80, "Fastify": 0.75, "Spring Boot": 0.40 }
+    },
+    "Express": {
+      "category": "backend",
+      "aliases": ["express", "expressjs", "express.js"],
+      "related": ["Node.js", "TypeScript", "REST API", "MongoDB"],
+      "prerequisites": ["Node.js"],
+      "roles": ["backend_developer", "full_stack_developer"],
+      "transferability": { "NestJS": 0.65, "Fastify": 0.70, "Koa": 0.75 }
+    },
+    "Fastify": {
+      "category": "backend",
+      "aliases": ["fastify"],
+      "related": ["Node.js", "TypeScript", "REST API"],
+      "prerequisites": ["Node.js"],
+      "roles": ["backend_developer"],
+      "transferability": { "Express": 0.75, "NestJS": 0.60 }
+    },
+    "Django": {
+      "category": "backend",
+      "aliases": ["django"],
+      "related": ["Python", "PostgreSQL", "REST API", "Docker"],
+      "prerequisites": ["Python"],
+      "roles": ["backend_developer"],
+      "transferability": { "Flask": 0.60, "FastAPI": 0.55, "Rails": 0.40 }
+    },
+    "Django REST Framework": {
+      "category": "backend",
+      "aliases": ["drf", "django rest framework"],
+      "related": ["Django", "Python", "REST API"],
+      "prerequisites": ["Django", "REST API"],
+      "roles": ["backend_developer"],
+      "transferability": { "FastAPI": 0.55, "Express": 0.45 }
+    },
+    "Flask": {
+      "category": "backend",
+      "aliases": ["flask"],
+      "related": ["Python", "REST API", "Docker"],
+      "prerequisites": ["Python"],
+      "roles": ["backend_developer"],
+      "transferability": { "Django": 0.55, "FastAPI": 0.65 }
+    },
+    "FastAPI": {
+      "category": "backend",
+      "aliases": ["fastapi", "fast api"],
+      "related": ["Python", "REST API", "Docker", "GraphQL"],
+      "prerequisites": ["Python"],
+      "roles": ["backend_developer"],
+      "transferability": { "Flask": 0.65, "Django": 0.50, "Express": 0.45 }
+    },
+    "Rails": {
+      "category": "backend",
+      "aliases": ["ruby on rails", "ruby-on-rails", "rails"],
+      "related": ["Ruby", "PostgreSQL", "REST API", "Docker"],
+      "prerequisites": ["Ruby"],
+      "roles": ["backend_developer"],
+      "transferability": { "Django": 0.40, "Laravel": 0.35 }
+    },
+    "Laravel": {
+      "category": "backend",
+      "aliases": ["laravel"],
+      "related": ["PHP", "MySQL", "REST API", "Docker"],
+      "prerequisites": ["PHP"],
+      "roles": ["backend_developer"],
+      "transferability": { "Django": 0.35, "Rails": 0.35 }
+    },
+    "Spring Boot": {
+      "category": "backend",
+      "aliases": ["spring boot", "spring", "springframework", "spring boot 3"],
+      "related": ["Java", "SQL", "Docker", "REST API", "Microservices"],
+      "prerequisites": ["Java"],
+      "roles": ["backend_developer", "enterprise_developer"],
+      "transferability": { "Java": 0.70, "NestJS": 0.35, "Django": 0.30 }
+    },
+    "Node.js": {
+      "category": "backend",
+      "aliases": ["node", "nodejs", "node.js", "node js"],
+      "related": ["Express", "NestJS", "Fastify", "GraphQL", "TypeScript", "JavaScript"],
+      "prerequisites": ["JavaScript"],
+      "roles": ["backend_developer", "full_stack_developer"],
+      "transferability": { "Python": 0.30, "Go": 0.25, "Java": 0.25 }
+    },
+    "Docker": {
+      "category": "devops",
+      "aliases": ["docker", "dockerfile", "docker compose"],
+      "related": ["Kubernetes", "CI/CD", "AWS", "Azure", "GCP", "Linux"],
+      "prerequisites": ["Linux"],
+      "roles": ["devops_engineer", "backend_developer", "platform_engineer"],
+      "transferability": { "Kubernetes": 0.60, "Podman": 0.80 }
+    },
+    "Kubernetes": {
+      "category": "devops",
+      "aliases": ["k8s", "kubernetes"],
+      "related": ["Docker", "AWS", "GCP", "Terraform", "Linux", "Helm"],
+      "prerequisites": ["Docker"],
+      "roles": ["devops_engineer", "platform_engineer", "sre"],
+      "transferability": { "Docker Swarm": 0.50, "ECS": 0.55 }
+    },
+    "CI/CD": {
+      "category": "devops",
+      "aliases": ["cicd", "ci/cd", "continuous integration", "continuous deployment", "continuous delivery"],
+      "related": ["Docker", "GitHub Actions", "Jenkins", "Git"],
+      "prerequisites": ["Git"],
+      "roles": ["devops_engineer", "backend_developer"],
+      "transferability": { "GitHub Actions": 0.60, "Jenkins": 0.60, "GitLab CI": 0.60 }
+    },
+    "GitHub Actions": {
+      "category": "devops",
+      "aliases": ["github actions", "gh actions"],
+      "related": ["CI/CD", "Docker", "GitHub"],
+      "prerequisites": ["CI/CD", "Git"],
+      "roles": ["devops_engineer", "backend_developer"],
+      "transferability": { "Jenkins": 0.55, "GitLab CI": 0.70, "CircleCI": 0.65 }
+    },
+    "GitLab CI": {
+      "category": "devops",
+      "aliases": ["gitlab ci", "gitlab ci/cd", "gitlab pipeline"],
+      "related": ["CI/CD", "Docker", "GitLab"],
+      "prerequisites": ["CI/CD", "Git"],
+      "roles": ["devops_engineer"],
+      "transferability": { "GitHub Actions": 0.70, "Jenkins": 0.60 }
+    },
+    "Jenkins": {
+      "category": "devops",
+      "aliases": ["jenkins"],
+      "related": ["CI/CD", "Docker", "Java"],
+      "prerequisites": ["CI/CD"],
+      "roles": ["devops_engineer"],
+      "transferability": { "GitHub Actions": 0.55, "GitLab CI": 0.60 }
+    },
+    "Terraform": {
+      "category": "devops",
+      "aliases": ["terraform", "tf"],
+      "related": ["AWS", "Azure", "GCP", "Kubernetes", "Linux"],
+      "prerequisites": ["Linux"],
+      "roles": ["devops_engineer", "cloud_engineer", "platform_engineer"],
+      "transferability": { "CloudFormation": 0.60, "Pulumi": 0.65, "Ansible": 0.30 }
+    },
+    "Ansible": {
+      "category": "devops",
+      "aliases": ["ansible"],
+      "related": ["Linux", "AWS", "Docker"],
+      "prerequisites": ["Linux"],
+      "roles": ["devops_engineer", "systems_engineer"],
+      "transferability": { "Terraform": 0.30, "Chef": 0.50, "Puppet": 0.50 }
+    },
+    "AWS": {
+      "category": "cloud",
+      "aliases": ["aws", "amazon web services"],
+      "related": ["Docker", "Kubernetes", "Terraform", "Linux", "Python", "Node.js"],
+      "prerequisites": ["Linux"],
+      "roles": ["cloud_engineer", "devops_engineer", "backend_developer"],
+      "transferability": { "Azure": 0.50, "GCP": 0.45 }
+    },
+    "Azure": {
+      "category": "cloud",
+      "aliases": ["azure", "microsoft azure"],
+      "related": ["Docker", "Kubernetes", "CI/CD", "Terraform", ".NET"],
+      "prerequisites": ["Linux"],
+      "roles": ["cloud_engineer", "devops_engineer"],
+      "transferability": { "AWS": 0.50, "GCP": 0.40 }
+    },
+    "GCP": {
+      "category": "cloud",
+      "aliases": ["gcp", "google cloud", "google cloud platform"],
+      "related": ["Docker", "Kubernetes", "Terraform", "Python"],
+      "prerequisites": ["Linux"],
+      "roles": ["cloud_engineer", "devops_engineer"],
+      "transferability": { "AWS": 0.45, "Azure": 0.40 }
+    },
+    "AWS Lambda": {
+      "category": "cloud",
+      "aliases": ["lambda", "aws lambda", "serverless"],
+      "related": ["AWS", "Node.js", "Python", "DynamoDB"],
+      "prerequisites": ["AWS"],
+      "roles": ["backend_developer", "cloud_engineer"],
+      "transferability": { "Azure Functions": 0.70, "Google Cloud Functions": 0.70 }
+    },
+    "Vercel": {
+      "category": "cloud",
+      "aliases": ["vercel", "zeit"],
+      "related": ["Next.js", "React", "TypeScript"],
+      "prerequisites": [],
+      "roles": ["frontend_developer", "full_stack_developer"],
+      "transferability": { "Netlify": 0.70, "Cloudflare Pages": 0.60 }
+    },
+    "Netlify": {
+      "category": "cloud",
+      "aliases": ["netlify"],
+      "related": ["React", "Next.js", "Gatsby"],
+      "prerequisites": [],
+      "roles": ["frontend_developer"],
+      "transferability": { "Vercel": 0.70, "Cloudflare Pages": 0.60 }
+    },
+    "Cloudflare": {
+      "category": "cloud",
+      "aliases": ["cloudflare", "cloudflare workers", "cloudflare pages"],
+      "related": ["JavaScript", "CDN", "DNS"],
+      "prerequisites": [],
+      "roles": ["frontend_developer", "devops_engineer"],
+      "transferability": { "Vercel": 0.40, "Netlify": 0.40 }
+    },
+    "Linux": {
+      "category": "fundamentals",
+      "aliases": ["linux", "ubuntu", "centos", "debian", "bash", "shell", "command line"],
+      "related": ["Docker", "Nginx", "AWS", "CI/CD", "Networking"],
+      "prerequisites": [],
+      "roles": ["devops_engineer", "backend_developer", "systems_engineer", "dba"],
+      "transferability": { "macOS": 0.70, "Windows Server": 0.40 }
+    },
+    "Git": {
+      "category": "fundamentals",
+      "aliases": ["git", "git scm", "version control"],
+      "related": ["GitHub", "GitLab", "Bitbucket", "CI/CD"],
+      "prerequisites": [],
+      "roles": ["all_developers"],
+      "transferability": { "GitHub": 0.70, "GitLab": 0.70, "SVN": 0.40 }
+    },
+    "GitHub": {
+      "category": "tools",
+      "aliases": ["github", "github.com"],
+      "related": ["Git", "GitHub Actions", "CI/CD", "Pull Requests"],
+      "prerequisites": ["Git"],
+      "roles": ["all_developers"],
+      "transferability": { "GitLab": 0.80, "Bitbucket": 0.75 }
+    },
+    "GitLab": {
+      "category": "tools",
+      "aliases": ["gitlab", "gitlab.com"],
+      "related": ["Git", "GitLab CI", "CI/CD"],
+      "prerequisites": ["Git"],
+      "roles": ["all_developers"],
+      "transferability": { "GitHub": 0.80, "Bitbucket": 0.75 }
+    },
+    "Nginx": {
+      "category": "devops",
+      "aliases": ["nginx"],
+      "related": ["Linux", "Docker", "AWS", "Reverse Proxy"],
+      "prerequisites": ["Linux"],
+      "roles": ["devops_engineer", "backend_developer"],
+      "transferability": { "Apache": 0.60, "Caddy": 0.50 }
+    },
+    "Jest": {
+      "category": "testing",
+      "aliases": ["jest", "jestjs"],
+      "related": ["Node.js", "TypeScript", "React", "TDD"],
+      "prerequisites": ["JavaScript"],
+      "roles": ["frontend_developer", "backend_developer"],
+      "transferability": { "Vitest": 0.85, "Mocha": 0.60 }
+    },
+    "Playwright": {
+      "category": "testing",
+      "aliases": ["playwright"],
+      "related": ["TypeScript", "JavaScript", "Testing", "CI/CD"],
+      "prerequisites": ["JavaScript"],
+      "roles": ["qa_engineer", "frontend_developer"],
+      "transferability": { "Cypress": 0.70, "Puppeteer": 0.60, "Selenium": 0.50 }
+    },
+    "Cypress": {
+      "category": "testing",
+      "aliases": ["cypress"],
+      "related": ["JavaScript", "TypeScript", "React", "Testing"],
+      "prerequisites": ["JavaScript"],
+      "roles": ["qa_engineer", "frontend_developer"],
+      "transferability": { "Playwright": 0.70, "Selenium": 0.50 }
+    },
+    "Selenium": {
+      "category": "testing",
+      "aliases": ["selenium", "selenium webdriver"],
+      "related": ["Java", "Python", "C#", "Testing"],
+      "prerequisites": ["Java", "Python"],
+      "roles": ["qa_engineer"],
+      "transferability": { "Playwright": 0.50, "Cypress": 0.50 }
+    },
+    "TDD": {
+      "category": "methodologies",
+      "aliases": ["tdd", "test driven", "test-driven development"],
+      "related": ["Testing", "Jest", "CI/CD"],
+      "prerequisites": [],
+      "roles": ["backend_developer", "frontend_developer", "full_stack_developer"],
+      "transferability": { "BDD": 0.70 }
+    },
+    "Data Structures": {
+      "category": "fundamentals",
+      "aliases": ["data structures", "data structures and algorithms", "dsa"],
+      "related": ["Algorithms", "Computer Science", "Problem Solving"],
+      "prerequisites": [],
+      "roles": ["all_developers"],
+      "transferability": {}
+    },
+    "Algorithms": {
+      "category": "fundamentals",
+      "aliases": ["algorithms", "algo", "algorithm design"],
+      "related": ["Data Structures", "Problem Solving", "Computer Science"],
+      "prerequisites": ["Data Structures"],
+      "roles": ["all_developers"],
+      "transferability": {}
+    },
+    "Object-Oriented Programming": {
+      "category": "fundamentals",
+      "aliases": ["oop", "object-oriented", "object oriented programming", "object-oriented programming"],
+      "related": ["Java", "C#", "Python", "Design Patterns"],
+      "prerequisites": [],
+      "roles": ["all_developers"],
+      "transferability": { "Functional Programming": 0.40 }
+    },
+    "Design Patterns": {
+      "category": "fundamentals",
+      "aliases": ["design patterns", "gof", "gang of four"],
+      "related": ["Object-Oriented Programming", "Software Architecture", "System Design"],
+      "prerequisites": ["Object-Oriented Programming"],
+      "roles": ["all_developers", "software_architect"],
+      "transferability": {}
+    },
+    "System Design": {
+      "category": "fundamentals",
+      "aliases": ["system design", "system architecture", "distributed systems"],
+      "related": ["Microservices", "Database Design", "API Design", "Software Architecture"],
+      "prerequisites": [],
+      "roles": ["senior_developer", "tech_lead", "architect"],
+      "transferability": {}
+    },
+    "Software Architecture": {
+      "category": "fundamentals",
+      "aliases": ["software architecture", "architecture"],
+      "related": ["System Design", "Design Patterns", "Microservices"],
+      "prerequisites": [],
+      "roles": ["tech_lead", "architect"],
+      "transferability": {}
+    },
+    "API Design": {
+      "category": "fundamentals",
+      "aliases": ["api design", "api architecture"],
+      "related": ["REST API", "GraphQL", "gRPC", "OpenAPI", "Swagger"],
+      "prerequisites": ["REST API"],
+      "roles": ["backend_developer", "full_stack_developer"],
+      "transferability": {}
+    },
+    "Database Design": {
+      "category": "fundamentals",
+      "aliases": ["database design", "schema design", "data modeling"],
+      "related": ["SQL", "PostgreSQL", "MySQL", "MongoDB", "Normalization"],
+      "prerequisites": ["SQL"],
+      "roles": ["backend_developer", "dba", "data_engineer"],
+      "transferability": {}
+    },
+    "Debugging": {
+      "category": "fundamentals",
+      "aliases": ["debugging", "debug", "troubleshooting"],
+      "related": ["Problem Solving", "Testing"],
+      "prerequisites": [],
+      "roles": ["all_developers"],
+      "transferability": {}
+    },
+    "Code Review": {
+      "category": "fundamentals",
+      "aliases": ["code review", "peer review", "pull request review"],
+      "related": ["Git", "GitHub", "Best Practices"],
+      "prerequisites": ["Git"],
+      "roles": ["all_developers"],
+      "transferability": {}
+    },
+    "Problem Solving": {
+      "category": "fundamentals",
+      "aliases": ["problem solving", "analytical thinking", "critical thinking"],
+      "related": ["Data Structures", "Algorithms", "Debugging"],
+      "prerequisites": [],
+      "roles": ["all_developers"],
+      "transferability": {}
+    },
+    "Authentication": {
+      "category": "security",
+      "aliases": ["authentication", "auth", "user authentication"],
+      "related": ["Authorization", "JWT", "OAuth", "OAuth 2.0", "Session Management"],
+      "prerequisites": [],
+      "roles": ["backend_developer", "security_engineer"],
+      "transferability": { "Authorization": 0.60 }
+    },
+    "Authorization": {
+      "category": "security",
+      "aliases": ["authorization", "authz", "access control", "rbac", "role-based access control"],
+      "related": ["Authentication", "JWT", "OAuth", "Security"],
+      "prerequisites": ["Authentication"],
+      "roles": ["backend_developer", "security_engineer"],
+      "transferability": { "Authentication": 0.60 }
+    },
+    "JWT": {
+      "category": "security",
+      "aliases": ["jwt", "json web token", "json web tokens"],
+      "related": ["Authentication", "Authorization", "REST API", "Node.js"],
+      "prerequisites": ["Authentication"],
+      "roles": ["backend_developer"],
+      "transferability": { "OAuth 2.0": 0.50, "Session Tokens": 0.60 }
+    },
+    "OAuth": {
+      "category": "security",
+      "aliases": ["oauth", "oauth2", "oauth 2.0", "open authorization"],
+      "related": ["Authentication", "Authorization", "JWT", "OpenID Connect"],
+      "prerequisites": ["Authentication"],
+      "roles": ["backend_developer", "security_engineer"],
+      "transferability": { "SAML": 0.40 }
+    },
+    "HTTPS": {
+      "category": "security",
+      "aliases": ["https", "ssl", "tls", "ssl/tls"],
+      "related": ["Networking", "Security", "Certificates"],
+      "prerequisites": ["Networking"],
+      "roles": ["devops_engineer", "backend_developer", "security_engineer"],
+      "transferability": {}
+    },
+    "OWASP": {
+      "category": "security",
+      "aliases": ["owasp", "owasp top 10", "application security", "appsec"],
+      "related": ["XSS", "SQL Injection", "CSRF", "Security"],
+      "prerequisites": [],
+      "roles": ["security_engineer", "backend_developer"],
+      "transferability": {}
+    },
+    "XSS": {
+      "category": "security",
+      "aliases": ["xss", "cross-site scripting"],
+      "related": ["OWASP", "HTML", "JavaScript", "Security"],
+      "prerequisites": [],
+      "roles": ["security_engineer", "frontend_developer"],
+      "transferability": { "CSRF": 0.40 }
+    },
+    "SQL Injection": {
+      "category": "security",
+      "aliases": ["sql injection", "sqli"],
+      "related": ["OWASP", "SQL", "Security", "Parameterized Queries"],
+      "prerequisites": ["SQL"],
+      "roles": ["security_engineer", "backend_developer"],
+      "transferability": {}
+    },
+    "Pandas": {
+      "category": "ai_ml",
+      "aliases": ["pandas"],
+      "related": ["Python", "NumPy", "Data Analysis", "SQL"],
+      "prerequisites": ["Python"],
+      "roles": ["data_analyst", "data_scientist", "data_engineer"],
+      "transferability": { "NumPy": 0.80, "Polars": 0.60 }
+    },
+    "NumPy": {
+      "category": "ai_ml",
+      "aliases": ["numpy"],
+      "related": ["Python", "Pandas", "TensorFlow", "PyTorch", "Machine Learning"],
+      "prerequisites": ["Python"],
+      "roles": ["data_scientist", "ml_engineer"],
+      "transferability": { "Pandas": 0.70 }
+    },
+    "TensorFlow": {
+      "category": "ai_ml",
+      "aliases": ["tensorflow", "tf"],
+      "related": ["Python", "Machine Learning", "NumPy", "Keras"],
+      "prerequisites": ["Python", "Machine Learning"],
+      "roles": ["ml_engineer", "data_scientist"],
+      "transferability": { "PyTorch": 0.70, "JAX": 0.40 }
+    },
+    "PyTorch": {
+      "category": "ai_ml",
+      "aliases": ["pytorch", "torch"],
+      "related": ["Python", "Machine Learning", "NumPy"],
+      "prerequisites": ["Python", "Machine Learning"],
+      "roles": ["ml_engineer", "data_scientist"],
+      "transferability": { "TensorFlow": 0.70, "JAX": 0.45 }
+    },
+    "Scikit-learn": {
+      "category": "ai_ml",
+      "aliases": ["scikit learn", "sklearn", "scikit-learn"],
+      "related": ["Python", "Machine Learning", "Pandas", "NumPy"],
+      "prerequisites": ["Python", "Machine Learning"],
+      "roles": ["data_scientist", "ml_engineer"],
+      "transferability": { "TensorFlow": 0.40, "PyTorch": 0.40 }
+    },
+    "Machine Learning": {
+      "category": "ai_ml",
+      "aliases": ["ml", "machine learning", "statistical learning"],
+      "related": ["Python", "TensorFlow", "PyTorch", "Scikit-learn", "NumPy", "Pandas"],
+      "prerequisites": ["Python", "SQL"],
+      "roles": ["ml_engineer", "data_scientist", "ai_engineer"],
+      "transferability": { "Deep Learning": 0.70, "Data Analysis": 0.50 }
+    },
+    "Deep Learning": {
+      "category": "ai_ml",
+      "aliases": ["deep learning", "dl", "neural networks"],
+      "related": ["Machine Learning", "TensorFlow", "PyTorch", "GPU Computing"],
+      "prerequisites": ["Machine Learning"],
+      "roles": ["ml_engineer", "ai_engineer"],
+      "transferability": { "Machine Learning": 0.70 }
+    },
+    "NLP": {
+      "category": "ai_ml",
+      "aliases": ["nlp", "natural language processing", "natural language"],
+      "related": ["Machine Learning", "Python", "LLM", "Transformers"],
+      "prerequisites": ["Machine Learning"],
+      "roles": ["ml_engineer", "ai_engineer"],
+      "transferability": { "Computer Vision": 0.30 }
+    },
+    "Computer Vision": {
+      "category": "ai_ml",
+      "aliases": ["computer vision", "cv", "image processing"],
+      "related": ["Machine Learning", "Deep Learning", "Python", "OpenCV"],
+      "prerequisites": ["Machine Learning", "Deep Learning"],
+      "roles": ["ml_engineer", "ai_engineer"],
+      "transferability": { "NLP": 0.30 }
+    },
+    "LLM": {
+      "category": "ai_ml",
+      "aliases": ["llm", "large language model", "large language models", "foundation model"],
+      "related": ["Machine Learning", "NLP", "OpenAI API", "Transformers", "RAG", "Prompt Engineering"],
+      "prerequisites": ["Machine Learning", "NLP"],
+      "roles": ["ai_engineer", "ml_engineer"],
+      "transferability": { "NLP": 0.50 }
+    },
+    "RAG": {
+      "category": "ai_ml",
+      "aliases": ["rag", "retrieval augmented generation", "retrieval-augmented generation"],
+      "related": ["LLM", "Vector Database", "Embeddings", "Python"],
+      "prerequisites": ["LLM"],
+      "roles": ["ai_engineer"],
+      "transferability": { "LLM Fine-tuning": 0.40 }
+    },
+    "Vector Database": {
+      "category": "ai_ml",
+      "aliases": ["vector database", "vector db", "embedding store", "pinecone", "weaviate", "chromadb", "milvus"],
+      "related": ["RAG", "Embeddings", "LLM", "Machine Learning"],
+      "prerequisites": [],
+      "roles": ["ai_engineer", "data_engineer"],
+      "transferability": { "Elasticsearch": 0.30 }
+    },
+    "Embeddings": {
+      "category": "ai_ml",
+      "aliases": ["embeddings", "text embeddings", "word embeddings"],
+      "related": ["Machine Learning", "NLP", "LLM", "RAG", "Vector Database"],
+      "prerequisites": ["Machine Learning"],
+      "roles": ["ai_engineer", "ml_engineer"],
+      "transferability": {}
+    },
+    "Prompt Engineering": {
+      "category": "ai_ml",
+      "aliases": ["prompt engineering", "prompt design", "prompting"],
+      "related": ["LLM", "OpenAI API", "NLP"],
+      "prerequisites": [],
+      "roles": ["ai_engineer"],
+      "transferability": {}
+    },
+    "LangChain": {
+      "category": "ai_ml",
+      "aliases": ["langchain", "lang chain"],
+      "related": ["LLM", "Python", "RAG", "Vector Database"],
+      "prerequisites": ["Python", "LLM"],
+      "roles": ["ai_engineer"],
+      "transferability": { "LlamaIndex": 0.60, "Haystack": 0.50 }
+    },
+    "OpenAI API": {
+      "category": "ai_ml",
+      "aliases": ["openai", "openai api", "gpt", "gpt-4", "chatgpt api"],
+      "related": ["LLM", "Python", "Node.js", "Prompt Engineering"],
+      "prerequisites": [],
+      "roles": ["ai_engineer", "full_stack_developer"],
+      "transferability": { "Anthropic API": 0.70, "Google AI API": 0.60 }
+    },
+    "Data Analysis": {
+      "category": "ai_ml",
+      "aliases": ["data analysis", "analytics", "business intelligence", "bi"],
+      "related": ["Python", "SQL", "Pandas", "Excel", "Tableau"],
+      "prerequisites": ["SQL"],
+      "roles": ["data_analyst", "data_scientist", "business_analyst"],
+      "transferability": { "Machine Learning": 0.30 }
+    },
+    "Apache Spark": {
+      "category": "data_engineering",
+      "aliases": ["spark", "apache spark", "pyspark"],
+      "related": ["Python", "SQL", "Hadoop", "Data Engineering", "ETL"],
+      "prerequisites": ["Python", "SQL"],
+      "roles": ["data_engineer"],
+      "transferability": { "Flink": 0.50, "Databricks": 0.60 }
+    },
+    "Airflow": {
+      "category": "data_engineering",
+      "aliases": ["airflow", "apache airflow"],
+      "related": ["Python", "SQL", "ETL", "Data Engineering"],
+      "prerequisites": ["Python"],
+      "roles": ["data_engineer"],
+      "transferability": { "Prefect": 0.60, "Dagster": 0.60 }
+    },
+    "ETL": {
+      "category": "data_engineering",
+      "aliases": ["etl", "extract transform load", "data pipeline"],
+      "related": ["Python", "SQL", "Apache Spark", "Airflow", "Data Engineering"],
+      "prerequisites": ["SQL"],
+      "roles": ["data_engineer"],
+      "transferability": { "ELT": 0.70 }
+    },
+    "React Native": {
+      "category": "mobile",
+      "aliases": ["react native", "react-native", "rn"],
+      "related": ["React", "TypeScript", "JavaScript", "Expo"],
+      "prerequisites": ["React", "JavaScript"],
+      "roles": ["mobile_developer"],
+      "transferability": { "Flutter": 0.40, "Ionic": 0.45 }
+    },
+    "Flutter": {
+      "category": "mobile",
+      "aliases": ["flutter", "dart"],
+      "related": ["Dart", "Android", "iOS"],
+      "prerequisites": [],
+      "roles": ["mobile_developer"],
+      "transferability": { "React Native": 0.40, "Kotlin": 0.30, "Swift": 0.30 }
+    },
+    "iOS": {
+      "category": "mobile",
+      "aliases": ["ios", "iphone", "ipad", "swiftui", "uikit"],
+      "related": ["Swift", "Xcode", "App Store"],
+      "prerequisites": ["Swift"],
+      "roles": ["ios_developer", "mobile_developer"],
+      "transferability": { "Android": 0.30 }
+    },
+    "Android": {
+      "category": "mobile",
+      "aliases": ["android", "android sdk", "jetpack compose"],
+      "related": ["Kotlin", "Java", "Jetpack Compose", "Android Studio"],
+      "prerequisites": ["Kotlin", "Java"],
+      "roles": ["android_developer", "mobile_developer"],
+      "transferability": { "iOS": 0.30, "Flutter": 0.35 }
+    },
+    "Figma": {
+      "category": "design",
+      "aliases": ["figma"],
+      "related": ["UI Design", "UX Research", "Tailwind CSS", "Prototyping"],
+      "prerequisites": [],
+      "roles": ["ui_designer", "ux_designer", "product_designer", "frontend_developer"],
+      "transferability": { "Adobe XD": 0.70, "Sketch": 0.60 }
+    },
+    "UI Design": {
+      "category": "design",
+      "aliases": ["ui design", "user interface design", "visual design"],
+      "related": ["Figma", "HTML", "CSS", "Accessibility", "UX Research"],
+      "prerequisites": [],
+      "roles": ["ui_designer", "product_designer", "frontend_developer"],
+      "transferability": { "UX Design": 0.50 }
+    },
+    "UX Research": {
+      "category": "design",
+      "aliases": ["ux", "ux research", "user experience", "usability"],
+      "related": ["Figma", "UI Design", "Product Design", "Accessibility"],
+      "prerequisites": [],
+      "roles": ["ux_designer", "product_designer"],
+      "transferability": { "UI Design": 0.50 }
+    },
+    "Accessibility": {
+      "category": "design",
+      "aliases": ["accessibility", "a11y", "wcag", "section 508"],
+      "related": ["HTML", "CSS", "UI Design", "UX Research"],
+      "prerequisites": ["HTML", "CSS"],
+      "roles": ["frontend_developer", "ui_designer"],
+      "transferability": {}
+    },
+    "Agile": {
+      "category": "methodologies",
+      "aliases": ["agile", "agile methodology", "agile development"],
+      "related": ["Scrum", "Kanban", "Jira", "Project Management"],
+      "prerequisites": [],
+      "roles": ["project_manager", "product_manager", "scrum_master"],
+      "transferability": { "Scrum": 0.70, "Kanban": 0.60 }
+    },
+    "Scrum": {
+      "category": "methodologies",
+      "aliases": ["scrum", "scrum methodology"],
+      "related": ["Agile", "Jira", "Sprint Planning", "Project Management"],
+      "prerequisites": ["Agile"],
+      "roles": ["scrum_master", "project_manager", "product_manager"],
+      "transferability": { "Kanban": 0.60, "SAFe": 0.40 }
+    },
+    "Project Management": {
+      "category": "methodologies",
+      "aliases": ["project management", "pm", "program management"],
+      "related": ["Agile", "Scrum", "Jira", "Confluence", "Stakeholder Management"],
+      "prerequisites": [],
+      "roles": ["project_manager", "product_manager", "scrum_master"],
+      "transferability": { "Product Management": 0.50 }
+    },
+    "WordPress": {
+      "category": "tools",
+      "aliases": ["wordpress", "wp"],
+      "related": ["PHP", "MySQL", "HTML", "CSS", "SEO"],
+      "prerequisites": ["PHP", "HTML", "CSS"],
+      "roles": ["web_developer", "frontend_developer"],
+      "transferability": { "Shopify": 0.30, "Webflow": 0.30 }
+    },
+    "Shopify": {
+      "category": "tools",
+      "aliases": ["shopify", "shopify liquid"],
+      "related": ["E-Commerce", "HTML", "CSS", "JavaScript"],
+      "prerequisites": ["HTML", "CSS"],
+      "roles": ["web_developer", "frontend_developer"],
+      "transferability": { "WooCommerce": 0.50, "WordPress": 0.30 }
+    },
+    "SEO": {
+      "category": "tools",
+      "aliases": ["seo", "search engine optimization"],
+      "related": ["WordPress", "Digital Marketing", "HTML", "Google Analytics"],
+      "prerequisites": ["HTML"],
+      "roles": ["digital_marketer", "web_developer", "content_strategist"],
+      "transferability": { "SEM": 0.50 }
+    },
+    "Digital Marketing": {
+      "category": "tools",
+      "aliases": ["digital marketing", "online marketing", "internet marketing"],
+      "related": ["SEO", "Social Media Marketing", "Content Marketing", "Analytics"],
+      "prerequisites": [],
+      "roles": ["digital_marketer", "marketing_manager"],
+      "transferability": {}
+    },
+    "Networking": {
+      "category": "fundamentals",
+      "aliases": ["networking", "computer networking", "tcp/ip", "dns", "http"],
+      "related": ["Linux", "AWS", "Systems Administration", "Firewall"],
+      "prerequisites": [],
+      "roles": ["devops_engineer", "systems_engineer", "network_engineer"],
+      "transferability": { "Systems Administration": 0.40 }
+    },
+    "Systems Administration": {
+      "category": "fundamentals",
+      "aliases": ["systems administration", "sysadmin", "system admin"],
+      "related": ["Linux", "Networking", "Docker", "Security"],
+      "prerequisites": ["Linux"],
+      "roles": ["systems_engineer", "devops_engineer"],
+      "transferability": { "DevOps": 0.50 }
+    },
+    "IT Support": {
+      "category": "fundamentals",
+      "aliases": ["it support", "help desk", "technical support", "desktop support"],
+      "related": ["Networking", "Systems Administration", "Windows", "Active Directory"],
+      "prerequisites": [],
+      "roles": ["it_support", "help_desk"],
+      "transferability": { "Systems Administration": 0.40 }
+    }
+  },
+
+  "categories": {
+    "languages": ["JavaScript", "TypeScript", "Python", "Java", "C#", "Go", "Rust", "PHP", "Ruby", "Swift", "Kotlin", "Dart"],
+    "frontend": ["React", "Next.js", "Vue", "Nuxt.js", "Angular", "AngularJS", "Svelte", "Remix", "Astro", "HTML", "CSS", "Tailwind CSS", "SASS", "Redux", "Zustand", "TanStack Query", "React Hook Form", "Vite"],
+    "backend": ["NestJS", "Express", "Fastify", "Django", "Django REST Framework", "Flask", "FastAPI", "Rails", "Laravel", "Spring Boot", "Node.js"],
+    "databases": ["SQL", "PostgreSQL", "MySQL", "MongoDB", "Redis", "SQLite", "Elasticsearch", "Prisma", "DynamoDB", "Supabase", "Firebase"],
+    "devops": ["Docker", "Kubernetes", "CI/CD", "GitHub Actions", "GitLab CI", "Jenkins", "Terraform", "Ansible", "Nginx"],
+    "cloud": ["AWS", "Azure", "GCP", "AWS Lambda", "Vercel", "Netlify", "Cloudflare"],
+    "fundamentals": ["HTML", "CSS", "Linux", "Git", "Data Structures", "Algorithms", "Object-Oriented Programming", "Design Patterns", "System Design", "Software Architecture", "API Design", "Database Design", "Debugging", "Code Review", "Problem Solving", "Networking", "Systems Administration", "IT Support"],
+    "ai_ml": ["Pandas", "NumPy", "TensorFlow", "PyTorch", "Scikit-learn", "Machine Learning", "Deep Learning", "NLP", "Computer Vision", "LLM", "RAG", "Vector Database", "Embeddings", "Prompt Engineering", "LangChain", "OpenAI API", "Data Analysis"],
+    "data_engineering": ["Apache Spark", "Airflow", "ETL"],
+    "mobile": ["React Native", "Flutter", "iOS", "Android"],
+    "testing": ["Jest", "Playwright", "Cypress", "Selenium", "TDD"],
+    "security": ["Authentication", "Authorization", "JWT", "OAuth", "HTTPS", "OWASP", "XSS", "SQL Injection"],
+    "design": ["Figma", "UI Design", "UX Research", "Accessibility"],
+    "methodologies": ["Agile", "Scrum", "Project Management"],
+    "architecture": ["REST API", "GraphQL", "gRPC", "WebSocket", "Microservices", "Event-Driven", "Server-Side Rendering"],
+    "tools": ["GitHub", "GitLab", "WordPress", "Shopify", "SEO", "Digital Marketing"]
+  },
+
+  "relationships": [
+    { "from": "JavaScript", "to": "TypeScript", "type": "superset_of", "weight": 0.85 },
+    { "from": "JavaScript", "to": "Node.js", "type": "runtime_for", "weight": 0.90 },
+    { "from": "JavaScript", "to": "React", "type": "used_in", "weight": 0.80 },
+    { "from": "TypeScript", "to": "JavaScript", "type": "extends", "weight": 0.95 },
+    { "from": "TypeScript", "to": "NestJS", "type": "commonly_used_with", "weight": 0.90 },
+    { "from": "TypeScript", "to": "Angular", "type": "required_by", "weight": 0.95 },
+    { "from": "Node.js", "to": "Express", "type": "framework_for", "weight": 0.95 },
+    { "from": "Node.js", "to": "NestJS", "type": "framework_for", "weight": 0.95 },
+    { "from": "Node.js", "to": "Fastify", "type": "framework_for", "weight": 0.95 },
+    { "from": "React", "to": "Next.js", "type": "meta_framework_for", "weight": 0.90 },
+    { "from": "React", "to": "React Native", "type": "extends_to", "weight": 0.80 },
+    { "from": "React", "to": "Redux", "type": "state_management_for", "weight": 0.70 },
+    { "from": "Vue", "to": "Nuxt.js", "type": "meta_framework_for", "weight": 0.90 },
+    { "from": "Angular", "to": "TypeScript", "type": "requires", "weight": 0.95 },
+    { "from": "Python", "to": "Django", "type": "framework_for", "weight": 0.95 },
+    { "from": "Python", "to": "Flask", "type": "framework_for", "weight": 0.95 },
+    { "from": "Python", "to": "FastAPI", "type": "framework_for", "weight": 0.95 },
+    { "from": "Python", "to": "Machine Learning", "type": "primary_language_for", "weight": 0.95 },
+    { "from": "Java", "to": "Spring Boot", "type": "framework_for", "weight": 0.95 },
+    { "from": "Kotlin", "to": "Java", "type": "jvm_interop", "weight": 0.80 },
+    { "from": "Kotlin", "to": "Android", "type": "primary_language_for", "weight": 0.90 },
+    { "from": "SQL", "to": "PostgreSQL", "type": "dialect_of", "weight": 0.90 },
+    { "from": "SQL", "to": "MySQL", "type": "dialect_of", "weight": 0.90 },
+    { "from": "PostgreSQL", "to": "Prisma", "type": "orm_for", "weight": 0.80 },
+    { "from": "Docker", "to": "Kubernetes", "type": "orchestrated_by", "weight": 0.80 },
+    { "from": "Docker", "to": "CI/CD", "type": "used_in", "weight": 0.70 },
+    { "from": "Kubernetes", "to": "AWS", "type": "deployed_on", "weight": 0.60 },
+    { "from": "Kubernetes", "to": "GCP", "type": "deployed_on", "weight": 0.60 },
+    { "from": "Machine Learning", "to": "TensorFlow", "type": "framework_for", "weight": 0.85 },
+    { "from": "Machine Learning", "to": "PyTorch", "type": "framework_for", "weight": 0.85 },
+    { "from": "LLM", "to": "RAG", "type": "technique_for", "weight": 0.80 },
+    { "from": "RAG", "to": "Vector Database", "type": "requires", "weight": 0.90 },
+    { "from": "Git", "to": "GitHub", "type": "hosting_for", "weight": 0.90 },
+    { "from": "Git", "to": "CI/CD", "type": "trigger_for", "weight": 0.70 }
+  ],
+
+  "transferability": {
+    "NestJS": { "Node.js": 0.90, "TypeScript": 0.90, "Express": 0.65, "REST API": 0.70 },
+    "Express": { "Node.js": 0.95, "TypeScript": 0.60, "Fastify": 0.85, "NestJS": 0.55 },
+    "Fastify": { "Node.js": 0.90, "TypeScript": 0.70, "Express": 0.75 },
+    "Next.js": { "React": 0.90, "TypeScript": 0.80, "JavaScript": 0.80, "Nuxt.js": 0.55 },
+    "Nuxt.js": { "Vue": 0.90, "TypeScript": 0.70, "Next.js": 0.50 },
+    "Django": { "Python": 0.90, "PostgreSQL": 0.70, "REST API": 0.65, "Flask": 0.55, "FastAPI": 0.50 },
+    "Flask": { "Python": 0.90, "REST API": 0.65, "Django": 0.50, "FastAPI": 0.60 },
+    "FastAPI": { "Python": 0.90, "REST API": 0.80, "Flask": 0.65, "Django": 0.45 },
+    "Spring Boot": { "Java": 0.90, "SQL": 0.60, "REST API": 0.70, "Microservices": 0.65 },
+    "Rails": { "Ruby": 0.90, "PostgreSQL": 0.70, "REST API": 0.65 },
+    "Laravel": { "PHP": 0.90, "MySQL": 0.70, "REST API": 0.60 },
+    "React Native": { "React": 0.80, "TypeScript": 0.70, "JavaScript": 0.75 },
+    "Flutter": { "Dart": 0.90, "React Native": 0.40 },
+    "Angular": { "TypeScript": 0.90, "JavaScript": 0.70, "React": 0.45, "Vue": 0.40 },
+    "Vue": { "JavaScript": 0.90, "TypeScript": 0.65, "React": 0.50, "Angular": 0.40 },
+    "Docker": { "Kubernetes": 0.60, "CI/CD": 0.50, "Linux": 0.65 },
+    "Kubernetes": { "Docker": 0.70, "AWS": 0.50, "GCP": 0.50, "Terraform": 0.45 },
+    "AWS": { "Azure": 0.50, "GCP": 0.45, "Docker": 0.50, "Linux": 0.60 },
+    "PostgreSQL": { "MySQL": 0.85, "SQL": 0.90, "SQLite": 0.75 },
+    "MySQL": { "PostgreSQL": 0.85, "SQL": 0.90, "MariaDB": 0.90 },
+    "MongoDB": { "PostgreSQL": 0.25, "Redis": 0.30 },
+    "TensorFlow": { "PyTorch": 0.70, "Scikit-learn": 0.50, "Keras": 0.80 },
+    "PyTorch": { "TensorFlow": 0.70, "Scikit-learn": 0.45 },
+    "Machine Learning": { "Deep Learning": 0.60, "Data Analysis": 0.45 },
+    "Jest": { "Vitest": 0.85, "Mocha": 0.60 },
+    "Playwright": { "Cypress": 0.70, "Selenium": 0.50, "Puppeteer": 0.60 },
+    "Cypress": { "Playwright": 0.70, "Selenium": 0.50 },
+    "GitHub Actions": { "GitLab CI": 0.70, "Jenkins": 0.55, "CircleCI": 0.65 },
+    "Figma": { "Adobe XD": 0.70, "Sketch": 0.60 }
+  },
+
+  "prerequisites": {
+    "NestJS": ["Node.js", "TypeScript"],
+    "Next.js": ["React", "JavaScript"],
+    "React Native": ["React", "JavaScript"],
+    "Nuxt.js": ["Vue", "JavaScript"],
+    "Django": ["Python"],
+    "Flask": ["Python"],
+    "FastAPI": ["Python"],
+    "Spring Boot": ["Java"],
+    "Rails": ["Ruby"],
+    "Laravel": ["PHP"],
+    "Kubernetes": ["Docker"],
+    "Terraform": ["Linux"],
+    "AWS Lambda": ["AWS"],
+    "TypeScript": ["JavaScript"],
+    "React": ["JavaScript"],
+    "Vue": ["JavaScript"],
+    "Angular": ["TypeScript", "JavaScript"],
+    "Django REST Framework": ["Django", "REST API"],
+    "TensorFlow": ["Python", "Machine Learning"],
+    "PyTorch": ["Python", "Machine Learning"],
+    "Scikit-learn": ["Python", "Machine Learning"],
+    "Deep Learning": ["Machine Learning"],
+    "NLP": ["Machine Learning"],
+    "RAG": ["LLM"],
+    "LangChain": ["Python", "LLM"],
+    "Prisma": ["SQL"],
+    "PostgreSQL": ["SQL"],
+    "MySQL": ["SQL"]
+  },
+
+  "roleProfiles": {
+    "backend_developer": {
+      "core": ["REST API", "SQL", "Git", "Problem Solving", "Debugging"],
+      "common": ["Node.js", "Python", "Java", "Docker", "PostgreSQL", "Testing"],
+      "advanced": ["Microservices", "Kubernetes", "Cloud", "System Design", "Message Queues"]
+    },
+    "frontend_developer": {
+      "core": ["HTML", "CSS", "JavaScript", "Git", "REST API"],
+      "common": ["React", "TypeScript", "Next.js", "Tailwind CSS", "Testing"],
+      "advanced": ["Performance Optimization", "Accessibility", "Design Systems", "SSR"]
+    },
+    "full_stack_developer": {
+      "core": ["HTML", "CSS", "JavaScript", "REST API", "SQL", "Git"],
+      "common": ["React", "Node.js", "TypeScript", "Docker", "PostgreSQL"],
+      "advanced": ["System Design", "Microservices", "Cloud", "DevOps"]
+    },
+    "mobile_developer": {
+      "core": ["JavaScript", "React", "Git", "REST API"],
+      "common": ["React Native", "TypeScript", "iOS", "Android", "Firebase"],
+      "advanced": ["Native Modules", "App Store Optimization", "CI/CD"]
+    },
+    "data_engineer": {
+      "core": ["Python", "SQL", "ETL", "Git"],
+      "common": ["Apache Spark", "Airflow", "Docker", "AWS", "Data Analysis"],
+      "advanced": ["Kafka", "Data Lake", "Data Warehouse", "Streaming"]
+    },
+    "data_scientist": {
+      "core": ["Python", "SQL", "Data Analysis", "Machine Learning", "Statistics"],
+      "common": ["Pandas", "NumPy", "Scikit-learn", "Jupyter", "Visualization"],
+      "advanced": ["Deep Learning", "NLP", "Computer Vision", "MLOps"]
+    },
+    "ml_engineer": {
+      "core": ["Python", "Machine Learning", "SQL", "Git"],
+      "common": ["TensorFlow", "PyTorch", "Docker", "AWS", "MLflow"],
+      "advanced": ["MLOps", "Model Serving", "Distributed Training", "Fine-tuning"]
+    },
+    "ai_engineer": {
+      "core": ["Python", "LLM", "Prompt Engineering", "REST API"],
+      "common": ["OpenAI API", "LangChain", "RAG", "Vector Database", "Embeddings"],
+      "advanced": ["Fine-tuning", "AI Agents", "Multi-modal", "Evaluation"]
+    },
+    "devops_engineer": {
+      "core": ["Linux", "Docker", "CI/CD", "Git", "Networking"],
+      "common": ["Kubernetes", "Terraform", "AWS", "Ansible", "Nginx"],
+      "advanced": ["Service Mesh", "Observability", "Security", "Cost Optimization"]
+    },
+    "qa_engineer": {
+      "core": ["Testing", "Git", "JavaScript", "Problem Solving"],
+      "common": ["Playwright", "Cypress", "Jest", "CI/CD", "API Testing"],
+      "advanced": ["Performance Testing", "Security Testing", "Test Architecture"]
+    },
+    "security_engineer": {
+      "core": ["OWASP", "Authentication", "Authorization", "Linux", "Networking"],
+      "common": ["OAuth", "JWT", "HTTPS", "Penetration Testing", "SIEM"],
+      "advanced": ["Zero Trust", "Cloud Security", "Compliance", "Incident Response"]
+    },
+    "ui_designer": {
+      "core": ["Figma", "UI Design", "HTML", "CSS", "Accessibility"],
+      "common": ["Prototyping", "Design Systems", "Wireframing", "Color Theory"],
+      "advanced": ["Motion Design", "Interaction Design", "User Research"]
+    },
+    "ux_designer": {
+      "core": ["UX Research", "Figma", "UI Design", "Accessibility"],
+      "common": ["User Testing", "Wireframing", "Information Architecture", "Prototyping"],
+      "advanced": ["Service Design", "Content Strategy", "Design Thinking"]
+    },
+    "project_manager": {
+      "core": ["Project Management", "Agile", "Scrum", "Communication"],
+      "common": ["Jira", "Confluence", "Stakeholder Management", "Risk Management"],
+      "advanced": ["Program Management", "Portfolio Management", "Change Management"]
+    }
+  },
+
+  "roleSynonyms": {
+    "backend developer": ["backend", "back-end", "back end", "api", "node", "server-side", "server side"],
+    "frontend developer": ["frontend", "front-end", "front end", "ui developer", "react", "web developer", "client-side"],
+    "full stack developer": ["full stack", "fullstack", "full-stack", "software engineer", "web developer", "software developer"],
+    "software engineer": ["software engineer", "software developer", "developer", "full stack", "programmer", "swe"],
+    "web developer": ["web developer", "frontend", "full stack", "react", "node"],
+    "mobile developer": ["mobile", "ios developer", "android developer", "react native", "flutter"],
+    "data engineer": ["data engineer", "etl", "analytics engineer", "data pipeline"],
+    "data analyst": ["data analyst", "analytics", "business intelligence", "bi"],
+    "data scientist": ["data scientist", "machine learning", "ml engineer", "ai engineer"],
+    "machine learning engineer": ["machine learning", "ml engineer", "ai engineer"],
+    "ai engineer": ["ai", "artificial intelligence", "machine learning", "ml", "llm"],
+    "devops engineer": ["devops", "sre", "platform engineer", "cloud", "infrastructure"],
+    "site reliability engineer": ["sre", "devops", "platform engineer"],
+    "platform engineer": ["platform", "devops", "sre", "infrastructure", "cloud"],
+    "cloud engineer": ["cloud", "aws", "azure", "gcp", "devops"],
+    "systems engineer": ["systems", "infrastructure", "linux", "networking", "devops"],
+    "qa engineer": ["qa", "quality assurance", "testing", "test engineer", "sdet"],
+    "security engineer": ["security", "infosec", "cybersecurity", "application security", "appsec"],
+    "database administrator": ["dba", "database", "database engineer"],
+    "developer": ["developer", "engineer", "programmer", "coder"],
+    "ui designer": ["ui", "ui designer", "ui developer", "frontend", "web designer"],
+    "ux designer": ["ux", "ux designer", "user experience", "product designer"],
+    "product designer": ["product designer", "ux designer", "ui designer"],
+    "project manager": ["project manager", "pm", "program manager"],
+    "product manager": ["product manager", "pm", "product owner"],
+    "scrum master": ["scrum master", "agile coach", "delivery manager"]
+  },
+
+  "seniority": {
+    "INTERN": { "minYears": 0, "maxYears": 1, "responsibilities": [] },
+    "ENTRY": { "minYears": 0, "maxYears": 2, "responsibilities": ["task_execution", "learning"] },
+    "MID": { "minYears": 2, "maxYears": 5, "responsibilities": ["feature_development", "code_review", "mentoring_junior"] },
+    "SENIOR": { "minYears": 5, "maxYears": 8, "responsibilities": ["architecture", "mentoring", "technical_leadership", "system_design"] },
+    "LEAD": { "minYears": 7, "maxYears": null, "responsibilities": ["architecture", "mentoring", "technical_leadership", "system_design", "team_management", "cross_team"] }
+  },
+
+  "experienceYears": {
+    "INTERN": 0,
+    "ENTRY": 1,
+    "MID": 3,
+    "SENIOR": 5,
+    "LEAD": 7
+  },
+
+  "requirementWeights": {
+    "required": 1.0,
+    "preferred": 0.6,
+    "nice_to_have": 0.3
+  },
+
+  "negativeSignals": {
+    "devops_engineer": {
+      "coreSkills": ["Linux", "Docker", "Kubernetes", "CI/CD", "Terraform", "Cloud"],
+      "weakEvidence": ["React", "Next.js", "HTML", "CSS", "Vue", "Angular", "Figma", "UI Design"]
+    },
+    "data_scientist": {
+      "coreSkills": ["Python", "Machine Learning", "SQL", "Statistics", "Data Analysis"],
+      "weakEvidence": ["React", "Node.js", "Docker", "Kubernetes", "HTML", "CSS"]
+    },
+    "mobile_developer": {
+      "coreSkills": ["React Native", "Flutter", "Swift", "Kotlin", "iOS", "Android"],
+      "weakEvidence": ["Django", "Spring Boot", "Laravel", "PostgreSQL", "Elasticsearch"]
+    },
+    "ui_designer": {
+      "coreSkills": ["Figma", "UI Design", "Prototyping", "Design Systems"],
+      "weakEvidence": ["Python", "Java", "Docker", "Kubernetes", "SQL", "Machine Learning"]
+    }
+  },
+
+  "fundamentals": [
+    "Data Structures",
+    "Algorithms",
+    "Object-Oriented Programming",
+    "Design Patterns",
+    "System Design",
+    "Software Architecture",
+    "Database Design",
+    "API Design",
+    "Debugging",
+    "Git",
+    "Code Review",
+    "Problem Solving",
+    "Networking",
+    "Linux",
+    "HTML",
+    "CSS",
+    "JavaScript",
+    "SQL"
+  ],
+
+  "aliases": {
+    "node": "Node.js", "nodejs": "Node.js", "node.js": "Node.js",
+    "ts": "TypeScript", "typescript": "TypeScript",
+    "js": "JavaScript", "javascript": "JavaScript",
+    "reactjs": "React", "react.js": "React",
+    "nextjs": "Next.js", "next.js": "Next.js",
+    "vuejs": "Vue", "vue.js": "Vue", "vue 3": "Vue",
+    "nuxtjs": "Nuxt.js", "nuxt.js": "Nuxt.js",
+    "angularjs": "AngularJS", "angular.js": "AngularJS",
+    "angular 2+": "Angular", "angular modern": "Angular",
+    "tailwind": "Tailwind CSS", "tailwindcss": "Tailwind CSS",
+    "reduxjs": "Redux",
+    "python3": "Python", "python 3": "Python",
+    "drf": "Django REST Framework", "django rest framework": "Django REST Framework",
+    "flask": "Flask", "fastapi": "FastAPI",
+    "pandas": "Pandas", "numpy": "NumPy",
+    "tensorflow": "TensorFlow", "pytorch": "PyTorch",
+    "scikit learn": "Scikit-learn", "sklearn": "Scikit-learn",
+    "java": "Java", "spring": "Spring Boot", "spring boot": "Spring Boot",
+    "spring boot 3": "Spring Boot",
+    "php": "PHP", "laravel": "Laravel", "wordpress": "WordPress",
+    "ruby": "Ruby", "rails": "Rails", "ruby on rails": "Rails",
+    "postgres": "PostgreSQL", "postgresql": "PostgreSQL", "pg": "PostgreSQL", "psql": "PostgreSQL",
+    "mysql": "MySQL", "mongo": "MongoDB", "mongodb": "MongoDB",
+    "redis": "Redis", "sqlite": "SQLite",
+    "elasticsearch": "Elasticsearch", "elastic": "Elasticsearch",
+    "prisma": "Prisma",
+    "docker": "Docker", "k8s": "Kubernetes", "kubernetes": "Kubernetes",
+    "cicd": "CI/CD", "ci/cd": "CI/CD",
+    "linux": "Linux", "ubuntu": "Linux",
+    "aws": "AWS", "amazon web services": "AWS",
+    "azure": "Azure", "gcp": "GCP", "google cloud": "GCP",
+    "terraform": "Terraform", "ansible": "Ansible",
+    "nginx": "Nginx",
+    "github actions": "GitHub Actions", "gh actions": "GitHub Actions",
+    "vercel": "Vercel", "netlify": "Netlify",
+    "rest": "REST API", "rest apis": "REST API", "restful": "REST API", "rest api": "REST API",
+    "graphql": "GraphQL", "gql": "GraphQL",
+    "react native": "React Native", "rn": "React Native",
+    "flutter": "Flutter", "expo": "Expo",
+    "jest": "Jest", "playwright": "Playwright",
+    "cypress": "Cypress", "selenium": "Selenium",
+    "tdd": "TDD", "test driven": "TDD",
+    "figma": "Figma",
+    "ui design": "UI Design", "ux": "UX Research",
+    "scrum": "Scrum", "agile": "Agile", "jira": "Jira",
+    "machine learning": "Machine Learning", "ml": "Machine Learning",
+    "data analysis": "Data Analysis", "nlp": "NLP",
+    "seo": "SEO", "digital marketing": "Digital Marketing",
+    "shopify": "Shopify",
+    "git": "Git", "github": "GitHub", "gitlab": "GitLab",
+    "owasp": "OWASP", "jwt": "JWT", "oauth": "OAuth", "oauth2": "OAuth",
+    "authentication": "Authentication", "authorization": "Authorization",
+    "https": "HTTPS", "ssl": "HTTPS", "tls": "HTTPS",
+    "rag": "RAG", "llm": "LLM", "langchain": "LangChain",
+    "openai": "OpenAI API", "openai api": "OpenAI API",
+    "system design": "System Design", "dsa": "Data Structures"
+  }
+}

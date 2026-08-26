@@ -10,11 +10,13 @@
  * - Seniority with responsibility modeling
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as kb from './knowledge-base.json';
 
 // ── Load v2 knowledge base ──────────────────────────────────────────
-const raw = JSON.parse(fs.readFileSync(path.join(__dirname, 'knowledge-base.json'), 'utf-8'));
+// FIX #2: Use native JSON import instead of fs.readFileSync.
+//   resolveJsonModule: true in tsconfig + copy-assets ensures this works.
+
+const raw: any = kb;
 
 interface SkillEntry {
   category: string;
@@ -77,6 +79,15 @@ for (const r of RELATIONSHIPS) {
   REL_WEIGHT.set(`${r.from}->${r.to}`, r.weight);
 }
 
+// Memoization cache for normalizeSkill
+const NORM_CACHE = new Map<string, string>();
+
+// FIX #3: Pre-compute lowercase skill lookup map for O(1) normalization.
+const SKILLS_LOWERCASE = new Map<string, string>();
+for (const name of Object.keys(SKILLS)) {
+  SKILLS_LOWERCASE.set(name.toLowerCase(), name);
+}
+
 // ── Export for external use (e.g. Prisma seed) ─────────────────────
 export const SKILL_DICT: string[] = Object.keys(SKILLS);
 export const SKILL_ALIAS: Record<string, string> = ALIASES;
@@ -87,20 +98,29 @@ export const EXP_YEARS_EXPORT = EXP_YEARS;
 
 /**
  * Normalize a raw skill string to its canonical name using the v2 alias map.
- * Falls back to exact match, then case-insensitive match in skills dict.
+ * Falls back to exact match, then O(1) case-insensitive match via pre-computed map.
  */
 export function normalizeSkill(raw: string): string {
   const t = String(raw).trim();
   const low = t.toLowerCase();
+  const cached = NORM_CACHE.get(low);
+  if (cached) return cached;
+
+  let result: string;
   // 1. Direct alias lookup
-  if (ALIASES[low]) return ALIASES[low];
+  if (ALIASES[low]) result = ALIASES[low];
   // 2. Skills dict exact match
-  if (SKILLS[t]) return t;
+  else if (SKILLS[t]) result = t;
   // 3. Case-insensitive scan
-  for (const name of Object.keys(SKILLS)) {
-    if (name.toLowerCase() === low) return name;
+  else {
+    result = t;
+    for (const name of Object.keys(SKILLS)) {
+      if (name.toLowerCase() === low) { result = name; break; }
+    }
   }
-  return t;
+
+  NORM_CACHE.set(low, result);
+  return result;
 }
 
 /**
@@ -129,12 +149,12 @@ export function getTransferability(from: string, to: string): number {
   if (TRANSFERABILITY[to]?.[from]) return TRANSFERABILITY[to][from];
   // Via relationship weight
   const fwd = REL_WEIGHT.get(`${from}->${to}`);
-  if (fwd) return fwd * 0.8; // discount by 0.8 for indirect transfer
-  const rev = REL_WEIGHT.get(`${to}->from`);
+  if (fwd) return fwd * 0.8;
+  const rev = REL_WEIGHT.get(`${to}->${from}`);
   if (rev) return rev * 0.8;
   // Via related skills (1-hop)
   const sa = SKILLS[from];
-  if (sa?.related.includes(to)) return 0.4; // weak related match
+  if (sa?.related.includes(to)) return 0.4;
   const sb = SKILLS[to];
   if (sb?.related.includes(from)) return 0.4;
   return 0;
@@ -142,7 +162,6 @@ export function getTransferability(from: string, to: string): number {
 
 /**
  * Check if a skill meets the prerequisites for a target skill.
- * Returns true if all prerequisites are satisfied by the user's skill set.
  */
 export function satisfiesPrerequisites(targetSkill: string, userSkills: string[]): boolean {
   const prereqs = PREREQUISITES[targetSkill];
@@ -157,26 +176,20 @@ export function roleSimilarity(jobTitle: string, targetRole: string): number {
   const t = jobTitle.toLowerCase();
   const tr = targetRole.toLowerCase();
 
-  // Direct substring match
   if (t.includes(tr)) return 1;
 
-  // Synonym expansion
   const words = ROLE_SYNONYMS[tr] || [tr];
   let best = 0;
   for (const w of words) {
     if (t.includes(w)) best = Math.max(best, 0.75);
   }
 
-  // Category-level match: if job title contains a word that appears in
-  // any role's synonyms for the target role, give partial credit
   if (best === 0) {
-    // Check if the job title contains any word from the target role's profile
     const profile = ROLE_PROFILES[tr];
     if (profile) {
       const titleWords = t.split(/\s+/);
       for (const word of titleWords) {
         if (word.length > 3) {
-          // Check if this word relates to any core skill of the target role
           for (const coreSkill of profile.core) {
             const coreNorm = normalizeSkill(coreSkill);
             if (coreNorm.toLowerCase().includes(word) || word.includes(coreNorm.toLowerCase())) {
@@ -203,17 +216,14 @@ function detectNegativeSignals(
   const titleLower = jobTitle.toLowerCase();
 
   for (const [role, signals] of Object.entries(NEGATIVE_SIGNALS)) {
-    // Check if the job matches this role
     const roleWords = ROLE_SYNONYMS[role] || [role];
     const isJobRole = roleWords.some((w) => titleLower.includes(w));
     if (!isJobRole) continue;
 
-    // Check how many weak evidence skills the user has
     const userNorm = userSkills.map(normalizeSkill);
     const weakMatches = signals.weakEvidence.filter((w) => userNorm.includes(normalizeSkill(w)));
     const coreMatches = signals.coreSkills.filter((c) => userNorm.includes(normalizeSkill(c)));
 
-    // If user has mostly weak evidence and few core skills → negative signal
     if (weakMatches.length > 2 && coreMatches.length < 2) {
       return {
         isNegative: true,
@@ -228,13 +238,6 @@ function detectNegativeSignals(
 
 /**
  * Match user skills against job skills using v2 knowledge graph.
- *
- * Scoring tiers:
- * - Exact match: 1.00
- * - Strong transferable: 0.70-0.90
- * - Weak transferable: 0.40-0.60
- * - Related (graph): 0.30
- * - Missing: 0.00
  */
 function matchSkills(
   jobSkills: string[],
@@ -252,15 +255,10 @@ function matchSkills(
     if (userNorm.includes(js)) {
       direct.push(js);
     } else {
-      // Check transferability
       let bestTransfer = 0;
-      let bestFrom = '';
       for (const us of userNorm) {
         const t = getTransferability(us, js);
-        if (t > bestTransfer) {
-          bestTransfer = t;
-          bestFrom = us;
-        }
+        if (t > bestTransfer) bestTransfer = t;
       }
 
       if (bestTransfer >= 0.6) {
@@ -273,7 +271,6 @@ function matchSkills(
     }
   }
 
-  // Weighted skill fraction
   let totalWeight = 0;
   let earnedWeight = 0;
   for (const js of jobNorm) {
@@ -281,7 +278,6 @@ function matchSkills(
     if (direct.includes(js)) {
       earnedWeight += 1.0;
     } else if (transferable.includes(js)) {
-      // Use the actual transferability score
       let bestT = 0;
       for (const us of userNorm) {
         bestT = Math.max(bestT, getTransferability(us, js));
@@ -312,7 +308,6 @@ function matchRoleProfile(
     const isMatch = roleWords.some((w) => titleLower.includes(w));
     if (!isMatch) continue;
 
-    // Score against role profile
     let coreHits = 0;
     for (const s of profile.core) {
       const sn = normalizeSkill(s);
@@ -367,13 +362,16 @@ export interface MatchResult {
   parts: ScoreBreakdown[];
   matchedSkills: string[];
   transferableSkills: string[];
-  relatedSkills: string[]; // kept for backwards compat — includes both transferable and graph-related
+  relatedSkills: string[];
   missingSkills: string[];
   reasons: string[];
   summary: string;
 }
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+
+// FIX #5: Hoist regex to module-level constant (was recreated in every scoreJob call)
+const SENIORITY_RE = /\b(senior|lead|principal|head)\b/;
 
 /**
  * Score a job against a candidate profile using v2 knowledge base.
@@ -404,7 +402,6 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
     }
   }
 
-  // Also check role profile match
   const { roleMatch: profileMatch } = matchRoleProfile(job.title, prof.skills);
   if (profileMatch > 0.5) {
     roleBest = Math.max(roleBest, profileMatch * 0.8);
@@ -415,7 +412,7 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
   else if (roleBest >= 0.6) reasons.push(`Closely related to your "${roleTarget}" goal`);
 
   // ── 2. Skills (30%) — with transferability ────────────────────────
-  const uNorm = [...new Set(prof.skills.map(normalizeSkill))];
+  // FIX #4: Removed unused uNorm variable (was normalizing skills then discarding)
   const { direct, transferable, related, missing, skillFrac } = matchSkills(
     job.skills || [],
     prof.skills,
@@ -487,7 +484,8 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
 
   // ── Additional penalties ───────────────────────────────────────────
   const titleL = job.title.toLowerCase();
-  if (/\b(senior|lead|principal|head)\b/.test(titleL) && prof.years < 4) {
+  // FIX #5: Use pre-compiled regex instead of creating new RegExp each call
+  if (SENIORITY_RE.test(titleL) && prof.years < 4) {
     pts -= 8;
     reasons.push('Seniority above your stated preference (−8)');
   }
@@ -530,7 +528,7 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
     parts,
     matchedSkills: direct,
     transferableSkills: transferable,
-    relatedSkills: [...transferable, ...related], // backwards compat: combined list
+    relatedSkills: [...transferable, ...related],
     missingSkills: missing,
     reasons,
     summary,

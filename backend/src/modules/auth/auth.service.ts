@@ -124,11 +124,11 @@ export class AuthService {
     return this.tokenFor(user);
   }
 
-  private tokenFor(user: { id: string; email: string; role: 'USER' | 'ADMIN' }) {
-    const payload = { sub: user.id, email: user.email, role: user.role };
+  private tokenFor(user: { id: string; email: string; role: string }) {
+    const payload = { sub: user.id, email: user.email, role: user.role as 'USER' | 'ADMIN' };
     return {
       accessToken: this.jwt.sign(payload),
-      user: { id: user.id, email: user.email, role: user.role },
+      user: { id: user.id, email: user.email, role: user.role as 'USER' | 'ADMIN' },
     };
   }
 }

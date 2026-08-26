@@ -4,11 +4,12 @@ import {
   Patch,
   Post,
   Req,
+  Res,
   UseGuards,
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto, ChangePasswordDto } from './dto/auth.dto';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
@@ -33,6 +34,17 @@ export class AuthController {
 
   constructor(private readonly auth: AuthService) {}
 
+  private setAuthCookie(res: Response, token: string) {
+    const isProd = process.env.NODE_ENV === 'production';
+    res.cookie('jh_token', token, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+  }
+
   private enforceLimits(req: Request, email?: string) {
     const ip = req.ip ?? 'unknown';
     if (!this.ipLimiter.consume(`ip:${ip}`)) {
@@ -44,21 +56,27 @@ export class AuthController {
   }
 
   @Post('register')
-  async register(@Req() req: Request, @Body() dto: RegisterDto) {
+  async register(@Req() req: Request, @Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     this.enforceLimits(req);
-    return this.auth.register(dto);
+    const result = await this.auth.register(dto);
+    this.setAuthCookie(res, result.accessToken);
+    return result;
   }
 
   @Post('login')
-  async login(@Req() req: Request, @Body() dto: LoginDto) {
+  async login(@Req() req: Request, @Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     this.enforceLimits(req, dto.email);
-    return this.auth.login(dto);
+    const result = await this.auth.login(dto);
+    this.setAuthCookie(res, result.accessToken);
+    return result;
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch('password')
-  async changePassword(@Req() req: Request, @CurrentUser() user: AuthUser, @Body() dto: ChangePasswordDto) {
+  async changePassword(@Req() req: Request, @CurrentUser() user: AuthUser, @Body() dto: ChangePasswordDto, @Res({ passthrough: true }) res: Response) {
     this.enforceLimits(req);
-    return this.auth.changePassword(user.id, dto);
+    await this.auth.changePassword(user.id, dto);
+    this.setAuthCookie(res, ''); // clear cookie on password change
+    return { ok: true };
   }
 }

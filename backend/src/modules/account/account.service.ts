@@ -64,10 +64,10 @@ export class AccountService {
           title: null,
           summary: null,
           years: 0,
-          remote: false,
+          remote: 0,
           minSalary: 0,
-          excludeOnsite: false,
-          employmentTypes: this.prisma.isSQLite ? '[]' : [] as any,
+          excludeOnsite: 0,
+           employmentTypes: this.prisma.json([]),
         },
       });
 
@@ -96,7 +96,7 @@ export class AccountService {
           status: 'DELETED',
           email: pseudonym,
           tokenInvalidatedAt: new Date(),
-          notificationsPaused: this.prisma.bool(true) as any,
+          notificationsPaused: 1,
         },
       });
     });

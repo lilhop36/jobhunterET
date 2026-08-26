@@ -7,12 +7,10 @@ import {
   Target,
   Bell,
   Activity,
-  AlertTriangle,
   CheckCircle,
-  TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '../../../lib/auth';
-import { RequireAuth, useApi, ErrorBox, Loading, StatusPill, ScoreBadge } from '../../../lib/ui';
+import { RequireAuth, useApi, ErrorBox, Loading, StatusPill } from '../../../lib/ui';
 
 interface AdminStats {
   overview: {
@@ -93,10 +91,11 @@ function StatCard({
 }
 
 export default function AdminDashboardPage() {
-  const { user } = useAuth();
-  const { data, err, loading, reload } = useApi<AdminStats>('/api/admin/stats');
+  const { user, ready } = useAuth();
+  const isAdmin = ready && user?.role === 'ADMIN';
+  const { data, err, loading, reload } = useApi<AdminStats>(isAdmin ? '/api/admin/stats' : null);
 
-  if (user?.role !== 'ADMIN') {
+  if (ready && user && user.role !== 'ADMIN') {
     return (
       <RequireAuth>
         <h1>Admin Dashboard</h1>
@@ -114,7 +113,7 @@ export default function AdminDashboardPage() {
       </div>
       <p className="subtitle">System health, source metrics, and match cycle overview.</p>
 
-      {err && <ErrorBox msg={err} onRetry={reload} />}
+      {err && !loading && <ErrorBox msg={err} onRetry={reload} />}
       {loading && <Loading />}
 
       {data && (
@@ -332,9 +331,9 @@ export default function AdminDashboardPage() {
               <p className="muted">No activity logged yet.</p>
             ) : (
               <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                {data.recentActivity.map((log, i) => (
+                {data.recentActivity.map((log) => (
                   <div
-                    key={i}
+                    key={`${log.at}-${log.tag}`}
                     style={{
                       padding: '6px 8px',
                       borderBottom: '1px solid hsl(var(--border))',

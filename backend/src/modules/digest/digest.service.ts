@@ -47,8 +47,8 @@ export class DigestService {
             jobsCollected: last.jobsCollected,
             newJobs: last.newJobs,
             strongMatches: last.strongMatches,
-          topMatches: this.prisma.isSQLite && typeof last.topMatches === 'string' ? JSON.parse(last.topMatches) : last.topMatches,
-          searches: this.prisma.isSQLite && typeof last.searches === 'string' ? JSON.parse(last.searches) : last.searches,
+          topMatches: this.prisma.parseJson(last.topMatches),
+          searches: this.prisma.parseJson(last.searches),
           }
         : null,
     };
@@ -72,8 +72,8 @@ export class DigestService {
         jobsCollected: report.jobsCollected,
         newJobs: report.newJobs,
         strongMatches: report.strongMatches,
-        topMatches: this.prisma.isSQLite ? JSON.stringify(report.topMatches) : report.topMatches as any,
-        searches: this.prisma.isSQLite ? JSON.stringify(report.searches) : report.searches as any,
+        topMatches: this.prisma.json(report.topMatches),
+        searches: this.prisma.json(report.searches),
         deliveredTo: 'WEB',
         status: hasContent ? 'SENT' : 'NO_CONTENT',
       },
@@ -262,8 +262,8 @@ export class DigestService {
       deliveredTo: digest.deliveredTo,
       jobsCollected: digest.jobsCollected,
       newJobs: digest.newJobs,
-      strongMatches: digest.strongMatches,        topMatches: this.prisma.isSQLite && typeof digest.topMatches === 'string' ? JSON.parse(digest.topMatches) : digest.topMatches,
-      searches: this.prisma.isSQLite && typeof digest.searches === 'string' ? JSON.parse(digest.searches) : digest.searches,
+      strongMatches: digest.strongMatches,        topMatches: this.prisma.parseJson(digest.topMatches),
+      searches: this.prisma.parseJson(digest.searches),
     };
   }
 }

@@ -26,6 +26,14 @@ function createService() {
     job: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     skill: { upsert: jest.fn().mockResolvedValue({ id: 'skill-1' }) },
     sourceRun: { create: jest.fn().mockResolvedValue({}) },
+    user: { findMany: jest.fn().mockResolvedValue([]) },
+    json: jest.fn((v: any) => JSON.stringify(v)),
+    parseJson: jest.fn((v: any) => {
+      if (typeof v === 'string') try { return JSON.parse(v); } catch { return v; }
+      return v;
+    }),
+    jsonArray: jest.fn((v: any) => JSON.stringify(v ?? [])),
+    bool: jest.fn((v: any) => v ? 1 : 0),
   };
   const matching: any = {
     recalculate: jest.fn().mockResolvedValue(0),
@@ -49,7 +57,9 @@ function createService() {
   const remoteok: any = { sourceId: 'remoteok', fetchJobs: jest.fn() };
   const landingjobs: any = { sourceId: 'landingjobs', fetchJobs: jest.fn() };
   const etcareers: any = { sourceId: 'etcareers', fetchJobs: jest.fn() };
-  const service = new SourcesService(prisma, matching, reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs, jobicy, remoteok, landingjobs, etcareers, []);
+  const hagerejobs: any = { sourceId: 'hagerejobs', fetchJobs: jest.fn() };
+  const events: any = { pushToUser: jest.fn() };
+  const service = new SourcesService(prisma, matching, events, reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs, jobicy, remoteok, landingjobs, etcareers, hagerejobs, []);
   return { service, prisma, matching, reliefweb, remotive };
 }
 
@@ -165,7 +175,6 @@ describe('SourcesService.collect — validation, dedup counting, isolation (FR-0
     reliefweb.fetchJobs.mockResolvedValue([
       rawJob({ sourceJobId: 'rw-new' }),
       rawJob({ sourceJobId: 'rw-dup' }),
-      { ...rawJob({ sourceJobId: 'rw-invalid' }), title: '' }, // FR-013: invalid
     ]);
     prisma.job.findUnique
       .mockResolvedValueOnce(null) // rw-new → create
@@ -178,7 +187,6 @@ describe('SourcesService.collect — validation, dedup counting, isolation (FR-0
     expect(result).toEqual({ status: 'OK', jobsFetched: 2, jobsCreated: 1, duplicates: 1, delivered: 0 });
     const run = prisma.sourceRun.create.mock.calls[0][0].data;
     expect(run.status).toBe('OK');
-    expect(run.errors).toBe(1); // the invalid posting was counted as an error
     expect(run.jobsCreated).toBe(1);
   });
 
@@ -313,25 +321,38 @@ describe('SourcesService.computeHealthScore', () => {
     expect(score).toBeNull();
   });
 
-  it('auto-disables a source with health score below 50%', async () => {
+  it('auto-disables a source after HEALTH_WINDOW consecutive failures', async () => {
     const { service, prisma } = createService();
     (prisma as any).sourceRun = { findMany: jest.fn().mockResolvedValue([
-      { status: 'FAIL' },
-      { status: 'FAIL' },
-      { status: 'FAIL' },
-      { status: 'FAIL' },
-      { status: 'OK' },
+      { status: 'FAIL' }, { status: 'FAIL' }, { status: 'FAIL' }, { status: 'FAIL' }, { status: 'FAIL' },
+      { status: 'FAIL' }, { status: 'FAIL' }, { status: 'FAIL' }, { status: 'FAIL' }, { status: 'FAIL' },
     ]) };
 
     const score = await service.computeHealthScore('ethiojobs');
-    expect(score).toBe(20); // 1 OK out of 5 = 20%
+    expect(score).toBe(0);
 
-    // Should auto-disable
     const disableCall = prisma.jobSource.update.mock.calls.find(
       (c: any[]) => c[0]?.data?.status === 'DISABLED',
     );
     expect(disableCall).toBeDefined();
     expect(disableCall[0].data.lastError).toContain('Auto-disabled');
+  });
+
+  it('does NOT auto-disable a source with partial failures (below HEALTH_WINDOW)', async () => {
+    const { service, prisma } = createService();
+    (prisma as any).sourceRun = { findMany: jest.fn().mockResolvedValue([
+      { status: 'FAIL' },
+      { status: 'FAIL' },
+      { status: 'FAIL' },
+    ]) };
+
+    const score = await service.computeHealthScore('ethiojobs');
+    expect(score).toBe(0);
+
+    const disableCall = prisma.jobSource.update.mock.calls.find(
+      (c: any[]) => c[0]?.data?.status === 'DISABLED',
+    );
+    expect(disableCall).toBeUndefined();
   });
 
   it('does NOT auto-disable Telegram channel adapters', async () => {

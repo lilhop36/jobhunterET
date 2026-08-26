@@ -4,31 +4,20 @@ import { ReactNode, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider } from 'next-themes';
 import { AuthProvider, useAuth } from '../lib/auth';
+import { RequireAuth, useApi } from '../lib/ui';
 import { Sidebar } from '../components/shell/sidebar';
 import { Topbar } from '../components/shell/topbar';
 import { BottomNav } from '../components/shell/bottom-nav';
 import '../styles/globals.css';
 
 function Shell({ children }: { children: ReactNode }) {
-  const { token, api } = useAuth();
+  const { token } = useAuth();
   const path = usePathname();
-  const [data, setData] = useState<{ unread: number; completion: number } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, reload } = useApi<{ unread: number; completion: number }>('/api/dashboard');
 
   useEffect(() => {
-    if (!token || path === '/login' || path === '/register') {
-      setLoading(false);
-      return;
-    }
-    let alive = true;
-    setLoading(true);
-    api('/api/dashboard')
-      .then((d) => alive && setData({ unread: d?.counts?.unread ?? 0, completion: d?.completion ?? 0 }))
-      .catch(() => alive && setData({ unread: 0, completion: 0 }))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
+    if (!token || path === '/login' || path === '/register') return;
+    reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, path]);
 

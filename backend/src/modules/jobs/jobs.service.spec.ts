@@ -24,7 +24,8 @@ function createService() {
     findMany: jest.fn().mockResolvedValue([]),
   };
   const salary: any = { compareJobSalary: jest.fn().mockReturnValue(null) };
-  return { service: new JobsService({ job } as any, salary), job, salary };
+  const prisma = { job, json: (v: any) => v, parseJson: (v: any) => v, jsonArray: (v: any) => (Array.isArray(v) ? v : []) };
+  return { service: new JobsService(prisma as any, salary), job, salary };
 }
 
 describe('JobsService.list — PERF-002 keyset pagination', () => {

@@ -107,11 +107,7 @@ export class JobsService {
   }
 
   /** Parse JSON string fields back to arrays (SQLite compat). */
-  private pj(v: any): any[] {
-    if (Array.isArray(v)) return v;
-    if (typeof v === 'string') { try { return JSON.parse(v); } catch { return []; } }
-    return [];
-  }
+  // Deprecated: use this.prisma.jsonArray() / this.prisma.parseJson() instead.
 
   private serialize(j: any) {
     const match = j.matches && j.matches.length ? j.matches[0] : null;
@@ -121,7 +117,7 @@ export class JobsService {
       company: j.company,
       location: j.location,
       locationClass: j.locationClass,
-      tags: (() => { const t = j.tags; if (Array.isArray(t)) return t; if (typeof t === 'string') { try { return JSON.parse(t); } catch { return []; } } return []; })(),
+      tags: this.prisma.jsonArray(j.tags),
       workPlace: j.workPlace,
       employmentType: j.employmentType,
       experienceLevel: j.experienceLevel,
@@ -154,10 +150,10 @@ export class JobsService {
       match: match
         ? {
             score: match.score,
-            matchedSkills: this.pj(match.matchedSkills),
-            relatedSkills: this.pj(match.relatedSkills),
-            missingSkills: this.pj(match.missingSkills),
-            reasons: this.pj(match.reasons),
+            matchedSkills: this.prisma.jsonArray(match.matchedSkills),
+            relatedSkills: this.prisma.jsonArray(match.relatedSkills),
+            missingSkills: this.prisma.jsonArray(match.missingSkills),
+            reasons: this.prisma.jsonArray(match.reasons),
             summary: match.summary,
             parts: {
               role: match.roleScore,

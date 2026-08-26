@@ -1,16 +1,17 @@
-import { Controller, Get, Logger, Query, Sse } from '@nestjs/common';
+import { Controller, Get, Logger, Query, Req, Sse } from '@nestjs/common';
 import { Observable, merge, finalize, map, timer } from 'rxjs';
 import { EventsService, SseEvent } from './events.service';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '../../common/guards/jwt-auth.guard';
+import { Request } from 'express';
 
 /**
- * SSE controller — the client hits /api/events/stream?token=<jwt>.
+ * SSE controller — the client hits /api/events/stream.
  *
- * EventSource doesn't support custom headers, so we accept the JWT as a
- * query parameter. We verify it the same way JwtAuthGuard does, but
- * inline because @Sse() responses bypass the normal guard pipeline.
+ * SEC-011: token is now read from an HttpOnly cookie (jh_token) set at login,
+ * avoiding exposure in browser history, server logs, and referrer headers.
+ * EventSource always sends same-origin cookies automatically.
  */
 @Controller('events')
 export class EventsController {
@@ -27,17 +28,16 @@ export class EventsController {
 
   @Get('stream')
   @Sse('stream')
-  async stream(
-    @Query('token') token: string,
-  ): Promise<Observable<{ event: string; data: SseEvent }>> {
-    // ── Authenticate via query-param token ────────────────────
-    if (!token) {
+  async stream(@Query('token') token: string, @Req() req: Request): Promise<Observable<{ event: string; data: SseEvent }>> {
+    // Accept token from cookie (browser) or query param (API clients)
+    const resolvedToken = token || req.cookies?.jh_token;
+    if (!resolvedToken) {
       throw new Error('Unauthorized');
     }
 
     let payload: JwtPayload;
     try {
-      payload = this.jwt.verify<JwtPayload>(token);
+      payload = this.jwt.verify<JwtPayload>(resolvedToken);
     } catch {
       throw new Error('Unauthorized');
     }

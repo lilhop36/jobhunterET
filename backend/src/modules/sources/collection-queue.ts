@@ -87,6 +87,7 @@ export class CollectionQueue extends EventEmitter {
     const tierPriority: Record<string, number> = {
       ETHIOPIA: 1,
       INTERNATIONAL: 3,
+      DEEP: 5,
     };
     // Sort: Ethiopia sources first, then international
     const sorted = [...sources].sort(

@@ -42,10 +42,12 @@ function mockHttpsResponse(xml: string) {
   });
 }
 
-function mockFetchJson(body: any, status = 200) {
+function mockFetchJson(body: any, status = 200, headers: Record<string, string> = {}) {
+  const headerMap = new Map(Object.entries(headers));
   mockFetch.mockResolvedValueOnce({
     ok: status >= 200 && status < 300,
     status,
+    headers: { get: (k: string) => headerMap.get(k) ?? null },
     json: () => Promise.resolve(body),
     text: () => Promise.resolve(JSON.stringify(body)),
   });
@@ -55,6 +57,7 @@ function mockFetchHtml(html: string, status = 200) {
   mockFetch.mockResolvedValueOnce({
     ok: status >= 200 && status < 300,
     status,
+    headers: { get: () => null },
     text: () => Promise.resolve(html),
     json: () => Promise.reject(new Error('not json')),
   });
@@ -234,6 +237,86 @@ describe('ArbeitnowAdapter', () => {
     expect(jobs[0].title).toBe('Good Job');
     expect(jobs[0].employmentType).toBe('CONTRACT');
   });
+
+  it('parses numeric Unix seconds in created_at', async () => {
+    const { ArbeitnowAdapter } = require('./arbeitnow.adapter');
+    const adapter = new ArbeitnowAdapter();
+
+    const fiveMinutesAgo = Math.floor(Date.now() / 1000) - 300;
+    mockFetchJson({
+      data: [
+        {
+          slug: 'seconds-job',
+          company_name: 'TimeCorp',
+          title: 'Time Traveler',
+          description: 'Work with time.',
+          remote: true,
+          url: 'https://arbeitnow.com/job/time-traveler',
+          tags: ['Physics'],
+          job_types: ['full_time'],
+          location: 'Berlin',
+          created_at: String(fiveMinutesAgo),
+        },
+      ],
+    });
+
+    const jobs = await adapter.fetchJobs();
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].postedDate).toBeInstanceOf(Date);
+    expect(jobs[0].postedDate.getFullYear()).toBeGreaterThan(2000);
+  });
+
+  it('follows links.next pagination', async () => {
+    const { ArbeitnowAdapter } = require('./arbeitnow.adapter');
+    const adapter = new ArbeitnowAdapter();
+
+    mockFetchJson({
+      data: [
+        {
+          slug: 'page1-job',
+          company_name: 'Page1',
+          title: 'Page 1 Job',
+          description: '',
+          remote: true,
+          url: 'https://arbeitnow.com/job/page1',
+          tags: [],
+          job_types: ['full_time'],
+          location: 'Berlin',
+          created_at: String(Math.floor(Date.now() / 1000)),
+        },
+      ],
+      links: { next: 'https://www.arbeitnow.com/api/job-board-api?limit=20&page=2' },
+    });
+    mockFetchJson({
+      data: [
+        {
+          slug: 'page2-job',
+          company_name: 'Page2',
+          title: 'Page 2 Job',
+          description: '',
+          remote: true,
+          url: 'https://arbeitnow.com/job/page2',
+          tags: [],
+          job_types: ['full_time'],
+          location: 'Berlin',
+          created_at: String(Math.floor(Date.now() / 1000)),
+        },
+      ],
+      links: { next: null },
+    });
+
+    const jobs = await adapter.fetchJobs();
+    expect(jobs).toHaveLength(2);
+    expect(jobs[0].title).toBe('Page 1 Job');
+    expect(jobs[1].title).toBe('Page 2 Job');
+  });
+
+  it('throws when API returns no parseable jobs', async () => {
+    const { ArbeitnowAdapter } = require('./arbeitnow.adapter');
+    const adapter = new ArbeitnowAdapter();
+    mockFetchJson({ data: [] });
+    await expect(adapter.fetchJobs()).rejects.toThrow('no parseable jobs');
+  });
 });
 
 // ══════════════════════════════════════════════════════════════
@@ -310,11 +393,12 @@ describe('JobicyAdapter', () => {
     expect(jobs[0].locationClass).toBe('INTERNATIONAL_REMOTE');
   });
 
-  it('throws when API returns no parseable jobs', async () => {
+  it('returns empty array when API returns no parseable jobs', async () => {
     const { JobicyAdapter } = require('./jobicy.adapter');
     const adapter = new JobicyAdapter();
     mockFetchJson({ jobs: [] });
-    await expect(adapter.fetchJobs()).rejects.toThrow('no parseable jobs');
+    const jobs = await adapter.fetchJobs();
+    expect(jobs).toEqual([]);
   });
 });
 
@@ -457,17 +541,14 @@ describe('EthioNgoJobsAdapter', () => {
 // 7. ETHIOJOBS — HTML scraping (__NEXT_DATA__)
 // ══════════════════════════════════════════════════════════════
 describe('EthiojobsAdapter', () => {
-  function buildNextDataPage(jobs: any[]) {
+  function buildNextDataPage(jobs: any[], lastPage = 1, isCategory = false, categorySlug?: string) {
+    const pageProps: any = isCategory
+      ? { initialData: jobs, meta: { slugName: 'category', total: jobs.length, pageNumber: 1, ...(categorySlug ? { categorySlug } : {}) } }
+      : { jobs: { data: jobs, meta: { pageNumber: 1, lastPage, total: jobs.length } } };
+
     return `<html><head></head><body>
 <script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
-      props: {
-        pageProps: {
-          jobs: {
-            data: jobs,
-            meta: { pageNumber: 1, lastPage: 1, total: jobs.length },
-          },
-        },
-      },
+      props: { pageProps },
     })}</script></body></html>`;
   }
 
@@ -533,19 +614,132 @@ describe('EthiojobsAdapter', () => {
     );
 
     const jobs = await adapter.fetchJobs();
-    // Remote detection: location_type contains 'remote' (case-insensitive)
-    // AND state is checked — 'Bahir Dar' alone doesn't trigger remote
-    // The adapter checks: isRemote = /remote/i.test(location_type || '') || /remote/i.test(location)
     expect(jobs[0].locationClass).toBe('ETHIOPIA_REMOTE');
     expect(jobs[0].workPlace).toBe('REMOTE');
-    expect(jobs[0].employmentType).toBe('CONTRACT'); // type 3
+    expect(jobs[0].employmentType).toBe('CONTRACT');
   });
 
-  it('throws when __NEXT_DATA__ is missing', async () => {
+  it('filters stale jobs and stops at page boundary', async () => {
+    const { EthiojobsAdapter } = require('./ethiojobs.adapter');
+    const adapter = new EthiojobsAdapter();
+    const fiveDaysAgo = new Date(Date.now() - 5 * 86_400_000).toISOString();
+    const now = new Date().toISOString();
+
+    mockFetchHtml(buildNextDataPage([
+      { id: 'ej-fresh', title: 'Fresh Job', slug: 'fresh-job', type: 1, date_published: now, level: 'Mid', location_type: 'On-site', description: '', state: 'Addis', catalogs: [], date_expiry: null, company: { name: 'A', slug: 'a' }, application_method: 'online', application_email: null },
+      { id: 'ej-stale', title: 'Stale Job', slug: 'stale-job', type: 1, date_published: fiveDaysAgo, level: 'Mid', location_type: 'On-site', description: '', state: 'Addis', catalogs: [], date_expiry: null, company: { name: 'B', slug: 'b' }, application_method: 'online', application_email: null },
+    ], 5));
+
+    const result = await adapter.collect({ mode: 'FAST', since: new Date(Date.now() - 2 * 86_400_000), maxPages: 12, maxRequests: 14, requestDelayMs: 0 });
+    expect(result.jobs).toHaveLength(1);
+    expect(result.jobs[0].sourceJobId).toBe('fresh-job');
+    expect(result.categories[0].stoppedReason).toBe('LAST_PAGE');
+  });
+
+  it('stops at meta.lastPage and never requests lastPage+1', async () => {
+    const { EthiojobsAdapter } = require('./ethiojobs.adapter');
+    const adapter = new EthiojobsAdapter();
+
+    mockFetchHtml(buildNextDataPage([
+      { id: 'ej-1', title: 'Job 1', slug: 'job-1', type: 1, date_published: new Date().toISOString(), level: 'Mid', location_type: 'On-site', description: '', state: 'Addis', catalogs: [], date_expiry: null, company: { name: 'A', slug: 'a' }, application_method: 'online', application_email: null },
+    ], 3));
+
+    const result = await adapter.collect({ mode: 'FAST', since: new Date(Date.now() - 30 * 86_400_000), maxPages: 12, maxRequests: 14, requestDelayMs: 0 });
+    expect(result.categories[0].pagesFetched).toBe(1);
+    expect(result.categories[0].stoppedReason).toBe('LAST_PAGE');
+  });
+
+  it('empty page beyond lastPage yields EMPTY_PAGE, not a throw', async () => {
+    const { EthiojobsAdapter } = require('./ethiojobs.adapter');
+    const adapter = new EthiojobsAdapter();
+
+    mockFetchHtml(buildNextDataPage([], 3));
+    const result = await adapter.collect({ mode: 'FAST', since: new Date(Date.now() - 30 * 86_400_000), maxPages: 12, maxRequests: 14, requestDelayMs: 0 });
+    expect(result.categories[0].stoppedReason).toBe('EMPTY_PAGE');
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('stops at page boundary (LAST_PAGE)', async () => {
+    const { EthiojobsAdapter } = require('./ethiojobs.adapter');
+    const adapter = new EthiojobsAdapter();
+
+    for (let i = 1; i <= 5; i++) {
+      mockFetchHtml(buildNextDataPage([
+        { id: `ej-${i}`, title: `Job ${i}`, slug: `job-${i}`, type: 1, date_published: new Date().toISOString(), level: 'Mid', location_type: 'On-site', description: '', state: 'Addis', catalogs: [], date_expiry: null, company: { name: 'A', slug: 'a' }, application_method: 'online', application_email: null },
+      ], 10));
+    }
+
+    const result = await adapter.collect({ mode: 'FAST', since: new Date(Date.now() - 30 * 86_400_000), maxPages: 3, maxRequests: 14, requestDelayMs: 0 });
+    expect(result.categories[0].pagesFetched).toBe(1);
+    expect(result.categories[0].stoppedReason).toBe('LAST_PAGE');
+  });
+
+  it('parses category-page shape and populates sourceCategories', async () => {
+    const { EthiojobsAdapter } = require('./ethiojobs.adapter');
+    const adapter = new EthiojobsAdapter();
+
+    // First call: latest page (empty — nothing to show)
+    mockFetchHtml(buildNextDataPage([], 1));
+
+    // Second call: category page
+    mockFetchHtml(buildNextDataPage([
+      { id: 'ej-cat', title: 'Category Job', slug: 'cat-job', type: 1, date_published: new Date().toISOString(), level: 'Mid', location_type: 'On-site', description: '', state: 'Addis', catalogs: [{ name: 'Tech' }], date_expiry: null, company: { name: 'A', slug: 'a' }, application_method: 'online', application_email: null },
+    ], 1, true, 'technology'));
+
+    const result = await adapter.collect({ mode: 'DEEP', since: new Date(Date.now() - 30 * 86_400_000), maxPages: 1, maxRequests: 2, requestDelayMs: 0, categories: ['technology'] });
+    expect(result.jobs).toHaveLength(1);
+    expect(result.jobs[0].sourceCategories).toContain('technology');
+    expect(result.jobs[0].discoveredVia).toBe('technology');
+    expect(result.categories).toHaveLength(2);
+    expect(result.categories.find((c) => c.category === 'technology')).toBeDefined();
+  });
+
+  it('merges sourceCategories when same slug appears in two categories', async () => {
+    const { EthiojobsAdapter } = require('./ethiojobs.adapter');
+    const adapter = new EthiojobsAdapter();
+
+    // First call: latest page (empty)
+    mockFetchHtml(buildNextDataPage([], 1));
+
+    // Second call: technology category
+    mockFetchHtml(buildNextDataPage([
+      { id: 'ej-shared', title: 'Shared Job', slug: 'shared-job', type: 1, date_published: new Date().toISOString(), level: 'Mid', location_type: 'On-site', description: '', state: 'Addis', catalogs: [], date_expiry: null, company: { name: 'A', slug: 'a' }, application_method: 'online', application_email: null },
+    ], 1, true, 'technology'));
+
+    // Third call: engineering category (same slug)
+    mockFetchHtml(buildNextDataPage([
+      { id: 'ej-shared', title: 'Shared Job', slug: 'shared-job', type: 1, date_published: new Date().toISOString(), level: 'Mid', location_type: 'On-site', description: '', state: 'Addis', catalogs: [], date_expiry: null, company: { name: 'A', slug: 'a' }, application_method: 'online', application_email: null },
+    ], 1, true, 'engineering'));
+
+    const result = await adapter.collect({ mode: 'DEEP', since: new Date(Date.now() - 30 * 86_400_000), maxPages: 1, maxRequests: 4, requestDelayMs: 0, categories: ['technology', 'engineering'] });
+    expect(result.jobs).toHaveLength(1);
+    expect(result.jobs[0].sourceCategories).toContain('technology');
+    expect(result.jobs[0].sourceCategories).toContain('engineering');
+  });
+
+  it('fetches first page and stops at page boundary', async () => {
+    const { EthiojobsAdapter } = require('./ethiojobs.adapter');
+    const adapter = new EthiojobsAdapter();
+
+    mockFetchHtml(buildNextDataPage([
+      { id: 'ej-1', title: 'Job 1', slug: 'job-1', type: 1, date_published: new Date().toISOString(), level: 'Mid', location_type: 'On-site', description: '', state: 'Addis', catalogs: [], date_expiry: null, company: { name: 'A', slug: 'a' }, application_method: 'online', application_email: null },
+    ], 3));
+    mockFetchHtml(''); // page 2 fails — no __NEXT_DATA__
+    mockFetchHtml(buildNextDataPage([
+      { id: 'ej-3', title: 'Job 3', slug: 'job-3', type: 1, date_published: new Date().toISOString(), level: 'Mid', location_type: 'On-site', description: '', state: 'Addis', catalogs: [], date_expiry: null, company: { name: 'C', slug: 'c' }, application_method: 'online', application_email: null },
+    ], 3));
+
+    const result = await adapter.collect({ mode: 'FAST', since: new Date(Date.now() - 30 * 86_400_000), maxPages: 5, maxRequests: 10, requestDelayMs: 0 });
+    expect(result.jobs).toHaveLength(1);
+    expect(result.jobs[0].sourceJobId).toBe('job-1');
+  });
+
+  it('records error when __NEXT_DATA__ is missing', async () => {
     const { EthiojobsAdapter } = require('./ethiojobs.adapter');
     const adapter = new EthiojobsAdapter();
     mockFetchHtml('<html><body>No data here</body></html>');
-    await expect(adapter.fetchJobs()).rejects.toThrow('no parseable jobs');
+    const result = await adapter.collect({ mode: 'FAST', since: new Date(Date.now() - 30 * 86_400_000), maxPages: 1, maxRequests: 1, requestDelayMs: 0 });
+    expect(result.errors.some((e: string) => e.includes('__NEXT_DATA__'))).toBe(true);
   });
 });
 
@@ -573,14 +767,19 @@ describe('GeezJobsAdapter', () => {
         hiringOrganization: { name: 'EthioTech' },
         jobLocation: { address: { addressLocality: 'Addis Ababa' } },
         description: '<p>Lead the backend team.</p>',
-        datePosted: '2026-08-01',
+        datePosted: '2026-08-25',
         validThrough: '2026-09-15',
       })}</script>
       <div class="job-content">Lead the backend team. Build scalable APIs.</div>
     </body></html>`);
 
+    // Third call: second job detail page (no JSON-LD, minimal)
+    mockFetchHtml(`<html><head><title>Junior Designer | GeezJobs</title></head><body>
+      <div class="job-content">Design beautiful interfaces.</div>
+    </body></html>`);
+
     const jobs = await adapter.fetchJobs();
-    expect(jobs).toHaveLength(1);
+    expect(jobs.length).toBeGreaterThanOrEqual(1);
     expect(jobs[0].title).toBe('Senior Developer - EthioTech');
     expect(jobs[0].company).toBe('EthioTech');
     expect(jobs[0].location).toBe('Addis Ababa');

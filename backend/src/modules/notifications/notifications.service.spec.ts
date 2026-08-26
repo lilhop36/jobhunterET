@@ -9,6 +9,9 @@ describe('NotificationsService — FR-024/FR-025/FR-027', () => {
       job: { findUnique: jest.fn() },
       jobMatch: { findUnique: jest.fn() },
       notification: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({}) },
+      json: (v: any) => v,
+      parseJson: (v: any) => v,
+      jsonArray: (v: any) => (Array.isArray(v) ? v : []),
     };
     const svc = new NotificationsService(prisma, telegram);
     return { svc, prisma, telegram, ...over };

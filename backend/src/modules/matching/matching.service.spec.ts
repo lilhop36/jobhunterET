@@ -37,6 +37,9 @@ function makeService(notifyResult: 'SENT' | 'WEB' | 'SKIPPED' = 'SENT') {
       findMany: jest.fn().mockResolvedValue([]),
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
+    json: (v: any) => v,
+    parseJson: (v: any) => v,
+    jsonArray: (v: any) => (Array.isArray(v) ? v : []),
   };
   const notifications: any = { notifyForMatch: jest.fn().mockResolvedValue(notifyResult) };
   const svc = new MatchingService(prisma, notifications);
