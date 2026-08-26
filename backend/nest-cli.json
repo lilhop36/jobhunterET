@@ -1,1 +1,15 @@
-{"$schema":"https://json.schemastore.org/nest-cli","collection":"@nestjs/schematics","sourceRoot":"src","compilerOptions":{"builder":"swc","deleteOutDir":true,"assets":[{"include":"prisma/**/*.sql","outDir":"dist"},{"include": "src/modules/matching/knowledge-base.json", "outDir": "dist/modules/matching"}]}}
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "builder": "swc",
+    "deleteOutDir": false,
+    "assets": [
+      { "include": "**/knowledge-base.json", "outDir": "dist" },
+      { "include": "**/source-configs.json", "outDir": "dist" },
+      { "include": "**/category-taxonomy.json", "outDir": "dist" },
+      { "include": "**/source-categories.json", "outDir": "dist" }
+    ]
+  }
+}
