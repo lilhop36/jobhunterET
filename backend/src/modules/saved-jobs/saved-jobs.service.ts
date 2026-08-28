@@ -22,7 +22,7 @@ export class SavedJobsService {
       });
       return { saved: true };
     }
-    await this.applications.save(userId, jobId, current?.version);
+    await this.applications.save(userId, jobId, undefined);
     return { saved: true };
   }
 }
