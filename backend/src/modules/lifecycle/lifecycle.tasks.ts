@@ -202,7 +202,7 @@ export class LifecycleTasks {
     });
   }
 
-  /** NFR-008: nightly PostgreSQL + uploads backup. */
+  /** Nightly PostgreSQL + uploads backup. */
   @Interval(backupIntervalMs())
   async backup() {
     await this.runExclusive('backup', async () => {

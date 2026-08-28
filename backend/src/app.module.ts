@@ -19,6 +19,7 @@ import { AccountModule } from './modules/account/account.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { SalaryModule } from './modules/salary/salary.module';
 import { EventsModule } from './modules/events/events.module';
+import { HealthController } from './modules/health/health.controller';
 
 @Module({
   imports: [
@@ -43,5 +44,6 @@ import { EventsModule } from './modules/events/events.module';
     SalaryModule,
     EventsModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

@@ -50,12 +50,15 @@ function getToken(): string | null {
 
 // ── Core fetch with dedup ────────────────────────────────────
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
+
 async function fetchJson(path: string): Promise<any> {
   const headers: Record<string, string> = {};
   const tk = getToken();
   if (tk) headers['authorization'] = `Bearer ${tk}`;
 
-  const res = await fetch(path, { headers });
+  const url = API_BASE ? `${API_BASE}${path}` : path;
+  const res = await fetch(url, { headers });
   if (res.status === 401) {
     localStorage.removeItem('jh_token');
     localStorage.removeItem('jh_user');

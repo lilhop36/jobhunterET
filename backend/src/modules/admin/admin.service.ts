@@ -41,7 +41,7 @@ export class AdminService {
       this.prisma.job.count({ where: { status: 'EXPIRED' } }),
       this.prisma.job.count({ where: { status: 'REMOVED' } }),
       this.prisma.jobMatch.count(),
-      this.prisma.jobMatch.count({ where: { score: { gte: 75 } } }),
+      this.prisma.jobMatch.count({ where: { score: { gte: 65 } } }),
       this.prisma.notification.count(),
       this.prisma.notification.count({ where: { status: 'UNREAD_WEB' } }),
       this.prisma.application.count(),

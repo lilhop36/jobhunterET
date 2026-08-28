@@ -31,6 +31,7 @@ export class DashboardService {
         telegramLink,
         recentNotifications,
         applications,
+        bestScoreResult,
       ] = await Promise.all([
         // 1. DB-level count for new matches (24h)
         this.prisma.jobMatch.count({
@@ -90,14 +91,22 @@ export class DashboardService {
           where: { userId },
           select: { jobId: true, stage: true },
         }),
+        // 12. Best match score for the hero ring
+        this.prisma.jobMatch.findFirst({
+          where: { userId, job: { status: 'ACTIVE' } },
+          orderBy: { score: 'desc' },
+          select: { score: true, jobId: true, job: { select: { title: true, company: true } } },
+        }),
       ]);
 
-      // FIX #3: Safely parse SQLite JSON fields and always return arrays
+      // Parse SQLite JSON fields (may be stored as strings)
       const parseJson = (val: any): any[] => Array.isArray(val) ? val : this.prisma.parseJson(val) ?? [];
+
+      const best = bestScoreResult;
 
       return {
         greeting: 'Selam',
-        // FIX #2: Optional chaining — profile may be null for new users
+        // Profile may be null for new users
         completion: profileView?.completion ?? 0,
         onboardDone: profileView?.onboardDone ?? false,
         telegramLinked: !!telegramLink,
@@ -112,6 +121,7 @@ export class DashboardService {
           status: n.status,
           createdAt: n.createdAt,
         })),
+        bestScore: best ? { score: best.score, jobId: best.jobId, title: best.job?.title ?? 'Job', company: best.job?.company ?? '' } : null,
         lastCycle: latestCycle
           ? {
               jobsEvaluated: latestCycle.jobsEvaluated,
@@ -136,7 +146,7 @@ export class DashboardService {
           : null,
       };
     } catch (err: any) {
-      // FIX #4: Log with stack trace and throw HTTP 500 so frontend <ErrorBox onRetry> works
+      // Log with stack trace and rethrow
       this.logger.error(
         `[DASHBOARD] Summary failed for userId=${userId}: ${err.message}`,
         err.stack,

@@ -51,6 +51,19 @@ coverage/
 htmlcov/
 .coverage
 
+# Build artifacts
+.next/
+frontend/.next/
+
+# Uploads
+uploads/
+
+# Dev/agent tooling
+.freebuff/
+.dev-logs/
+.agents/
+.cursor/
+
 # Compressed files
 *.zip
 *.gz

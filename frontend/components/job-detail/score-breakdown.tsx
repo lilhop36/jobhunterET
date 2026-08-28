@@ -30,7 +30,7 @@ export function ScoreBreakdown({ job }: { job: JobDetail }) {
           })}
         </>
       ) : (
-        <p className="muted">No breakdown available.</p>
+        <p className="muted">No match data yet.</p>
       )}
 
       <h3 style={{ marginTop: 16 }}>Skills required</h3>

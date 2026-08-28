@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../lib/auth';
 import { RequireAuth, useApi, ErrorBox, Loading, ScoreBadge, EmptyState, fmtDate } from '../../lib/ui';
@@ -76,7 +76,7 @@ export default function MatchesPage() {
   return (
     <RequireAuth>
       <h1>Your matches</h1>
-      <p className="subtitle">Every job scored against your profile, with reasons you can see (FR-019a).</p>
+      <p className="subtitle">Each job scored and explained.</p>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
         {FILTERS.map((f) => (
@@ -101,12 +101,11 @@ export default function MatchesPage() {
       <div className="card">
         {data && allItems.length === 0 && (
           <EmptyState
-            icon="🎯"
-            title={filter === 'UNSEEN' ? 'Nothing unseen' : 'No matches here yet'}
+            title={filter === 'UNSEEN' ? 'Nothing unseen' : 'No matches yet'}
             message={
               filter === 'UNSEEN'
-                ? 'Every match has already been sent to your Inbox or Telegram. New jobs will appear here as they are collected.'
-                : 'Match scores update on each collection cycle — check back after the next run, or hit Recalculate now.'
+                ? 'Everything has already been sent to your Inbox or Telegram. New matches will show up as jobs are collected.'
+                : 'Scores refresh on each collection run. Check back soon or recalculate now.'
             }
             action={filter === 'UNSEEN' ? 'Browse all matches' : 'Recalculate now'}
             actionHref={filter === 'UNSEEN' ? '/matches' : undefined}

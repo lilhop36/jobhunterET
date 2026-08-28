@@ -47,7 +47,7 @@ export default function AdminUsersPage() {
     return (
       <RequireAuth>
         <h1>Admin — Users</h1>
-        <div className="error-box">403 — admin access required (FR-002f).</div>
+        <div className="error-box">403 — admin access required.</div>
       </RequireAuth>
     );
   }
@@ -110,7 +110,7 @@ export default function AdminUsersPage() {
   return (
     <RequireAuth>
       <h1>Admin — Users</h1>
-      <p className="subtitle">User metadata only — never CV contents, matches, or notifications (FR-002f).</p>
+      <p className="subtitle">User metadata only — never CV contents, matches, or notifications.</p>
 
       {result && <div className={result.startsWith('Error') ? 'error-box' : 'ok-box'}>{result}</div>}
       {err && !loading && <ErrorBox msg={err} onRetry={load} />}
@@ -126,7 +126,7 @@ export default function AdminUsersPage() {
             </button>
           </div>
           <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>
-            Share this with the user securely. They must change it on next login. (FR-002f assisted reset)
+            Share this with the user securely. They must change it on next login.
           </p>
           <button className="btn ghost small" onClick={() => { setTempPassword(null); setResetTarget(null); }}>
             Dismiss

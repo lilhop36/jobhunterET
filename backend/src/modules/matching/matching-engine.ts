@@ -13,7 +13,7 @@
 import * as kb from './knowledge-base.json';
 
 // ── Load v2 knowledge base ──────────────────────────────────────────
-// FIX #2: Use native JSON import instead of fs.readFileSync.
+// Load skill synonym map at startup
 //   resolveJsonModule: true in tsconfig + copy-assets ensures this works.
 
 const raw: any = kb;
@@ -82,7 +82,7 @@ for (const r of RELATIONSHIPS) {
 // Memoization cache for normalizeSkill
 const NORM_CACHE = new Map<string, string>();
 
-// FIX #3: Pre-compute lowercase skill lookup map for O(1) normalization.
+// Pre-computed lowercase skill lookup
 const SKILLS_LOWERCASE = new Map<string, string>();
 for (const name of Object.keys(SKILLS)) {
   SKILLS_LOWERCASE.set(name.toLowerCase(), name);
@@ -174,7 +174,10 @@ export function satisfiesPrerequisites(targetSkill: string, userSkills: string[]
  */
 export function roleSimilarity(jobTitle: string, targetRole: string): number {
   const t = jobTitle.toLowerCase();
-  const tr = targetRole.toLowerCase();
+  // Normalize underscores to spaces and strip stray quotes so that
+  // user-stored roles like '"backend_developer"' or 'backend_developer'
+  // match knowledge-base keys like 'backend developer'.
+  const tr = targetRole.toLowerCase().replace(/["']/g, '').replace(/_/g, ' ');
 
   if (t.includes(tr)) return 1;
 
@@ -288,7 +291,11 @@ function matchSkills(
     }
   }
 
-  const skillFrac = totalWeight > 0 ? earnedWeight / totalWeight : 0.5;
+  // When the job has no extractable skills, default to a generous neutral
+  // (0.65) so that role + location alignment can push scores above threshold.
+  // Many Ethiopian HTML-scraped jobs have empty skill arrays — penalizing
+  // the candidate for missing employer data is unfair.
+  const skillFrac = totalWeight > 0 ? earnedWeight / totalWeight : 0.65;
 
   return { direct, transferable, related, missing, skillFrac };
 }
@@ -370,7 +377,7 @@ export interface MatchResult {
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
-// FIX #5: Hoist regex to module-level constant (was recreated in every scoreJob call)
+// Hoist regex to module-level constant
 const SENIORITY_RE = /\b(senior|lead|principal|head)\b/;
 
 /**
@@ -397,7 +404,8 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
     const s = roleSimilarity(job.title, tr.role) * w;
     if (s > roleBest) {
       roleBest = s;
-      roleTarget = tr.role;
+      // Store a display-friendly role name (strip quotes, convert underscores to spaces)
+      roleTarget = tr.role.replace(/["']/g, '').replace(/_/g, ' ');
       rolePrio = tr.priority;
     }
   }
@@ -412,7 +420,7 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
   else if (roleBest >= 0.6) reasons.push(`Closely related to your "${roleTarget}" goal`);
 
   // ── 2. Skills (30%) — with transferability ────────────────────────
-  // FIX #4: Removed unused uNorm variable (was normalizing skills then discarding)
+  
   const { direct, transferable, related, missing, skillFrac } = matchSkills(
     job.skills || [],
     prof.skills,
@@ -425,13 +433,55 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
 
   // ── 3. Experience (15%) ───────────────────────────────────────────
   const reqYears = EXP_YEARS[job.experienceLevel] ?? 2;
-  const expFrac = reqYears === 0 ? 1 : clamp(Math.max(0.15, prof.years / reqYears), 0, 1);
+  // Entry-level and intern roles give full credit — they are designed for
+  // people with little or no professional experience.  Only mid/senior/lead
+  // roles apply the experience ratio penalty.
+  let expFrac: number;
+  if (job.experienceLevel === 'ENTRY' || job.experienceLevel === 'INTERN') {
+    expFrac = 1;
+  } else if (reqYears === 0) {
+    expFrac = 1;
+  } else {
+    expFrac = clamp(Math.max(0.3, prof.years / reqYears), 0, 1);
+  }
   if (prof.years >= reqYears) reasons.push(`Experience fits (${prof.years} yrs vs ${reqYears}+ required)`);
   else if (reqYears - prof.years >= 2) reasons.push(`Requires ${reqYears}+ yrs — you have ${prof.years}`);
 
   // ── 4. Location (15%) ─────────────────────────────────────────────
   const tierW: Record<string, number> = { HIGH: 1, MEDIUM: 0.62, LOW: 0.38 };
-  const tw = (n: string) => tierW[prof.locationTiers[n] ?? ''] ?? 0.12;
+
+  // Resolve a location tier for the user.  If the user has a specific city
+  // (e.g. "addis_ababa") but no explicit "Ethiopia" entry, treat the city
+  // as an Ethiopia-tier match.  Conversely, if the user has "Ethiopia"
+  // but not a specific city, city-tier lookups resolve to the Ethiopia tier.
+  const ETHIOPIAN_CITIES = new Set([
+    'addis ababa', 'addis_ababa', 'bahir dar', 'bahir_dar', 'hawassa',
+    'dire dawa', 'dire_dawa', 'jimma', 'mekelle', 'adama', 'dessie',
+    'gondar', 'harar', 'arba minch', 'debremarkos', 'debre_markos',
+    'hossana', 'shashamane', 'nazret', 'bolda',
+  ]);
+  // Build a set of user's Ethiopian city tiers for quick lookup
+  const userEthioCityTier = (() => {
+    for (const [region, tier] of Object.entries(prof.locationTiers)) {
+      if (ETHIOPIAN_CITIES.has(region.toLowerCase().replace(/_/g, ' '))) return tier;
+    }
+    return '';
+  })();
+
+  const resolveTier = (key: string): string => {
+    // Direct match (e.g. "Ethiopia", "Remote", "USA")
+    const direct = prof.locationTiers[key];
+    if (direct) return direct;
+    // If querying for "Ethiopia" and user has a specific Ethiopian city → use that tier
+    if (key === 'Ethiopia' && userEthioCityTier) return userEthioCityTier;
+    // If user has "Ethiopia" and querying for an Ethiopian city → use Ethiopia tier
+    if (ETHIOPIAN_CITIES.has(key.toLowerCase().replace(/_/g, ' '))) {
+      return prof.locationTiers['Ethiopia'] ?? userEthioCityTier ?? '';
+    }
+    return '';
+  };
+  const tw = (n: string) => tierW[resolveTier(n)] ?? 0.12;
+
   let locFrac = 0;
   let locWhy = '';
   if (job.locationClass === 'ETHIOPIA_LOCAL') {
@@ -484,10 +534,16 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
 
   // ── Additional penalties ───────────────────────────────────────────
   const titleL = job.title.toLowerCase();
-  // FIX #5: Use pre-compiled regex instead of creating new RegExp each call
+  // Seniority penalty: only apply when the job is genuinely senior-level
+  // (title contains senior keywords AND the role profile confirms it) AND
+  // the candidate has fewer than 4 years of experience.  A generic title
+  // like "Software Engineer" that happens to match a senior synonym in
+  // the knowledge base should not trigger this penalty.
+  // Seniority penalty fires when the job title contains senior-level keywords
+  // (senior, lead, principal, head) and the candidate has < 4 years experience.
   if (SENIORITY_RE.test(titleL) && prof.years < 4) {
-    pts -= 8;
-    reasons.push('Seniority above your stated preference (−8)');
+    pts -= 5;
+    reasons.push('Seniority above your stated experience (−5)');
   }
   if (job.workPlace === 'ONSITE' && !job.locationClass.includes('LOCAL') && prof.excludeOnsite) {
     pts -= 6;

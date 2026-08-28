@@ -51,7 +51,7 @@ export function StatusPill({ status }: { status: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Skeleton loaders (NFR-006: no layout shift, skeleton on async lists) */
+/* Skeleton loaders */
 /* ------------------------------------------------------------------ */
 
 export function CardSkeleton({ className }: { className?: string }) {
@@ -101,19 +101,21 @@ export function Loading() {
   return <ListSkeleton />;
 }
 
-/** §32.8: designed empty state — icon, message, and an optional CTA. Never a blank page. */
+/* Designed empty state — icon, message, and an optional CTA */
 export function EmptyState({
   icon,
   title,
   message,
   action,
   actionHref,
+  onClick,
 }: {
   icon?: ReactNode;
   title: string;
   message: string;
   action?: string;
   actionHref?: string;
+  onClick?: () => void;
 }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-14 text-center" role="status">
@@ -126,6 +128,11 @@ export function EmptyState({
         <Link href={actionHref} className="btn mt-5">
           {action}
         </Link>
+      )}
+      {action && !actionHref && onClick && (
+        <button onClick={onClick} className="btn mt-5">
+          {action}
+        </button>
       )}
     </div>
   );

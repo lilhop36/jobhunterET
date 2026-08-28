@@ -15,7 +15,7 @@ import { t } from '@/lib/i18n';
 
 export interface NavItem {
   href: string;
-  /** i18n dictionary key (NFR-007) — labels resolved via t() */
+  /** i18n dictionary key — labels resolved via t() */
   labelKey: string;
   icon: LucideIcon;
   adminOnly?: boolean;

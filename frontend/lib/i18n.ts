@@ -1,5 +1,5 @@
-// Minimal i18n layer (NFR-007): all user-facing strings are dictionary keys so
-// the UI can be translated (Amharic = Phase 2 per SRS §37). English is the MVP
+// Minimal i18n layer: all user-facing strings are dictionary keys so
+// the UI can be translated. English is the MVP.
 // locale; User.locale is persisted server-side and surfaced to the client.
 // Usage: import { t } from '@/lib/i18n'; t('nav.matches')
 

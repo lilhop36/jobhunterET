@@ -100,7 +100,7 @@ export default function SearchesPage() {
           <h2 style={{ margin: 0, flex: 1 }}>
             Daily digest{' '}
             <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>
-              (FR-028)
+             
             </span>
           </h2>
           <button className="btn" disabled={running || digestLoading} onClick={runDigest}>

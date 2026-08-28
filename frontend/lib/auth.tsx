@@ -24,6 +24,7 @@ export const useAuth = () => useContext(Ctx);
 
 const TOKEN_KEY = 'jh_token';
 const USER_KEY = 'jh_user';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -59,7 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Without this, the tokenless request 401s and the app wrongly logs the user out.
     const tk = token ?? (typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null);
     if (tk) headers['authorization'] = `Bearer ${tk}`;
-    const res = await fetch(path, { ...opts, headers });
+    const url = API_BASE ? `${API_BASE}${path}` : path;
+    const res = await fetch(url, { ...opts, headers });
     if (res.status === 401) {
       clear();
       router.push('/login');
@@ -71,7 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const authenticate = async (path: string, email: string, password: string) => {
-    const data = await fetch(path, {
+    const url = API_BASE ? `${API_BASE}${path}` : path;
+    const data = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email, password }),

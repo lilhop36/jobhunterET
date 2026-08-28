@@ -1,5 +1,5 @@
 /**
- * §32.9: String externalization for i18n readiness.
+ * String externalization for i18n readiness.
  * All user-facing strings live here. Translations are Phase 2.
  * Usage: import { STRINGS } from '@/lib/strings'; then STRINGS.dashboard.title
  */

@@ -51,7 +51,7 @@ See `backend/.env.example` for the full list. Critical ones:
 | `DATABASE_URL` | ✅ | PostgreSQL connection string |
 | `JWT_SECRET` | ✅ | JWT signing secret (48+ bytes) |
 | `TELEGRAM_BOT_TOKEN` | ⚠️ | From @BotFather (needed for alerts) |
-| `MATCH_THRESHOLD` | ❌ | Default 75 (FR-019) |
+| `MATCH_THRESHOLD` | ❌ | Default 65 (FR-019) |
 | `ADMIN_EMAILS` | ❌ | Comma-separated admin emails |
 
 ---

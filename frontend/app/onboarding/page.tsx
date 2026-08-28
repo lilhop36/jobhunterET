@@ -86,7 +86,7 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Resume: prefill from the existing profile so the wizard is resumable (FR-003d).
+  // Resume: prefill from the existing profile so the wizard is resumable.
   useEffect(() => {
     api('/api/profile')
       .then((p: any) => {
@@ -156,7 +156,7 @@ export default function OnboardingPage() {
       <div style={{ maxWidth: 640, margin: '0 auto' }}>
         <h1>Onboarding wizard</h1>
         <p className="subtitle">
-          Three quick steps — skippable and resumable. Each step sharpens your matches (FR-003d).
+          Three quick steps. Each one makes your matches better.
         </p>
 
         {/* Step indicator */}
@@ -211,7 +211,7 @@ export default function OnboardingPage() {
               {roles.length === 0 && <span className="muted" style={{ fontSize: 13 }}>Nothing added yet.</span>}
             </div>
             <p className="muted" style={{ fontSize: 12.5, margin: '10px 0 6px' }}>
-              Suggestions:
+              Try adding:
             </p>
             <div className="flex flex-wrap gap-1.5">
               {ROLE_SUGGESTIONS.filter((r) => !roles.some((x) => x.role === r)).map((r) => (
@@ -228,7 +228,7 @@ export default function OnboardingPage() {
           <div className="card">
             <h2>2. Your skills</h2>
             <p className="muted" style={{ marginTop: 0, fontSize: 13.5 }}>
-              Tap skills you have — aliases are normalized centrally (FR-004).
+              Tap the skills you have — variations like "JS" and "JavaScript" count the same.
             </p>
             <div className="flex flex-wrap gap-1.5">
               {skills.map((s) => (
@@ -240,7 +240,7 @@ export default function OnboardingPage() {
               {skills.length === 0 && <span className="muted" style={{ fontSize: 13 }}>Nothing selected yet.</span>}
             </div>
             <p className="muted" style={{ fontSize: 12.5, margin: '10px 0 6px' }}>
-              Suggestions:
+              Try adding:
             </p>
             <div className="flex flex-wrap gap-1.5">
               {SKILL_SUGGESTIONS.filter((s) => !skills.includes(s)).map((s) => (
@@ -267,7 +267,7 @@ export default function OnboardingPage() {
               {locTiers.length === 0 && <span className="muted" style={{ fontSize: 13 }}>Nothing added yet.</span>}
             </div>
             <p className="muted" style={{ fontSize: 12.5, margin: '10px 0 6px' }}>
-              Suggestions:
+              Try adding:
             </p>
             <div className="flex flex-wrap gap-1.5">
               {LOCATION_SUGGESTIONS.filter((l) => !locTiers.some((x) => x.region === l.region)).map((l) => (

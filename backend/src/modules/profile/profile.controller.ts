@@ -96,7 +96,7 @@ export class ProfileController {
     };
   }
 
-  /** FR-003a / NFR-005: download the active CV — ownership enforced via the JWT user. */
+  /** Download the active CV — ownership enforced via the JWT user. */
   @Get('cv/download')
   async downloadCv(@CurrentUser() user: AuthUser, @Res() res: Response) {
     const cv = await this.prisma.cvFile.findFirst({

@@ -134,7 +134,7 @@ export class MatchingService extends MatchingEngine {
     }
 
     const profiles = await this.buildProfilesForUsers(users.map((u) => u.id));
-    const thresholds = new Map(users.map((u) => [u.id, u.matchThreshold ?? 75]));
+    const thresholds = new Map(users.map((u) => [u.id, u.matchThreshold ?? 65]));
 
     const existing = await this.prisma.jobMatch.findMany({
       where: { jobId: { in: jobIds } },
@@ -146,7 +146,7 @@ export class MatchingService extends MatchingEngine {
     const notifyCandidates: { userId: string; jobId: string; score: number; summary: string }[] = [];
     let above = 0;
 
-    // FIX #3: Yield to event loop periodically during CPU-bound scoring loop.
+    // Yield to event loop periodically during CPU-bound scoring
     // Process users in chunks to prevent blocking other requests/SSE streams.
     const USER_CHUNK = 50;
     for (let ui = 0; ui < users.length; ui += USER_CHUNK) {
@@ -164,7 +164,7 @@ export class MatchingService extends MatchingEngine {
             score: result.score,
             ...this.toMatchData(result),
           });
-          if (result.score >= (thresholds.get(user.id) ?? 75)) {
+          if (result.score >= (thresholds.get(user.id) ?? 65)) {
             above++;
             notifyCandidates.push({ userId: user.id, jobId: job.id, score: result.score, summary: result.summary });
           }
@@ -253,7 +253,7 @@ export class MatchingService extends MatchingEngine {
 
   /**
    * FR-018: Persist/upsert matches for a user against the latest ACTIVE jobs.
-   * FIX #1: Use $transaction to batch existing-pair updates (eliminates N+1 loop).
+   * Batch existing-pair updates in a single transaction (eliminates N+1 loop).
    */
   async recalculate(
     userId: string,
@@ -290,7 +290,7 @@ export class MatchingService extends MatchingEngine {
       }
     }
 
-    // FIX #1: Batch all updates in a single $transaction instead of N sequential queries
+    // Batch all updates in a single transaction
     if (updateOps.length) {
       const updateTx = updateOps.map((op) =>
         this.prisma.jobMatch.update({
@@ -314,7 +314,7 @@ export class MatchingService extends MatchingEngine {
       // skipDuplicates isn't supported on SQLite — that branch is handled separately
       return (await (this.prisma.jobMatch as any).createMany({ data: rows, skipDuplicates: true })).count;
     }
-    // FIX #2: Batch SQLite inserts using $transaction with concurrent creates
+    // Batch SQLite inserts in a single transaction
     const BATCH = 50;
     let count = 0;
     for (let i = 0; i < rows.length; i += BATCH) {

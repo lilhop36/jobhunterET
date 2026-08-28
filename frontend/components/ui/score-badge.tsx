@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils';
 
 /**
- * §32.5: Band-colored circular score badge.
+ * Band-colored circular score badge.
  * 90-100 emerald, 80-89 blue, 70-79 amber, 60-69 slate, <60 red.
  */
 export function ScoreCircle({

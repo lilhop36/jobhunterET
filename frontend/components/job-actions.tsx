@@ -30,7 +30,7 @@ interface Props {
 }
 
 /**
- * Save / Reject / Apply for a single job (FR-025b parity with the Telegram
+ * Save / Reject / Apply for a single job (parity with the Telegram
  * inline buttons). Every action is optimistic — the UI updates instantly and
  * rolls back on failure. Reject and Apply use a two-step arming confirmation:
  * the first click arms the button ("Confirm …?"), the second commits it, and

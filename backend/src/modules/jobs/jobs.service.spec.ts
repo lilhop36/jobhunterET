@@ -28,7 +28,7 @@ function createService() {
   return { service: new JobsService(prisma as any, salary), job, salary };
 }
 
-describe('JobsService.list — PERF-002 keyset pagination', () => {
+describe('JobsService.list — keyset pagination', () => {
   it('applies the default page size, stable ordering, and returns the envelope', async () => {
     const { service, job } = createService();
     job.count.mockResolvedValue(3);
@@ -83,5 +83,34 @@ describe('JobsService.list — PERF-002 keyset pagination', () => {
       source: { priorityTier: 'ETHIOPIA' },
       OR: expect.any(Array),
     });
+  });
+});
+
+describe('JobsService.tagCounts', () => {
+  it('tallies tags across ACTIVE jobs and maps known metadata + counts', async () => {
+    const { service, job } = createService();
+    job.findMany.mockResolvedValue([
+      { tags: ['ethiopian', 'remote'] },
+      { tags: ['remote'] },
+      { tags: null },
+      { tags: ['tech', 'ethiopian'] },
+    ]);
+
+    const res = await service.tagCounts();
+
+    expect(job.findMany).toHaveBeenCalledWith({
+      where: { status: 'ACTIVE' },
+      select: { tags: true },
+      take: 10000,
+    });
+    const byId = Object.fromEntries(res.map((t: any) => [t.id, t.count]));
+    expect(byId.ethiopian).toBe(2);
+    expect(byId.remote).toBe(2);
+    expect(byId.tech).toBe(1);
+    expect(byId.ngo).toBe(0);
+    // non-meta tags are dropped (no known tag id)
+    expect(res.every((t: any) => t.id && t.emoji && t.label)).toBe(true);
+    // sorted descending by count
+    expect(res[0].count).toBeGreaterThanOrEqual(res[1].count);
   });
 });

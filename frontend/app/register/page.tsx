@@ -30,7 +30,7 @@ export default function RegisterPage() {
   return (
     <div className="auth-wrap">
       <h1>Create account</h1>
-      <p className="muted center">The first registered user becomes an admin (FR-001).</p>
+      <p className="muted center">The first registered user becomes an admin.</p>
       <form className="card auth-box" onSubmit={submit}>
         {err && <div className="error-box">{err}</div>}
         <label htmlFor="email">Email</label>

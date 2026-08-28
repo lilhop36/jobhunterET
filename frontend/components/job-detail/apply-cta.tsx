@@ -13,7 +13,7 @@ import { cleanEmail } from './utils';
 import type { JobDetail } from './types';
 
 /**
- * FR-025: Adaptive apply CTA based on applyMethod.
+ * Adaptive apply CTA based on applyMethod.
  * Shows different UI for ONLINE_URL, EMAIL, IN_PERSON, SOURCE_ACCOUNT, PDF_FORM.
  */
 export function ApplyCTA({ job }: { job: JobDetail }) {

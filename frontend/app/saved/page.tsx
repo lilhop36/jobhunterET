@@ -28,7 +28,7 @@ export default function SavedPage() {
   return (
     <RequireAuth>
       <h1>Saved jobs</h1>
-      <p className="subtitle">Jobs you&apos;ve saved for later (FR-029).</p>
+      <p className="subtitle">Jobs you&apos;ve saved for later.</p>
       {err && <ErrorBox msg={err} onRetry={reload} />}
       {loading && <Loading />}
       <div className="card">

@@ -26,7 +26,7 @@ export default function JobDetailPage() {
           {/* ── Hero header ───────────────────────────────────────── */}
           <JobHero job={data} />
 
-          {/* ── Low-confidence warning (FR-012c) ─────────────────── */}
+          {/* Low-confidence warning */}
           {data.parseConfidence < 40 && (
             <div className="notice-amber">
               ⚠️ Low parse confidence ({data.parseConfidence}%) — details may be unreliable.

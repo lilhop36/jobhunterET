@@ -55,15 +55,24 @@ interface JobPage {
   total: number;
 }
 
-const ALL_TAGS = [
-  { id: 'ethiopian', emoji: '🇪🇹', label: 'Ethiopian' },
-  { id: 'remote', emoji: '🌍', label: 'Remote' },
-  { id: 'international', emoji: '🌐', label: 'International' },
-  { id: 'ngo', emoji: '🏥', label: 'NGO' },
-  { id: 'tech', emoji: '💻', label: 'Tech' },
-  { id: 'senior', emoji: '⭐', label: 'Senior' },
-  { id: 'entry_level', emoji: '🌱', label: 'Entry Level' },
-  { id: 'freelance', emoji: '📋', label: 'Freelance' },
+interface TagCount {
+  id: string;
+  emoji: string;
+  label: string;
+  color: string;
+  description: string;
+  count: number;
+}
+
+const FALLBACK_TAGS: TagCount[] = [
+  { id: 'ethiopian', emoji: '🇪🇹', label: 'Ethiopian', color: '#22c55e', description: '', count: 0 },
+  { id: 'remote', emoji: '🌍', label: 'Remote', color: '#3b82f6', description: '', count: 0 },
+  { id: 'international', emoji: '🌐', label: 'International', color: '#8b5cf6', description: '', count: 0 },
+  { id: 'ngo', emoji: '🏥', label: 'NGO', color: '#f59e0b', description: '', count: 0 },
+  { id: 'tech', emoji: '💻', label: 'Tech', color: '#06b6d4', description: '', count: 0 },
+  { id: 'senior', emoji: '⭐', label: 'Senior', color: '#ef4444', description: '', count: 0 },
+  { id: 'entry_level', emoji: '🌱', label: 'Entry Level', color: '#10b981', description: '', count: 0 },
+  { id: 'freelance', emoji: '📋', label: 'Freelance', color: '#f97316', description: '', count: 0 },
 ];
 
 export default function JobsPage() {
@@ -72,6 +81,10 @@ export default function JobsPage() {
   const [q, setQ] = useState('');
   const [query, setQuery] = useState<string | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+
+  // Live tag metadata + job counts for the category filter pills.
+  const tagRes = useApi<TagCount[] | null>('/api/jobs/tags/counts');
+  const tags: TagCount[] = tagRes.data && !tagRes.err && (tagRes.data?.length ?? 0) > 0 ? tagRes.data : FALLBACK_TAGS;
 
   // Build API URL with query + tag
   const apiUrl = (() => {
@@ -102,7 +115,7 @@ export default function JobsPage() {
   return (
     <RequireAuth>
       <h1>Jobs</h1>
-      <p className="subtitle">New postings from Ethiopia-first sources, ranked by your profile.</p>
+      <p className="subtitle">Fresh listings, ranked for you.</p>
 
       <form className="card" onSubmit={search} style={{ display: 'flex', gap: 10 }}>
         <input
@@ -129,19 +142,22 @@ export default function JobsPage() {
         >
           All
         </button>
-        {ALL_TAGS.map((t) => (
+        {tags.map((t) => (
           <button
             key={t.id}
             onClick={() => { setActiveTag(activeTag === t.id ? null : t.id); reload(); }}
+            title={t.description ? `${t.description} — ${t.count} job(s)` : `${t.count} job(s)`}
             style={{
               padding: '4px 10px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
-              border: `1px solid ${activeTag === t.id ? '#3b82f6' : '#e5e7eb'}`,
-              background: activeTag === t.id ? '#3b82f618' : '#f9fafb',
-              color: activeTag === t.id ? '#3b82f6' : '#6b7280',
+              border: `1px solid ${activeTag === t.id ? t.color : '#e5e7eb'}`,
+              background: activeTag === t.id ? t.color + '18' : '#f9fafb',
+              color: activeTag === t.id ? t.color : '#6b7280',
               fontWeight: activeTag === t.id ? 700 : 400,
             }}
           >
             {t.emoji} {t.label}
+            {' '}
+            <span className="muted" style={{ fontSize: 11 }}>{t.count}</span>
           </button>
         ))}
       </div>
@@ -152,9 +168,8 @@ export default function JobsPage() {
       <div className="card">
         {data && items.length === 0 && (
           <EmptyState
-            icon="🔍"
-            title="No jobs match your filters"
-            message="Try a broader search, or clear the query to see the latest postings."
+            title="No jobs found"
+            message="Try a broader search or clear your filters."
             action="Browse all jobs"
             actionHref="/jobs"
           />
@@ -169,7 +184,7 @@ export default function JobsPage() {
                   <span
                     className="pill"
                     style={{ marginLeft: 8 }}
-                    title={`Low parse confidence (${j.parseConfidence}%) — details may be unreliable (FR-012c)`}
+                    title={`Low parse confidence (${j.parseConfidence}%) — details may be unreliable`}
                   >
                     low-confidence
                   </span>

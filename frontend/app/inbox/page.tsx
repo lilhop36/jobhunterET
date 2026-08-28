@@ -50,7 +50,7 @@ export default function InboxPage() {
         )}
       </div>
       <p className="subtitle">
-        Missed alerts that couldn&apos;t reach Telegram — nothing is ever silently lost (FR-024c).
+        Alerts that didn&apos;t make it to Telegram.
       </p>
       {err && <ErrorBox msg={err} onRetry={reload} />}
       {loading && <Loading />}
@@ -58,9 +58,8 @@ export default function InboxPage() {
       <div className="card">
         {data && items.length === 0 && (
           <EmptyState
-            icon="📭"
-            title="Inbox empty — you're all caught up"
-            message="When Telegram isn't linked (or delivery fails), qualifying matches land here so nothing is ever lost (FR-024c)."
+            title="Inbox empty — all caught up"
+            message="When Telegram isn't linked (or delivery fails), matches show up here instead."
           />
         )}
         {items.map((n) => (

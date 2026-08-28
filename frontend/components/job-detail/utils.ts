@@ -36,10 +36,19 @@ export function cleanEmail(raw: string | null | undefined): string {
  * - Lines that look like pipe-table rows become a <table>.
  */
 export function plainToHtml(text: string): string {
-  const blocks = text.split(/\n{2,}/);
+  // Strip trailing/leading whitespace, collapse 3+ newlines to 2, remove blank lines
+  const cleaned = text
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/^[ \t]+|[ \t]+$/gm, '')
+    .replace(/\n[ \t]*\n/g, '\n\n')
+    .trim();
+
+  const blocks = cleaned.split(/\n{2,}/);
   return blocks
     .map((block) => {
-      const lines = block.split('\n');
+      const lines = block.split('\n').filter((l) => l.trim());
+      if (lines.length === 0) return '';
       const tableLines = lines.filter((l) => (l.match(/\|/g) ?? []).length >= 2);
       if (tableLines.length >= 2 && tableLines.length >= lines.length * 0.6) {
         const rows = lines
@@ -52,6 +61,7 @@ export function plainToHtml(text: string): string {
       }
       return `<p>${lines.join('<br/>')}</p>`;
     })
+    .filter(Boolean)
     .join('');
 }
 

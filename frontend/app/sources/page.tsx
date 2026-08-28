@@ -163,7 +163,7 @@ export default function SourcesPage() {
           {showForm ? 'Cancel' : '+ New source'}
         </button>
       </div>
-      <p className="subtitle">Admin-only source management, collection queue, and health monitoring.</p>
+      <p className="subtitle">Manage sources, run collections, and check health.</p>
 
       {result && (
         <div className={result.includes('FAIL') || result.includes('failed') ? 'error-box' : 'ok-box'}
@@ -173,7 +173,7 @@ export default function SourcesPage() {
       )}
       {err && <ErrorBox msg={err} onRetry={reload} />}
 
-      {/* ── Dashboard Summary ──────────────────────────────── */}
+      
       <div className="grid grid-2" style={{ marginBottom: 16 }}>
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ flex: 1 }}>
@@ -276,7 +276,7 @@ export default function SourcesPage() {
         </form>
       )}
 
-      {/* ── Source Cards ────────────────────────────────────── */}
+      
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {loading && <Loading />}
         {data?.map((s) => {
@@ -333,7 +333,7 @@ export default function SourcesPage() {
                     onClick={() => collect(s.id, s.name)}
                     title="Collect now"
                   >
-                    {busyId === s.id ? '…' : '⚡ Collect'}
+                    {busyId === s.id ? '…' : 'Collect'}
                   </button>
                   <button
                     className="btn ghost small"

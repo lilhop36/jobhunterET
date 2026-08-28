@@ -14,7 +14,7 @@ model User {
   role                Role                 @default(USER)
   locale              String               @default("en")
   notificationsPaused Boolean              @default(false)
-  matchThreshold      Int                  @default(75)
+  matchThreshold      Int                  @default(65)
   pausedUntil         DateTime?
   createdAt           DateTime             @default(now())
   digestEnabled       Boolean              @default(true)
@@ -227,6 +227,7 @@ model Job {
 
   @@unique([sourceId, sourceJobId])
   @@index([status])
+  @@index([status, postedDate])
   @@index([firstSeenAt])
   @@index([status, matchedAt])
   @@index([status, deadline])

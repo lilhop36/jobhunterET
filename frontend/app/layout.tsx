@@ -9,6 +9,7 @@ import { Sidebar } from '../components/shell/sidebar';
 import { Topbar } from '../components/shell/topbar';
 import { BottomNav } from '../components/shell/bottom-nav';
 import '../styles/globals.css';
+import '../styles/globals.css';
 
 function Shell({ children }: { children: ReactNode }) {
   const { token } = useAuth();

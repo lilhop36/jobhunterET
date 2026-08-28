@@ -197,7 +197,7 @@ export class NotificationsService {
     return run;
   }
 
-  /** PERF-002: keyset-paginated Web Inbox — stable (createdAt, id) ordering, total count. */
+  /** Keyset-paginated Web Inbox — stable (createdAt, id) ordering. */
   async listInbox(userId: string, limitRaw?: string, cursorRaw?: string): Promise<Page<any>> {
     const where: any = { userId, channel: 'WEB' };
     const limit = parseLimit(limitRaw, PAGE_SIZE, MAX_PAGE_SIZE);

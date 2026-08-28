@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SalaryService } from '../salary/salary.service';
+import { getAllTags } from '../sources/source-classifier';
 import {
   Page,
   decodeCursor,
@@ -29,12 +30,15 @@ const MAX_PAGE_SIZE = 100;
 
 @Injectable()
 export class JobsService {
+  // 60-second in-memory cache for tagCounts() to prevent DoS on unbounded query
+  private tagCountsCache: { data: any; expiresAt: number } | null = null;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly salary: SalaryService,
   ) {}
 
-  /** PERF-002: keyset-paginated job list — stable (sortKey, id) ordering, total count. */
+  /** Keyset-paginated job list — stable (sortKey, id) ordering. */
   async list(f: JobFilter): Promise<Page<any>> {
     const where: any = f.showDead ? {} : { status: 'ACTIVE' };
     if (f.source) where.sourceId = f.source;
@@ -90,6 +94,28 @@ export class JobsService {
       encodeCursor({ [sortCol]: (last[sortCol] as Date | null)?.toISOString() ?? null, id: last.id }),
     );
     return { items: items.map((j) => this.serialize(j)), nextCursor, total };
+  }
+
+  /** Tag meta + live active-job counts for the browse-page filter pills (all users). */
+  async tagCounts() {
+    if (this.tagCountsCache && Date.now() < this.tagCountsCache.expiresAt) {
+      return this.tagCountsCache.data;
+    }
+    const jobs = await this.prisma.job.findMany({
+      where: { status: 'ACTIVE' },
+      select: { tags: true },
+      take: 10000, // safety cap — prevents unbounded load at scale
+    });
+    const counts: Record<string, number> = {};
+    for (const j of jobs) {
+      if (!j.tags) continue;
+      for (const t of this.prisma.jsonArray(j.tags)) counts[t] = (counts[t] ?? 0) + 1;
+    }
+    const result = getAllTags()
+      .map((t) => ({ ...t, count: counts[t.id] ?? 0 }))
+      .sort((a, b) => b.count - a.count);
+    this.tagCountsCache = { data: result, expiresAt: Date.now() + 60_000 };
+    return result;
   }
 
   async detail(id: string, userId?: string) {

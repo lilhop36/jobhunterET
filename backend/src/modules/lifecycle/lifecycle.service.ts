@@ -145,7 +145,7 @@ export class LifecycleService {
     return notFound;
   }
 
-  /** NFR-008: run the PostgreSQL + uploads backup script. */
+  /** Run the PostgreSQL + uploads backup script. */
   async runBackup(): Promise<{ ok: boolean; skipped?: boolean; output?: string }> {
     const scriptPath = join(process.cwd(), 'scripts', 'backup.sh');
     try {

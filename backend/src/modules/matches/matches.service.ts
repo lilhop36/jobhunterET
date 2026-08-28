@@ -22,7 +22,7 @@ export class MatchesService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  /** PERF-002: keyset-paginated match feed — band filters push into the DB query. */
+  /** Keyset-paginated match feed — band filters push into the DB query. */
   async list(userId: string, filter?: string, limitRaw?: string, cursorRaw?: string): Promise<Page<any>> {
     // FR-015/FR-018: dead listings never surface in the match feed — only ACTIVE jobs.
     const where: any = { userId, job: { status: 'ACTIVE' } };
@@ -100,7 +100,7 @@ export class MatchesService {
   async recalculate(userId: string) {
     const created = await this.matching.recalculate(userId);
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    const threshold = user?.matchThreshold ?? 75;
+    const threshold = user?.matchThreshold ?? 65;
     const matches = await this.prisma.jobMatch.findMany({
       where: { userId, score: { gte: threshold } },
       select: { jobId: true, score: true, summary: true },

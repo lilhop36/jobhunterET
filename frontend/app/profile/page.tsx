@@ -45,7 +45,7 @@ export default function ProfilePage() {
   const [cvMsg, setCvMsg] = useState<string | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
 
-  // Cleanup XHR on unmount (fix #7)
+  // Cleanup XHR on unmount
   useEffect(() => {
     return () => {
       if (xhrRef.current) {
@@ -101,7 +101,7 @@ export default function ProfilePage() {
         locationTiers: profile.locationTiers.map((l) => ({ region: l.region, tier: l.tier })),
       };
       setProfile(await api('/api/profile', { method: 'PATCH', body: JSON.stringify(dto) }));
-      setOk('Profile saved — matches recalculated against the latest 1,000 jobs (FR-003e).');
+      setOk('Profile saved.');
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -111,14 +111,14 @@ export default function ProfilePage() {
 
   const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setProfile((p) => (p ? { ...p, [k]: v } : p));
 
-  /** FR-003a: client-side type/size validation + progress via XHR upload. */
+  /* Client-side type/size validation + progress via XHR upload */
   const uploadCv = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
     setCvMsg(null);
     if (!/\.(pdf|docx)$/i.test(file.name)) {
-      setCvMsg('Only .pdf or .docx files are allowed (FR-003a).');
+      setCvMsg('Only .pdf or .docx files are allowed.');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -132,7 +132,8 @@ export default function ProfilePage() {
     await new Promise<void>((resolve) => {
       const xhr = new XMLHttpRequest();
       xhrRef.current = xhr;
-      xhr.open('POST', '/api/profile/cv');
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
+      xhr.open('POST', API_BASE ? `${API_BASE}/api/profile/cv` : '/api/profile/cv');
       if (token) xhr.setRequestHeader('authorization', `Bearer ${token}`);
       xhr.upload.onprogress = (ev) => {
         if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
@@ -141,8 +142,6 @@ export default function ProfilePage() {
         if (xhr.status >= 200 && xhr.status < 300) {
           setCv(JSON.parse(xhr.responseText));
           setCvMsg(`Uploaded ${file.name}.`);
-          // FIX #1: Do NOT call load() here — it would overwrite unsaved profile edits.
-          // CV state is already updated directly above. Completion meter will refresh on next save.
         } else {
           try {
             setCvMsg(JSON.parse(xhr.responseText).message || 'Upload failed.');
@@ -163,7 +162,6 @@ export default function ProfilePage() {
     setUploading(false);
   };
 
-  /** FIX #2: deleteCv with confirmation, loading state, and error handling. */
   const deleteCv = async () => {
     if (!window.confirm('Are you sure you want to remove your CV? This will lower your profile completion score.')) return;
     setDeletingCv(true);
@@ -182,8 +180,7 @@ export default function ProfilePage() {
   return (
     <RequireAuth>
       <h1>Profile</h1>
-      <p className="subtitle">Your career data drives every match (FR-003).</p>
-      {/* FIX #5: Hide messages during async operations */}
+      <p className="subtitle">Your profile shapes every match.</p>
       {err && !loading && !saving && !uploading && !deletingCv && <ErrorBox msg={err} />}
       {ok && !loading && !saving && !uploading && <div className="ok-box">{ok}</div>}
       {loading && <Loading />}
@@ -197,7 +194,6 @@ export default function ProfilePage() {
                 {profile.completion}%
               </span>
             </h2>
-            {/* FIX #6: ARIA attributes for screen readers */}
             <div
               className="progress"
               role="progressbar"
@@ -210,11 +206,8 @@ export default function ProfilePage() {
             </div>
             {!profile.onboardDone && profile.completion < 100 && (
               <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>
-                💡 New here? Finish the{' '}
-                <Link href="/onboarding" style={{ fontWeight: 600 }}>
-                  3-step onboarding wizard
-                </Link>{' '}
-                to get matches that actually fit.
+                New here? <Link href="/onboarding" style={{ fontWeight: 600 }}>Run through the onboarding</Link>{' '}
+                to get better matches.
               </p>
             )}
           </div>
@@ -234,7 +227,6 @@ export default function ProfilePage() {
                 <a className="btn ghost small" href={cv.downloadUrl}>
                   <Download className="h-4 w-4" /> Download
                 </a>
-                {/* FIX #2: Button uses deletingCv state */}
                 <button className="btn danger small" onClick={deleteCv} disabled={deletingCv}>
                   <Trash2 className="h-4 w-4" /> {deletingCv ? 'Removing…' : 'Remove'}
                 </button>
@@ -272,7 +264,6 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* FIX #4: Wrapped in <form> for Enter-key submission */}
           <form onSubmit={(e) => { e.preventDefault(); save(); }}>
             <div className="grid grid-2">
               <div className="card">
@@ -342,7 +333,6 @@ export default function ProfilePage() {
                         .map((line) => line.trim())
                         .filter(Boolean)
                         .map((line) => {
-                          // FIX #3: Pop last part as priority, join remaining as role
                           const { value: role, priority } = parsePrioLine(line, 'MEDIUM');
                           return { role, priority };
                         }),
@@ -363,7 +353,6 @@ export default function ProfilePage() {
                         .map((line) => line.trim())
                         .filter(Boolean)
                         .map((line) => {
-                          // FIX #3: Pop last part as tier, join remaining as region
                           const { value: region, priority: tier } = parsePrioLine(line, 'MEDIUM');
                           return { region, tier };
                         }),
@@ -382,7 +371,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* FIX #4: type="submit" for form Enter-key support */}
             <button type="submit" className="btn" disabled={saving}>
               {saving ? 'Saving…' : 'Save profile'}
             </button>

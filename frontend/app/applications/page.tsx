@@ -43,7 +43,7 @@ export default function ApplicationsPage() {
   return (
     <RequireAuth>
       <h1>Applications</h1>
-      <p className="subtitle">Your pipeline: Discovered → Saved → Applied → … → Offer (FR-031).</p>
+      <p className="subtitle">Your pipeline: Discovered → Saved → Applied → … → Offer.</p>
       {err && !loading && <ErrorBox msg={err} onRetry={reload} />}
       {loading && <Loading />}
 
@@ -89,7 +89,7 @@ export default function ApplicationsPage() {
         </div>
       )}
 
-      {/* §32.6: rejected/withdrawn in a collapsible section */}
+      
       {data && (
         <div className="card" style={{ marginTop: 14 }}>
           <button

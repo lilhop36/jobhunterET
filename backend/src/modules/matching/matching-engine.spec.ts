@@ -169,7 +169,7 @@ describe('scoreJob — penalties and confidence (FR-020 / FR-012c)', () => {
     const base = scoreJob(makeJob(), makeProfile());
     const senior = scoreJob(makeJob({ title: 'Senior Backend Developer' }), makeProfile({ years: 2 }));
     expect(senior.score).toBeLessThan(base.score);
-    expect(senior.reasons).toContain('Seniority above your stated preference (−8)');
+    expect(senior.reasons).toContain('Seniority above your stated experience (−5)');
   });
 
   it('down-weights jobs with low parse confidence', () => {

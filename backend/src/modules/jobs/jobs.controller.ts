@@ -21,7 +21,7 @@ export class JobsController {
       sort: (q.sort as any) || 'newest',
       showDead: q.showDead === 'true',
       userId: user.id,
-      // PERF-002: keyset pagination
+      // Keyset pagination
       limit: q.limit,
       cursor: q.cursor,
     };
@@ -31,5 +31,11 @@ export class JobsController {
   @Get(':id')
   detail(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.jobs.detail(id, user.id);
+  }
+
+  /** Tag meta + live job counts for the browse-page filter pills. */
+  @Get('tags/counts')
+  tagCounts() {
+    return this.jobs.tagCounts();
   }
 }

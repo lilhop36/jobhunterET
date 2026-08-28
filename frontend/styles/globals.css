@@ -1,53 +1,60 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 220 15% 10%;
+    /* Addis Precision palette */
+    --background: 50 20% 98%;          /* #FAFAF8 warm white */
+    --foreground: 238 30% 14%;          /* #1A1A2E rich dark */
     --card: 0 0% 100%;
-    --card-foreground: 220 15% 10%;
-    --primary: 156 72% 30%;
+    --card-foreground: 238 30% 14%;
+    --primary: 184 60% 26%;            /* #0D7377 teal depths */
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 46%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
+    --secondary: 50 20% 96%;
+    --secondary-foreground: 238 30% 14%;
+    --muted: 50 15% 95%;
+    --muted-foreground: 220 10% 46%;
+    --accent: 42 55% 55%;              /* #D4A843 gold warmth */
+    --accent-foreground: 238 30% 14%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --success: 160 84% 30%;
+    --success: 140 35% 38%;            /* #4A7C59 sage */
     --warning: 32 95% 42%;
     --info: 213 75% 45%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 156 72% 30%;
+    --border: 220 15% 90%;
+    --input: 220 15% 90%;
+    --ring: 184 60% 26%;
     --radius: 0.625rem;
+    /* Typography tokens */
+    --font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
   }
 
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 98%;
-    --primary: 160 84% 39%;
-    --primary-foreground: 222 47% 8%;
-    --secondary: 217 33% 16%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 16%;
-    --muted-foreground: 215 20% 64%;
-    --accent: 217 33% 16%;
-    --accent-foreground: 210 40% 98%;
+    --background: 228 30% 8%;
+    --foreground: 210 40% 96%;
+    --card: 228 25% 11%;
+    --card-foreground: 210 40% 96%;
+    --primary: 184 55% 35%;            /* brighter teal for dark mode */
+    --primary-foreground: 228 30% 8%;
+    --secondary: 225 20% 15%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 225 20% 15%;
+    --muted-foreground: 220 15% 60%;
+    --accent: 42 50% 50%;              /* muted gold for dark */
+    --accent-foreground: 210 40% 96%;
     --destructive: 0 62% 47%;
     --destructive-foreground: 210 40% 98%;
-    --success: 160 64% 48%;
+    --success: 140 40% 45%;
     --warning: 38 92% 54%;
     --info: 213 75% 62%;
-    --border: 217 33% 19%;
-    --input: 217 33% 21%;
-    --ring: 160 84% 39%;
+    --border: 225 20% 18%;
+    --input: 225 20% 20%;
+    --ring: 184 55% 35%;
   }
 
   * {
@@ -60,7 +67,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--font-body);
   }
 
   button,
@@ -85,17 +92,20 @@
 /* ------------------------------------------------------------------ */
 
 h1 {
+  font-family: var(--font-display);
   font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.02em;
   margin: 0 0 4px;
 }
 h2 {
+  font-family: var(--font-display);
   font-size: 17px;
   font-weight: 700;
   margin: 0 0 12px;
 }
 h3 {
+  font-family: var(--font-display);
   font-size: 14.5px;
   font-weight: 600;
   margin: 0 0 8px;
@@ -136,8 +146,9 @@ h3 {
   padding: 16px 10px;
 }
 .stat .num {
+  font-family: var(--font-mono);
   font-size: 28px;
-  font-weight: 800;
+  font-weight: 500;
   color: hsl(var(--primary));
   font-variant-numeric: tabular-nums;
 }
@@ -151,8 +162,9 @@ h3 {
   align-items: center;
   padding: 3px 10px;
   border-radius: 999px;
+  font-family: var(--font-mono);
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 500;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -265,7 +277,7 @@ h3 {
   font-size: 12.5px;
   font-weight: 500;
 }
-/* §32.5 semantic chips: matched (green ✓), missing (amber ✗), related-via-graph (blue) */
+/* Semantic chips: matched, missing, related */
 .chip.match {
   background: hsl(var(--success) / 0.16);
   color: hsl(var(--success));
@@ -482,6 +494,136 @@ html.theme-transition * {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Match hero ring — dashboard best-score ring                         */
+/* ------------------------------------------------------------------ */
+.match-hero {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 20px 16px;
+}
+.match-hero__ring-wrap {
+  flex-shrink: 0;
+}
+.match-hero__ring {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  animation: ring-enter 0.8s ease both;
+}
+.match-hero__svg {
+  display: block;
+  transform: rotate(-90deg);
+}
+.match-hero__fill {
+  transition: stroke-dashoffset 0.8s ease 0.15s;
+}
+.match-hero__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+.match-hero__score {
+  font-family: var(--font-display, system-ui);
+  font-size: 42px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.match-hero__label {
+  font-family: var(--font-display, system-ui);
+  font-size: 20px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.match-hero__info {
+  flex: 1;
+  min-width: 0;
+}
+.match-hero__band {
+  font-size: 13px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+.match-hero__job {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-decoration: none;
+}
+.match-hero__job:hover .match-hero__title {
+  color: hsl(var(--primary));
+}
+.match-hero__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  line-height: 1.3;
+  transition: color 0.15s;
+}
+.match-hero__company {
+  font-size: 13px;
+  color: hsl(var(--muted-foreground));
+}
+.match-hero__stats {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+.match-hero__stat {
+  display: flex;
+  flex-direction: column;
+}
+.match-hero__stat-num {
+  font-family: var(--font-mono, monospace);
+  font-size: 18px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: hsl(var(--primary));
+}
+.match-hero__stat-lbl {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+@keyframes ring-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .match-hero__ring {
+    animation: none;
+  }
+  .match-hero__fill {
+    transition: none;
+  }
+}
+@media (max-width: 480px) {
+  .match-hero {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+  }
+  .match-hero__stats {
+    justify-content: center;
+  }
+}
+
 /* Touch target helper */
 button, a, input[type=checkbox], input[type=radio], label {
   touch-action: manipulation;
@@ -569,8 +711,9 @@ button, a, input[type=checkbox], input[type=radio], label {
   align-items: center;
   padding: 1px 7px;
   border-radius: 6px;
+  font-family: var(--font-mono);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 .score-pct.high {

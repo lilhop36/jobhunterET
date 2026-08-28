@@ -95,7 +95,7 @@ export function SalaryBenchmarkCard({ benchmark, jobSalary, jobCurrency }: Props
           <Info className="h-4 w-4" /> Salary benchmark
         </h3>
         <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>
-          No benchmark data available for this role yet. We&apos;re building the Ethiopian tech salary database.
+          No benchmark data yet for this role. The salary database is growing.
         </p>
       </div>
     );
@@ -115,7 +115,7 @@ export function SalaryBenchmarkCard({ benchmark, jobSalary, jobCurrency }: Props
         </span>
         {bench.notes && (
           <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2 }}>
-            💡 {bench.notes}
+            {bench.notes}
           </span>
         )}
       </div>
@@ -173,7 +173,7 @@ export function SalaryBenchmarkCard({ benchmark, jobSalary, jobCurrency }: Props
       {!hasSalary && (
         <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 8, background: 'hsl(var(--muted) / 0.4)', fontSize: 13 }}>
           <span className="muted">
-            This posting doesn&apos;t list a salary. Market range above is for reference.
+            This posting doesn&apos;t list a salary. The market range above is for reference.
           </span>
         </div>
       )}

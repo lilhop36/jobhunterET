@@ -73,7 +73,7 @@ export default function SettingsPage() {
     setOk('Telegram unlinked.');
   };
 
-  /** FR-002c: authenticated password change with current-password verification. */
+
   const changePassword = async (e: FormEvent) => {
     e.preventDefault();
     setPwMsg(null);
@@ -100,7 +100,7 @@ export default function SettingsPage() {
   return (
     <RequireAuth>
       <h1>Settings</h1>
-      <p className="subtitle">Notification threshold, pause control, and Telegram linking (FR-026 / FR-003b).</p>
+      <p className="subtitle">Control when and how you get notified.</p>
       {err && <ErrorBox msg={err} />}
       {ok && <div className="ok-box">{ok}</div>}
 
@@ -110,7 +110,7 @@ export default function SettingsPage() {
           <div className="card">
             <h2>Match threshold</h2>
             <p className="muted" style={{ marginTop: 0 }}>
-              Only matches at or above this score trigger an alert.
+              You only get notified when a match hits this score or higher.
             </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <input
@@ -132,7 +132,7 @@ export default function SettingsPage() {
             <p className="muted" style={{ fontSize: 13 }}>
               {projected !== null
                 ? `Projected weekly alerts at this threshold: ${projected}`
-                : 'Drag the slider to project alert volume (FR-026).'}
+                : 'Drag the slider to project alert volume.'}
             </p>
             <label className="checkbox-line">
               <input
@@ -149,7 +149,7 @@ export default function SettingsPage() {
                 onChange={(e) => saveSettings({ digestEnabled: e.target.checked })}
               />
               Daily digest — a summary of new jobs, strong matches, and your saved searches, delivered
-              once a day (FR-028)
+              once a day
             </label>
           </div>
 
@@ -189,7 +189,7 @@ export default function SettingsPage() {
                     <p>2. Send <code>/start {linkCode.code}</code> to the bot (code expires{' '}
                     {new Date(linkCode.expiresAt).toLocaleTimeString()}).</p>
                     <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>
-                      The code is single-use and expires after 10 minutes (FR-003b).
+                      The code is single-use and expires after 10 minutes.
                     </p>
                   </div>
                 )}
@@ -201,7 +201,7 @@ export default function SettingsPage() {
         <div className="card">
           <h2>Change password</h2>
           <p className="muted" style={{ marginTop: 0, fontSize: 13.5 }}>
-            Authenticated password change — supply your current password (FR-002c).
+            Enter your current password to change it.
           </p>
           <form onSubmit={changePassword} style={{ maxWidth: 420 }}>
             <label>Current password</label>
