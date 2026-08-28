@@ -9,7 +9,6 @@ import { Sidebar } from '../components/shell/sidebar';
 import { Topbar } from '../components/shell/topbar';
 import { BottomNav } from '../components/shell/bottom-nav';
 import '../styles/globals.css';
-import '../styles/globals.css';
 
 function Shell({ children }: { children: ReactNode }) {
   const { token } = useAuth();
@@ -43,6 +42,10 @@ function Shell({ children }: { children: ReactNode }) {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <title>JobHunter</title>
+        <link rel="icon" href="data:," />
+      </head>
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
