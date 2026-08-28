@@ -28,7 +28,8 @@ const nextConfig = {
   devIndicators: false,
 
   // Tell Next.js where the monorepo root is (silences multi-lockfile warning)
-  outputFileTracingRoot: resolve(import.meta.dirname, '..'),
+  // Only set when building outside Vercel (Vercel handles this itself)
+  ...(process.env.VERCEL ? {} : { outputFileTracingRoot: resolve(import.meta.dirname, '..') }),
 
   // ── Turbopack (stable in Next 15 — replaces webpack for dev) ──
   // Persistent disk cache: compiled modules survive restarts.
