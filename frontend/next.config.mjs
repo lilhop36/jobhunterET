@@ -24,6 +24,9 @@ const ports = loadPorts();
 const nextConfig = {
   reactStrictMode: true,
 
+  // Disable the Next.js dev indicator (floating "N" logo)
+  devIndicators: false,
+
   // Tell Next.js where the monorepo root is (silences multi-lockfile warning)
   outputFileTracingRoot: resolve(import.meta.dirname, '..'),
 
