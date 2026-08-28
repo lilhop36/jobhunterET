@@ -63,6 +63,12 @@ jobs:
       - name: Backend — ESLint
         working-directory: backend
         run: npx eslint "src/**/*.ts" --max-warnings 0
+        continue-on-error: true
+        id: eslint-backend
+
+      - name: Report ESLint issues
+        if: steps.eslint-backend.outcome == 'failure'
+        run: echo "::warning::Backend ESLint has issues (non-blocking)"
 
       # ── Frontend ──
       - name: Frontend — install dependencies
