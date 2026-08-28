@@ -44,7 +44,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" suppressHydrationWarning>
       <head>
         <title>JobHunter</title>
-        <link rel="icon" href="data:," />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       </head>
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
