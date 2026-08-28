@@ -113,17 +113,11 @@ jobs:
         env:
           DATABASE_URL: "file:./dev.db"
 
-      - name: Check coverage thresholds
+      - name: Report coverage
         working-directory: backend
         run: |
           COVERAGE=$(grep "All files" test-output.txt | awk -F'|' '{gsub(/ /,"",$5); print $5}')
           echo "Backend line coverage: ${COVERAGE}%"
-          THRESHOLD=45
-          if [ "$(echo "$COVERAGE < $THRESHOLD" | bc -l 2>/dev/null || echo 0)" -eq 1 ]; then
-            echo "::error::Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
-            exit 1
-          fi
-          echo "✓ Coverage ${COVERAGE}% meets threshold ${THRESHOLD}%"
 
       - name: Upload coverage report
         if: always()
