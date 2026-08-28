@@ -13,6 +13,8 @@
 [![Prisma](https://img.shields.io/badge/Prisma-5-2D3748?logo=prisma)](https://www.prisma.io/)
 [![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?logo=telegram)](https://core.telegram.org/bots)
 
+### [🟢 Live Demo →](https://jobhunter-e0oasuykh-abdigaboma-1924s-projects.vercel.app/login)
+
 </div>
 
 ---
