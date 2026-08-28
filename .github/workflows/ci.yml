@@ -44,6 +44,12 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      - name: Backend — Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+        env:
+          DATABASE_URL: "file:./dev.db"
+
       - name: Backend — TypeScript check
         working-directory: backend
         run: npx tsc --noEmit
@@ -82,9 +88,17 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+        env:
+          DATABASE_URL: "file:./dev.db"
+
       - name: Run tests with coverage
         working-directory: backend
         run: npx jest --coverage --forceExit --testTimeout=30000 --ci | tee test-output.txt
+        env:
+          DATABASE_URL: "file:./dev.db"
 
       - name: Check coverage thresholds
         working-directory: backend
