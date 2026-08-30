@@ -219,6 +219,13 @@ export class EthiojobsAdapter implements JobSourceAdapter {
     const isRemote = /remote/i.test(j.location_type || '') || /remote/i.test(location);
     const url = `${BASE}/jobs/${j.slug}`;
 
+    // Extract category names separately from skills
+    const categoryNames = (j.catalogs ?? []).map((c) => c.name);
+    
+    // Skills should be extracted from description, not from categories
+    // For now, leave skills empty - the intelligence layer will extract them
+    const skills: string[] = [];
+
     return {
       title: j.title,
       company: j.company?.name || 'Ethiojobs',
@@ -227,7 +234,8 @@ export class EthiojobsAdapter implements JobSourceAdapter {
       employmentType: mapEmployment(this.mapJobType(j.type)),
       experienceLevel: deriveExperience(j.title),
       workPlace: isRemote ? 'REMOTE' : 'ONSITE',
-      skills: (j.catalogs ?? []).map((c) => c.name).slice(0, 8),
+      skills,
+      categories: categoryNames.slice(0, 8),  // Store categories separately
       url,
       sourceJobId: j.slug,
       postedDate: new Date(j.date_published),

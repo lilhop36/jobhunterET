@@ -2,10 +2,10 @@
  * core pipeline. Adapters only fetch raw postings; normalization, validation,
  * deduplication and ghost-detection reconciliation happen in SourcesService. */
 
-export type LocationClass = 'ETHIOPIA_LOCAL' | 'ETHIOPIA_REMOTE' | 'INTERNATIONAL_REMOTE' | 'INTERNATIONAL_ONSITE' | 'INTERNATIONAL_HYBRID';
-export type EmploymentType = 'FULL_TIME' | 'CONTRACT' | 'PART_TIME' | 'INTERNSHIP';
-export type ExperienceLevel = 'INTERN' | 'ENTRY' | 'MID' | 'SENIOR' | 'LEAD';
-export type Workplace = 'ONSITE' | 'REMOTE' | 'HYBRID';
+export type LocationClass = 'ETHIOPIA_LOCAL' | 'ETHIOPIA_REMOTE' | 'INTERNATIONAL_REMOTE' | 'INTERNATIONAL_ONSITE' | 'INTERNATIONAL_HYBRID' | 'UNKNOWN';
+export type EmploymentType = 'FULL_TIME' | 'CONTRACT' | 'PART_TIME' | 'INTERNSHIP' | 'TEMPORARY' | 'UNKNOWN';
+export type ExperienceLevel = 'INTERN' | 'ENTRY' | 'MID' | 'SENIOR' | 'LEAD' | 'UNKNOWN';
+export type Workplace = 'ONSITE' | 'REMOTE' | 'HYBRID' | 'UNKNOWN';
 
 export interface RawJob {
   title: string;
@@ -18,10 +18,11 @@ export interface RawJob {
   salary?: number;
   currency?: string;
   skills: string[];
+  categories?: string[];  // Job categories/industries (separate from skills)
   url: string;
   sourceJobId: string;
-  postedDate: Date;
-  deadline?: Date;
+  postedDate: Date | null;  // Allow null when date cannot be determined
+  deadline?: Date | null;
   description?: string;
   country?: string;
   parseConfidence?: number;
@@ -89,21 +90,26 @@ export const FETCH_TIMEOUT_MS = 30_000;
 
 /** Derive an experience level from a job title when the source doesn't provide one. */
 export function deriveExperience(title: string): ExperienceLevel {
+  if (!title) return 'UNKNOWN';
   const t = title.toLowerCase();
   if (/\b(intern|graduate|trainee|apprentice)\b/.test(t)) return 'INTERN';
   if (/\b(junior|entry|associate|i)\b/.test(t) && !/\b(senior|lead)\b/.test(t)) return 'ENTRY';
   if (/\b(principal|head|director|vp|chief|staff)\b/.test(t)) return 'LEAD';
   if (/\b(senior|lead|sr)\b/.test(t)) return 'SENIOR';
-  return 'MID';
+  // If no indicator found, prefer UNKNOWN over assuming MID
+  return 'UNKNOWN';
 }
 
 /** Map a source-provided employment-type string onto the EmploymentType enum. */
 export function mapEmployment(raw: string | null | undefined): EmploymentType {
-  const t = (raw || '').toLowerCase();
+  if (!raw) return 'UNKNOWN';
+  const t = raw.toLowerCase();
   if (t.includes('part')) return 'PART_TIME';
   if (t.includes('contract') || t.includes('freelance')) return 'CONTRACT';
   if (t.includes('intern')) return 'INTERNSHIP';
-  return 'FULL_TIME';
+  if (t.includes('temp')) return 'TEMPORARY';
+  if (t.includes('full')) return 'FULL_TIME';
+  return 'UNKNOWN';
 }
 
 /** Clean HTML by removing scripts/styles/nav/footer but preserving structural tags. */
