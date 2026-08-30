@@ -8,7 +8,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { JobSourceAdapter, RawJob, CollectionRequest, CollectionResult, CategoryCollectionStat, StopReason, deriveExperience, FETCH_TIMEOUT_MS } from './job-source.adapter';
+import { JobSourceAdapter, RawJob, CollectionRequest, CollectionResult, CategoryCollectionStat, StopReason, deriveExperience, FETCH_TIMEOUT_MS, Workplace } from './job-source.adapter';
 
 const HOME = 'https://geezjobs.com/';
 const LISTING = 'https://geezjobs.com/jobs-in-ethiopia';
@@ -239,20 +239,25 @@ export class GeezJobsAdapter implements JobSourceAdapter {
     const postedDate = ld?.datePosted ? new Date(ld.datePosted) : new Date();
     if (since && postedDate < since) return null;
 
+    // Determine workplace from description - don't assume ONSITE
+    const isRemote = /remote/i.test(description || '') || /remote/i.test(title);
+    const workplace: Workplace = isRemote ? 'REMOTE' : 'UNKNOWN';
+
     return {
       title,
       company,
       location,
-      locationClass: 'ETHIOPIA_LOCAL',
-      employmentType: 'FULL_TIME',
+      locationClass: isRemote ? 'ETHIOPIA_REMOTE' : 'ETHIOPIA_LOCAL',
+      employmentType: 'UNKNOWN',  // Don't assume FULL_TIME
       experienceLevel: deriveExperience(expText),
-      workPlace: 'ONSITE',
+      workPlace: workplace,
       salary: salaryNum,
       currency,
-      skills: [],
+      skills: [],  // Skills will be extracted by intelligence layer
+      categories: [],  // Categories will be extracted by intelligence layer
       url: `https://geezjobs.com/job-detail/${slug}`,
       sourceJobId: slug,
-      postedDate,
+      postedDate: ld?.datePosted ? new Date(ld.datePosted) : null,  // Allow null if unknown
       deadline: deadlineDate,
       description,
       country: 'Ethiopia',
