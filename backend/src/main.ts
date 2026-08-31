@@ -5,7 +5,6 @@ import { parsePort } from './common/utils/parse-port';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { join } from 'path';
-import { execSync } from 'child_process';
 
 // Ensure required env vars have sane defaults so the app boots on Render
 // without manual env var configuration.
@@ -20,21 +19,6 @@ if (!process.env.JWT_SECRET) {
   console.warn('[main] JWT_SECRET not set — auto-generated (sessions lost on restart)');
 }
 
-// Push Prisma schema to the database using the SAME DATABASE_URL the app will use.
-// This ensures the SQLite file and tables exist before the app connects.
-if (process.env.DATABASE_URL.startsWith('file:')) {
-  console.log('[main] Running prisma db push to ensure database schema...');
-  try {
-    execSync('npx prisma db push --skip-generate --accept-data-loss', {
-      cwd: join(__dirname, '..'),
-      stdio: 'inherit',
-      env: process.env,
-    });
-    console.log('[main] Database schema ready.');
-  } catch (e) {
-    console.error('[main] prisma db push failed:', e.message);
-  }
-}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
