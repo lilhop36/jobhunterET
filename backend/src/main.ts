@@ -47,11 +47,17 @@ async function bootstrap() {
   // SEC-011: parse cookies for SSE token auth
   app.use(cookieParser());
 
-  // SEC-002: CORS — restrict to known origins in production, allow all in dev.
+  // SEC-002: CORS — restrict to known origins when CORS_ORIGIN is set,
+  // otherwise allow all origins so the app works without env var config.
   const corsOrigin = process.env.CORS_ORIGIN;
+  const allowedOrigins = corsOrigin
+    ? corsOrigin.split(',').map((s) => s.trim())
+    : [];
   const isDev = process.env.NODE_ENV !== 'production';
   app.enableCors({
-    origin: isDev ? true : (corsOrigin ? corsOrigin.split(',').map((s) => s.trim()) : false),
+    origin: isDev || allowedOrigins.length === 0
+      ? true
+      : (origin: string) => allowedOrigins.includes(origin),
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
