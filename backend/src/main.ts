@@ -4,21 +4,9 @@ import { AppModule } from './app.module';
 import { parsePort } from './common/utils/parse-port';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import { join } from 'path';
 
-// Ensure required env vars have sane defaults so the app boots on Render
-// without manual env var configuration.
-if (!process.env.DATABASE_URL) {
-  const dbPath = join(__dirname, '..', 'prod.db');
-  process.env.DATABASE_URL = `file:${dbPath}`;
-  console.warn(`[main] DATABASE_URL not set — defaulting to local SQLite: ${dbPath}`);
-}
-if (!process.env.JWT_SECRET) {
-  const { randomBytes } = require('crypto');
-  process.env.JWT_SECRET = randomBytes(48).toString('base64url');
-  console.warn('[main] JWT_SECRET not set — auto-generated (sessions lost on restart)');
-}
-
+// Env vars (DATABASE_URL, JWT_SECRET) are set by start.sh before this runs.
+// When running locally with `node dist/main.js` directly, set them in .env.
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
