@@ -7,7 +7,7 @@
     "build": "nest build && node scripts/copy-assets.js",
     "start": "nest start",
     "start:dev": "node scripts/copy-assets.js && nest start --watch",
-    "start:prod": "node dist/src/main.js",
+    "start:prod": "node dist/main.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "ts-node prisma/seed.ts",
