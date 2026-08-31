@@ -1,23 +1,39 @@
-import { Module } from '@nestjs/common';
+import { Module, Logger } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { randomBytes } from 'crypto';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
 
 /**
- * SEC-001 hardening: never sign JWTs with a default or well-known secret.
- * Refuse to boot when JWT_SECRET is missing or too weak, so a deployment
- * cannot silently run with a forgeable signing key.
+ * SEC-001 hardening: use JWT_SECRET from env when available.
+ * Auto-generates a random secret if missing, so deployments work
+ * out of the box. Set JWT_SECRET env var for persistence across restarts.
  */
 function resolveJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error(
-      'JWT_SECRET must be set to a strong secret (at least 32 characters). ' +
-        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'base64url\'))"',
+  if (secret && secret.length >= 32) {
+    return secret;
+  }
+  if (secret) {
+    Logger.warn(
+      'JWT_SECRET is too short (<32 chars). Auto-generating a random secret. '
+        + 'Set a strong JWT_SECRET env var for persistence across restarts.',
+      'AuthModule',
+    );
+  } else {
+    Logger.warn(
+      'JWT_SECRET not set — auto-generating a random secret. '
+        + 'Set a strong JWT_SECRET env var for persistence across restarts.',
+      'AuthModule',
     );
   }
-  return secret;
+  const generated = randomBytes(48).toString('base64url');
+  Logger.log(
+    `Auto-generated JWT_SECRET: ${generated.slice(0, 8)}... (set JWT_SECRET env var to persist)`,
+    'AuthModule',
+  );
+  return generated;
 }
 
 @Module({
