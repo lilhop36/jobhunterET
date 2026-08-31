@@ -38,6 +38,7 @@ if (process.env.DATABASE_URL.startsWith('file:')) {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   // SEC-001: Helmet security headers (X-Content-Type-Options, X-Frame-Options, etc.)

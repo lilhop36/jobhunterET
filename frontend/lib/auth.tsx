@@ -87,8 +87,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/dashboard');
   };
 
-  const login = (email: string, password: string) => authenticate('/api/auth/login', email, password);
-  const register = (email: string, password: string) => authenticate('/api/auth/register', email, password);
+  const login = (email: string, password: string) => authenticate('/auth/login', email, password);
+  const register = (email: string, password: string) => authenticate('/auth/register', email, password);
 
   const logout = () => {
     clear();
