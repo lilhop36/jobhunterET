@@ -7,6 +7,18 @@ import cookieParser from 'cookie-parser';
 
 // Env vars (DATABASE_URL, JWT_SECRET) are set by start.sh before this runs.
 // When running locally with `node dist/main.js` directly, set them in .env.
+import { join } from 'path';
+import { randomBytes } from 'crypto';
+
+if (!process.env.DATABASE_URL) {
+  const dbPath = join(__dirname, '..', 'prod.db');
+  process.env.DATABASE_URL = `file:${dbPath}`;
+  console.log('[main] DATABASE_URL defaulted to', process.env.DATABASE_URL);
+}
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  process.env.JWT_SECRET = randomBytes(48).toString('base64url');
+  console.warn('[main] JWT_SECRET not set or too short — auto-generated. Sessions will not survive restarts.');
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

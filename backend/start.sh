@@ -1,5 +1,4 @@
 #!/bin/sh
-set -e
 
 # Default DATABASE_URL for SQLite if not set
 export DATABASE_URL="${DATABASE_URL:-file:./prod.db}"
@@ -10,9 +9,12 @@ if [ -z "$JWT_SECRET" ]; then
   echo "[start.sh] JWT_SECRET auto-generated"
 fi
 
-# Push Prisma schema to ensure tables exist (fast, idempotent)
-echo "[start.sh] Running prisma db push..."
-npx prisma db push --skip-generate --accept-data-loss
+# Push Prisma schema to ensure tables exist
+# Use node directly (faster than npx, no download overhead)
+echo "[start.sh] Pushing database schema..."
+node node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss || {
+  echo "[start.sh] prisma db push failed — app will try to start anyway"
+}
 
 # Start the app
 echo "[start.sh] Starting app..."
