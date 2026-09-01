@@ -15,6 +15,7 @@ if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL = `file:${dbPath}`;
   console.log('[main] DATABASE_URL defaulted to', process.env.DATABASE_URL);
 }
+
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   process.env.JWT_SECRET = randomBytes(48).toString('base64url');
   console.warn('[main] JWT_SECRET not set or too short — auto-generated. Sessions will not survive restarts.');

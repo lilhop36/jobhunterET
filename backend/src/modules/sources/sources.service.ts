@@ -89,11 +89,19 @@ export class SourcesService implements OnModuleInit {
     this.logger.log(`[QUEUE] Initialized with concurrency=${(sourceConfigs as SourceConfigs).queue?.concurrency ?? 3}`);
     this.logger.log(`[CONFIG] Loaded ${Object.keys(this.sourceConfigMap).length} source configs`);
 
-    // Auto-create Telegram source rows if missing
-    await this.ensureTelegramSources();
+    // Auto-create Telegram source rows if missing (wrapped to survive cold-start DB issues)
+    try {
+      await this.ensureTelegramSources();
+    } catch (err: any) {
+      this.logger.warn(`[CONFIG] ensureTelegramSources skipped: ${err.message}`);
+    }
 
     // Auto-create config-driven sources that don't exist yet
-    await this.ensureConfigDrivenSources();
+    try {
+      await this.ensureConfigDrivenSources();
+    } catch (err: any) {
+      this.logger.warn(`[CONFIG] ensureConfigDrivenSources skipped: ${err.message}`);
+    }
   }
 
   /** Create JobSource rows for dynamically-registered Telegram channels. */
