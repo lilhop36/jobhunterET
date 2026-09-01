@@ -24,7 +24,16 @@ export const useAuth = () => useContext(Ctx);
 
 const TOKEN_KEY = 'jh_token';
 const USER_KEY = 'jh_user';
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
+const CONFIGURED_API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ?? '';
+
+function apiUrl(path: string) {
+  // Avoid sending requests back to the frontend when the production variable
+  // was accidentally configured with the Vercel site URL.
+  if (!CONFIGURED_API_BASE || (typeof window !== 'undefined' && CONFIGURED_API_BASE === window.location.origin)) {
+    return path;
+  }
+  return `${CONFIGURED_API_BASE}${path}`;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -60,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Without this, the tokenless request 401s and the app wrongly logs the user out.
     const tk = token ?? (typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null);
     if (tk) headers['authorization'] = `Bearer ${tk}`;
-    const url = API_BASE ? `${API_BASE}${path}` : path;
+    const url = apiUrl(path);
     const res = await fetch(url, { ...opts, headers });
     if (res.status === 401) {
       clear();
@@ -73,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const authenticate = async (path: string, email: string, password: string) => {
-    const url = API_BASE ? `${API_BASE.replace(/\/$/, '')}${path}` : path;
+    const url = apiUrl(path);
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -81,7 +90,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const data = await response.json().catch(() => null);
     if (!response.ok || !data?.accessToken) {
-      throw new Error(data?.message || `Authentication failed (${response.status})`);
+      const suffix = response.status === 404
+        ? ' — backend API is not connected to this deployment'
+        : ` (${response.status})`;
+      throw new Error(data?.message || `Authentication failed${suffix}`);
     }
     localStorage.setItem(TOKEN_KEY, data.accessToken);
     localStorage.setItem(USER_KEY, JSON.stringify(data.user));
