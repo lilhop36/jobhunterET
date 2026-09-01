@@ -1,8 +1,5 @@
 #!/bin/sh
 
-# Railway sets PORT and optionally DATABASE_URL / JWT_SECRET.
-# These defaults ensure the app boots with zero config.
-
 export DATABASE_URL="${DATABASE_URL:-file:./prod.db}"
 
 if [ -z "$JWT_SECRET" ]; then
@@ -10,5 +7,9 @@ if [ -z "$JWT_SECRET" ]; then
   echo "[start.sh] JWT_SECRET auto-generated"
 fi
 
-echo "[start.sh] Starting app (DB: $([ "${DATABASE_URL#file:}" = "$DATABASE_URL" ] && echo 'PostgreSQL' || echo 'SQLite'))..."
+echo "[start.sh] DATABASE_URL=$DATABASE_URL"
+echo "[start.sh] Running prisma db push..."
+npx prisma db push --skip-generate --accept-data-loss 2>&1 || echo "[start.sh] prisma db push failed — continuing anyway"
+
+echo "[start.sh] Starting app..."
 exec node dist/main.js

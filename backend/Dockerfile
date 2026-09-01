@@ -25,7 +25,9 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+# Prisma engine needs OpenSSL
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nestjs
 
@@ -34,12 +36,10 @@ COPY --from=deps /app/prisma ./prisma
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/scripts ./scripts
-
-# Create SQLite database with schema
-RUN DATABASE_URL="file:./prod.db" npx prisma db push --skip-generate --accept-data-loss
+COPY start.sh ./start.sh
 
 USER nestjs
 
 EXPOSE 3210
 
-CMD ["sh", "-c", "node dist/main.js"]
+CMD ["sh", "start.sh"]
