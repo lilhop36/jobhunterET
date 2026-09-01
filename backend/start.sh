@@ -9,13 +9,6 @@ if [ -z "$JWT_SECRET" ]; then
   echo "[start.sh] JWT_SECRET auto-generated"
 fi
 
-# Push Prisma schema to ensure tables exist
-# Use node directly (faster than npx, no download overhead)
-echo "[start.sh] Pushing database schema..."
-node node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss || {
-  echo "[start.sh] prisma db push failed — app will try to start anyway"
-}
-
-# Start the app
+echo "[start.sh] DATABASE_URL=$DATABASE_URL"
 echo "[start.sh] Starting app..."
 exec node dist/main.js
