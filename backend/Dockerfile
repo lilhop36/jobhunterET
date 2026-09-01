@@ -1,4 +1,5 @@
 FROM node:22 AS base
+# cache-bust: 2026-09-01
 
 # ── Dependencies ──
 FROM base AS deps

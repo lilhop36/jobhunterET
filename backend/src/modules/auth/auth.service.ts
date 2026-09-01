@@ -59,14 +59,26 @@ export class AuthService {
     const count = await this.prisma.user.count();
     const role = this.decideRole(dto.email, count === 0);
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        passwordHash: await this.hash(dto.password),
-        role,
-        profile: { create: {} },
-      },
-    });
+    let user;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          email: dto.email,
+          passwordHash: await this.hash(dto.password),
+          role,
+          profile: { create: {} },
+        },
+      });
+    } catch (err: any) {
+      this.logger.warn(`[AUTH] Nested profile create failed: ${err.message} — creating user without profile`);
+      user = await this.prisma.user.create({
+        data: {
+          email: dto.email,
+          passwordHash: await this.hash(dto.password),
+          role,
+        },
+      });
+    }
 
     this.logger.log(`[AUTH] User registered: userId=${user.id} role=${role}`);
     return this.tokenFor(user);
