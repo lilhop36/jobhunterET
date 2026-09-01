@@ -4,7 +4,7 @@
   "description": "JobHunter backend — NestJS + Prisma + PostgreSQL (SRS v2.2)",
   "private": true,
   "scripts": {
-    "build": "nest build && node scripts/copy-assets.js",
+    "build": "DATABASE_URL=${DATABASE_URL:-file:./prod.db} npx prisma db push --skip-generate --accept-data-loss && nest build && node scripts/copy-assets.js",
     "start": "nest start",
     "start:dev": "node scripts/copy-assets.js && nest start --watch",
     "start:prod": "sh start.sh",
