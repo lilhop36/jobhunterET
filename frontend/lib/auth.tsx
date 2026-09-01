@@ -88,9 +88,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
-    const data = await response.json().catch(() => null);
+    const contentType = response.headers.get('content-type') || '';
+    const data = contentType.includes('application/json')
+      ? await response.json().catch(() => null)
+      : null;
     if (!response.ok || !data?.accessToken) {
-      const suffix = response.status === 404
+      const suffix = response.status === 404 || contentType.includes('text/html')
         ? ' — backend API is not connected to this deployment'
         : ` (${response.status})`;
       throw new Error(data?.message || `Authentication failed${suffix}`);
