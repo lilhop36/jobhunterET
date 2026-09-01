@@ -34,6 +34,9 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/scripts ./scripts
 COPY start.sh ./start.sh
 
+# Create SQLite database with schema during build (node:22 has OpenSSL)
+RUN DATABASE_URL="file:./prod.db" npx prisma db push --skip-generate --accept-data-loss
+
 USER nestjs
 
 EXPOSE 3210

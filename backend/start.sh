@@ -7,9 +7,5 @@ if [ -z "$JWT_SECRET" ]; then
   echo "[start.sh] JWT_SECRET auto-generated"
 fi
 
-echo "[start.sh] DATABASE_URL=$DATABASE_URL"
-echo "[start.sh] Running prisma db push..."
-npx prisma db push --skip-generate --accept-data-loss 2>&1 || echo "[start.sh] prisma db push failed — continuing anyway"
-
-echo "[start.sh] Starting app..."
+echo "[start.sh] Starting app (DB: $DATABASE_URL)..."
 exec node dist/main.js
