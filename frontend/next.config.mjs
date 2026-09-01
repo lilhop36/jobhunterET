@@ -41,16 +41,9 @@ const nextConfig = {
   },
 
   async rewrites() {
-    // SRS §24 API lives at /api/* — proxy to the NestJS backend.
-    // Production uses the public backend origin configured at build time;
-    // development keeps the local backend proxy.
-    const backendOrigin = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
-    if (process.env.VERCEL && backendOrigin) {
-      return [{
-        source: '/api/:path*',
-        destination: `${backendOrigin}/api/:path*`,
-      }];
-    }
+    // Keep the local proxy for development. In Vercel production, the client
+    // calls NEXT_PUBLIC_API_URL directly so malformed env values cannot make
+    // the build fail while generating an invalid rewrite destination.
     if (!process.env.VERCEL) {
       return [{
         source: '/api/:path*',
