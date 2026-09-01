@@ -123,7 +123,7 @@ export function useEventStream(enabled = true): StreamState {
     esRef.current?.close();
 
     const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
-    const url = API_BASE ? `${API_BASE}/api/events/stream` : '/api/events/stream';
+    const url = API_BASE ? `${API_BASE.replace(/\/$/, '')}/api/events/stream` : '/api/events/stream';
     const es = new EventSource(url);
     esRef.current = es;
 

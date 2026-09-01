@@ -73,13 +73,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const authenticate = async (path: string, email: string, password: string) => {
-    const url = API_BASE ? `${API_BASE}${path}` : path;
-    const data = await fetch(url, {
+    const url = API_BASE ? `${API_BASE.replace(/\/$/, '')}${path}` : path;
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email, password }),
-    }).then((r) => r.json());
-    if (!data?.accessToken) throw new Error(data?.message || 'Authentication failed');
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.accessToken) {
+      throw new Error(data?.message || `Authentication failed (${response.status})`);
+    }
     localStorage.setItem(TOKEN_KEY, data.accessToken);
     localStorage.setItem(USER_KEY, JSON.stringify(data.user));
     setToken(data.accessToken);

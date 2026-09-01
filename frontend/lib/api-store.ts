@@ -57,7 +57,7 @@ async function fetchJson(path: string): Promise<any> {
   const tk = getToken();
   if (tk) headers['authorization'] = `Bearer ${tk}`;
 
-  const url = API_BASE ? `${API_BASE}${path}` : path;
+  const url = API_BASE ? `${API_BASE.replace(/\/$/, '')}${path}` : path;
   const res = await fetch(url, { headers });
   if (res.status === 401) {
     localStorage.removeItem('jh_token');

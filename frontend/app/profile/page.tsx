@@ -133,7 +133,7 @@ export default function ProfilePage() {
       const xhr = new XMLHttpRequest();
       xhrRef.current = xhr;
       const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
-      xhr.open('POST', API_BASE ? `${API_BASE}/api/profile/cv` : '/api/profile/cv');
+      xhr.open('POST', API_BASE ? `${API_BASE.replace(/\/$/, '')}/api/profile/cv` : '/api/profile/cv');
       if (token) xhr.setRequestHeader('authorization', `Bearer ${token}`);
       xhr.upload.onprogress = (ev) => {
         if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
