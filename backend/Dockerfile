@@ -1,5 +1,8 @@
 FROM node:22-slim AS base
 
+# Prisma needs OpenSSL
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 # ── Dependencies ──
 FROM base AS deps
 WORKDIR /app
