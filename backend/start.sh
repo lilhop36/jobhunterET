@@ -14,14 +14,11 @@ fi
 
 echo "[start.sh] DATABASE_URL=$DATABASE_URL"
 
-# Push Prisma schema — use local binary directly (npx may change CWD)
-PRISMA="${BACKEND_DIR}/node_modules/.bin/prisma"
-if [ -x "$PRISMA" ]; then
-  echo "[start.sh] Running prisma db push..."
-  "$PRISMA" db push --skip-generate --accept-data-loss 2>&1 || echo "[start.sh] prisma db push failed"
-else
-  echo "[start.sh] prisma binary not found at $PRISMA, skipping db push"
-fi
+# Push Prisma schema — use node directly to invoke prisma CLI
+# (avoids npx overhead and symlink issues)
+echo "[start.sh] Running prisma db push..."
+cd "$BACKEND_DIR"
+node node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss 2>&1 || echo "[start.sh] prisma db push failed — continuing anyway"
 
 # Start the app
 echo "[start.sh] Starting app..."
