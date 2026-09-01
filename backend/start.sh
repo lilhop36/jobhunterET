@@ -1,14 +1,14 @@
 #!/bin/sh
 
-# Default DATABASE_URL for SQLite if not set
+# Railway sets PORT and optionally DATABASE_URL / JWT_SECRET.
+# These defaults ensure the app boots with zero config.
+
 export DATABASE_URL="${DATABASE_URL:-file:./prod.db}"
 
-# Default JWT_SECRET if not set
 if [ -z "$JWT_SECRET" ]; then
   export JWT_SECRET="$(node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))")"
   echo "[start.sh] JWT_SECRET auto-generated"
 fi
 
-echo "[start.sh] DATABASE_URL=$DATABASE_URL"
-echo "[start.sh] Starting app..."
+echo "[start.sh] Starting app (DB: $([ "${DATABASE_URL#file:}" = "$DATABASE_URL" ] && echo 'PostgreSQL' || echo 'SQLite'))..."
 exec node dist/main.js

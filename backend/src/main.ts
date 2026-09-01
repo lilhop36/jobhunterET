@@ -11,7 +11,8 @@ import { join } from 'path';
 import { randomBytes } from 'crypto';
 
 if (!process.env.DATABASE_URL) {
-  const dbPath = join(__dirname, '..', 'prod.db');
+  // Use cwd() so the path works regardless of where node is launched from
+  const dbPath = join(process.cwd(), 'prod.db');
   process.env.DATABASE_URL = `file:${dbPath}`;
   console.log('[main] DATABASE_URL defaulted to', process.env.DATABASE_URL);
 }
