@@ -1,4 +1,3 @@
-```
 # Dependencies
 node_modules/
 
@@ -26,4 +25,9 @@ venv/
 .env
 .env.local
 .env.*
-```
+
+# Generated at runtime / by tests
+coverage/
+backend/coverage/
+backend/prisma/*.db
+backend/prisma/*.db-journal

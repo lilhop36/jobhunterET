@@ -50,25 +50,12 @@ jobs:
         env:
           DATABASE_URL: "file:./dev.db"
 
-      - name: Backend — TypeScript check
+      # This is a real gate: the backend has no ESLint install/config (the
+      # previous `eslint` step could never run), so `npm run lint` maps to the
+      # TypeScript compiler and must pass.
+      - name: Backend — TypeScript check (blocking)
         working-directory: backend
-        run: npx tsc --noEmit
-        continue-on-error: true
-        id: tsc-backend
-
-      - name: Report TypeScript issues
-        if: steps.tsc-backend.outcome == 'failure'
-        run: echo "::warning::Backend TypeScript check has issues (non-blocking)"
-
-      - name: Backend — ESLint
-        working-directory: backend
-        run: npx eslint "src/**/*.ts" --max-warnings 0
-        continue-on-error: true
-        id: eslint-backend
-
-      - name: Report ESLint issues
-        if: steps.eslint-backend.outcome == 'failure'
-        run: echo "::warning::Backend ESLint has issues (non-blocking)"
+        run: npm run lint
 
       # ── Frontend ──
       - name: Frontend — install dependencies
@@ -107,17 +94,13 @@ jobs:
         env:
           DATABASE_URL: "file:./dev.db"
 
+      # `npm run test:coverage` provisions a disposable SQLite database
+      # (prisma db push --force-reset + seed) before running jest. The exit
+      # status is the real jest status: there is no pipe to `tee` that could
+      # mask a red suite.
       - name: Run tests with coverage
         working-directory: backend
-        run: npx jest --coverage --forceExit --testTimeout=30000 --ci | tee test-output.txt
-        env:
-          DATABASE_URL: "file:./dev.db"
-
-      - name: Report coverage
-        working-directory: backend
-        run: |
-          COVERAGE=$(grep "All files" test-output.txt | awk -F'|' '{gsub(/ /,"",$5); print $5}')
-          echo "Backend line coverage: ${COVERAGE}%"
+        run: npm run test:coverage -- --ci --testTimeout=30000
 
       - name: Upload coverage report
         if: always()
@@ -170,9 +153,11 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      # Audit reports are informational until the advisory backlog is cleared;
+      # the job still surfaces them in the log without pretending to pass.
       - name: Audit backend dependencies (high+)
         working-directory: backend
-        run: npm audit --audit-level=critical || echo "::warning::Has advisories"
+        run: npm audit --audit-level=critical
 
       - name: Frontend — install dependencies
         working-directory: frontend
@@ -180,4 +165,4 @@ jobs:
 
       - name: Audit frontend dependencies (high+)
         working-directory: frontend
-        run: npm audit --audit-level=critical || echo "::warning::Has advisories"
+        run: npm audit --audit-level=critical

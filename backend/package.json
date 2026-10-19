@@ -15,8 +15,10 @@
     "db:sqlite": "./scripts/switch-db.sh sqlite && prisma generate",
     "db:pg": "./scripts/switch-db.sh pg && prisma generate",
     "db:switch": "./scripts/switch-db.sh && prisma generate",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest --coverage --forceExit",
+    "lint": "tsc --noEmit",
+    "test": "node scripts/run-tests.js",
+    "test:coverage": "node scripts/run-tests.js --coverage",
+    "test:unit": "jest --forceExit",
     "test:watch": "jest --watch --forceExit",
     "collect:report": "ts-node scripts/collection-coverage-report.ts",
     "backfill:categories": "ts-node scripts/backfill-categories.ts"
