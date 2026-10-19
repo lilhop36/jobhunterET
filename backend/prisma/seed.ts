@@ -1,8 +1,33 @@
-import { PrismaClient, SourceType, SourceTier, SourceStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
-import { SKILL_DICT } from '../src/modules/matching/matching-engine';
+import { SKILL_DICT, scoreJob } from '../src/modules/matching/matching-engine';
 
 const prisma = new PrismaClient();
+
+/**
+ * The repo ships two schemas: `schema.prisma` (SQLite, booleans = Int, enums =
+ * String, arrays = JSON text) and `schema.postgresql.prisma` (native booleans,
+ * enums and arrays). This seed must run against whichever one is active, so it
+ * never imports enum types and normalises values here instead.
+ */
+const isSQLite = (process.env.DATABASE_URL ?? '').startsWith('file:');
+
+// The generated client is typed for one schema at a time, so the cross-schema
+// representation is asserted here rather than repeating casts at every field.
+const bool = (value: boolean) =>
+  isSQLite ? (value ? 1 : 0) : (value as unknown as number);
+const json = <T>(value: T) =>
+  isSQLite ? JSON.stringify(value) : (value as unknown as string);
+
+type SourceRow = {
+  id: string;
+  name: string;
+  type: string;
+  baseUrl: string;
+  priorityTier: string;
+  status: string;
+  lastError?: string | null;
+};
 
 /**
  * Dev-only seed. Refuses to run unless SEED_DEMO_DATA=true (Phase 0.3 of the
@@ -23,15 +48,7 @@ async function main() {
   }
 
   // Sources
-  const sources: {
-    id: string;
-    name: string;
-    type: SourceType;
-    baseUrl: string;
-    priorityTier: SourceTier;
-    status: SourceStatus;
-    lastError?: string | null;
-  }[] = [
+  const sources: SourceRow[] = [
     { id: 'reliefweb', name: 'ReliefWeb (Ethiopia)', type: 'RSS', baseUrl: 'https://reliefweb.int/jobs/rss.xml?advanced-search=(C87)', priorityTier: 'ETHIOPIA', status: 'ACTIVE' },
     { id: 'ethiojobs', name: 'Ethiojobs.net', type: 'HTML', baseUrl: 'https://ethiojobs.net', priorityTier: 'ETHIOPIA', status: 'ACTIVE' },
     { id: 'ethiongojobs', name: 'EthioNGOJobs', type: 'JSON', baseUrl: 'https://ethiongojobs.com/wp-json/wp/v2/posts', priorityTier: 'ETHIOPIA', status: 'ACTIVE' },
@@ -65,11 +82,11 @@ async function main() {
             title: 'Software Engineer',
             summary: 'Backend-focused engineer who enjoys building clean APIs and data services.',
             years: 2,
-            remote: true,
+            remote: bool(true),
             minSalary: 700,
-            excludeOnsite: true,
-            employmentTypes: ['FULL_TIME', 'CONTRACT'],
-            onboardDone: true,
+            excludeOnsite: bool(true),
+            employmentTypes: json(['FULL_TIME', 'CONTRACT']),
+            onboardDone: bool(true),
           },
         },
       },
@@ -141,6 +158,92 @@ async function main() {
         skills: { create: skillIds.map((skillId) => ({ skillId })) },
       },
     });
+  }
+
+  // Real matches for the demo user, produced by the production scoring engine
+  // (not hand-written scores) so the dashboard has meaningful data.
+  const demoUser = await prisma.user.findUnique({
+    where: { email: 'amara@jobhunter.et' },
+    include: {
+      profile: true,
+      skills: { include: { skill: true } },
+      targetRoles: true,
+      locations: true,
+      matches: true,
+    },
+  });
+
+  if (demoUser?.profile && demoUser.matches.length === 0) {
+    const jobs = await prisma.job.findMany({
+      where: { status: 'ACTIVE' },
+      include: { skills: { include: { skill: true } } },
+    });
+
+    const locationTiers: Record<string, 'HIGH' | 'MEDIUM' | 'LOW'> = {};
+    for (const l of demoUser.locations) {
+      locationTiers[l.region] = l.tier as 'HIGH' | 'MEDIUM' | 'LOW';
+    }
+
+    const profileInput: Parameters<typeof scoreJob>[1] = {
+      skills: demoUser.skills.map((s) => s.skill.name),
+      targetRoles: demoUser.targetRoles.map((r) => ({
+        role: r.role,
+        priority: r.priority as 'HIGH' | 'MEDIUM' | 'LOW',
+      })),
+      locationTiers,
+      remote: Boolean(demoUser.profile.remote),
+      employmentTypes: JSON.parse(demoUser.profile.employmentTypes as unknown as string),
+      years: demoUser.profile.years,
+      minSalary: demoUser.profile.minSalary,
+      excludeOnsite: Boolean(demoUser.profile.excludeOnsite),
+    };
+
+    let created = 0;
+    for (const job of jobs) {
+      const result = scoreJob(
+        {
+          title: job.title,
+          skills: job.skills.map((s) => s.skill.name),
+          locationClass: job.locationClass,
+          location: job.location,
+          country: job.country ?? undefined,
+          employmentType: job.employmentType,
+          experienceLevel: job.experienceLevel,
+          salary: job.salary,
+          workPlace: job.workPlace,
+          parseConfidence: job.parseConfidence,
+          postedAt: job.postedDate,
+        },
+        profileInput,
+      );
+
+      if (result.score < demoUser.matchThreshold) continue;
+
+      const part = (label: string) =>
+        result.parts.find((p) => p.label === label)?.fraction ?? 0;
+
+      await prisma.jobMatch.create({
+        data: {
+          userId: demoUser.id,
+          jobId: job.id,
+          score: result.score,
+          roleScore: part('Role'),
+          skillScore: part('Skills'),
+          experienceScore: part('Experience'),
+          locationScore: part('Location'),
+          employmentScore: part('Employment'),
+          freshnessScore: part('Freshness'),
+          salaryScore: part('Salary'),
+          matchedSkills: json(result.matchedSkills),
+          relatedSkills: json(result.relatedSkills),
+          missingSkills: json(result.missingSkills),
+          reasons: json(result.reasons),
+          summary: result.summary,
+        },
+      });
+      created += 1;
+    }
+    console.log(`Created ${created} job matches for the demo user.`);
   }
 
   const jobCount = await prisma.job.count();

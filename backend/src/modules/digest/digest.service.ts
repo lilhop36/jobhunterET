@@ -62,7 +62,12 @@ export class DigestService {
     });
     if (!user) return null;
 
-    const report = await this.buildReport(user.id, user.searches);
+    // SQLite returns `remote` as 0/1; the matching helper compares it as a
+    // boolean, so normalise once here.
+    const report = await this.buildReport(
+      user.id,
+      user.searches.map((s) => ({ ...s, remote: Boolean(s.remote) })),
+    );
     const hasContent = report.newJobs > 0 || report.strongMatches > 0 || report.searches.length > 0;
 
     // Always record the run so the dashboard card / Searches page can show last-run status.

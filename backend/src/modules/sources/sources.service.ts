@@ -417,7 +417,8 @@ export class SourcesService implements OnModuleInit {
       salary: j.salary,
       currency: j.currency,
       deadline: j.deadline,
-      postedDate: j.postedDate,
+      // FidelityInput takes `Date | undefined`; RawJob allows null.
+      postedDate: j.postedDate ?? undefined,
     });
 
     await this.prisma.job.create({
@@ -433,7 +434,9 @@ export class SourcesService implements OnModuleInit {
         url: j.url,
         sourceId,
         sourceJobId: j.sourceJobId,
-        postedDate: j.postedDate,
+        // postedDate is optional in RawJob; fall back to first-seen time so the
+        // row stays orderable rather than failing the insert.
+        postedDate: j.postedDate ?? new Date(),
         deadline: fidelity.deadline,
         firstSeenAt: new Date(),
         lastSeenAt: new Date(),

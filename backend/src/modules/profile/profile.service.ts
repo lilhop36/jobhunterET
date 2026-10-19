@@ -44,11 +44,13 @@ export class ProfileService {
       title: p.title,
       summary: p.summary,
       years: p.years,
-      remote: p.remote,
+      // SQLite stores booleans as 0/1, so normalise at the API boundary
+      // instead of leaking numeric flags into the JSON response.
+      remote: Boolean(p.remote),
       minSalary: p.minSalary,
-      excludeOnsite: p.excludeOnsite,
+      excludeOnsite: Boolean(p.excludeOnsite),
       employmentTypes: this.prisma.jsonArray(p.employmentTypes),
-      onboardDone: p.onboardDone,
+      onboardDone: Boolean(p.onboardDone),
       skills: skills.map((s) => s.skill.name),
       targetRoles: roles.map((r) => ({ role: r.role, priority: r.priority })),
       locationTiers: locations.map((l) => ({ region: l.region, tier: l.tier })),

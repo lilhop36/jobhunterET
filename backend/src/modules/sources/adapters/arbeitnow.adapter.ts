@@ -34,7 +34,9 @@ export class ArbeitnowAdapter implements JobSourceAdapter {
       const body = (await res.json()) as { data?: ArbeitnowJob[]; links?: { next?: string } };
       const pageJobs = (body.data ?? [])
         .map((j) => this.toRaw(j))
-        .filter((j): j is RawJob => !!j && j.postedDate >= since);
+        // postedDate is nullable by contract: drop undated jobs instead of
+        // comparing null against a Date.
+        .filter((j): j is RawJob => !!j && !!j.postedDate && j.postedDate >= since);
 
       jobs.push(...pageJobs);
 

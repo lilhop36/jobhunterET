@@ -41,7 +41,8 @@ export class TelegramChannelAdapter implements JobSourceAdapter {
 
     for (const post of posts) {
       const job = this.parsePost(post);
-      if (job && job.postedDate >= since) {
+      // postedDate is nullable: an undated post cannot be placed in the window.
+      if (job && job.postedDate && job.postedDate >= since) {
         jobs.push(job);
       }
     }

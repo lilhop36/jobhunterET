@@ -64,6 +64,11 @@ const TELEGRAM_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
+// The HTML fixtures carry fixed August-2026 timestamps, so each test must pass
+// an explicit window instead of relying on the adapter's "last 7 days" default
+// (which expires the fixtures as the calendar moves on).
+const FIXTURE_SINCE = new Date('2026-08-01T00:00:00Z');
+
 describe('TelegramChannelAdapter', () => {
   let adapter: TelegramChannelAdapter;
 
@@ -78,7 +83,7 @@ describe('TelegramChannelAdapter', () => {
       text: async () => TELEGRAM_HTML,
     });
 
-    const jobs = await adapter.fetchJobs();
+    const jobs = await adapter.fetchJobs({ since: FIXTURE_SINCE });
 
     expect(jobs.length).toBe(2); // post 103 is too short / non-job
     expect(jobs[0].sourceJobId).toContain('TestChannel');
@@ -92,7 +97,7 @@ describe('TelegramChannelAdapter', () => {
       text: async () => TELEGRAM_HTML,
     });
 
-    const jobs = await adapter.fetchJobs();
+    const jobs = await adapter.fetchJobs({ since: FIXTURE_SINCE });
     // Company extraction uses pattern matching — at least some should be non-Unknown
     expect(jobs.some(j => j.company !== 'Unknown')).toBe(true);
   });
@@ -103,7 +108,7 @@ describe('TelegramChannelAdapter', () => {
       text: async () => TELEGRAM_HTML,
     });
 
-    const jobs = await adapter.fetchJobs();
+    const jobs = await adapter.fetchJobs({ since: FIXTURE_SINCE });
     const deadlines = jobs.filter(j => j.deadline);
     expect(deadlines.length).toBeGreaterThan(0);
   });
@@ -114,7 +119,7 @@ describe('TelegramChannelAdapter', () => {
       text: async () => TELEGRAM_HTML,
     });
 
-    const jobs = await adapter.fetchJobs();
+    const jobs = await adapter.fetchJobs({ since: FIXTURE_SINCE });
     const hasExternalUrl = jobs.some(
       j => j.url.includes('safaricom') || j.url.includes('dashen'),
     );
@@ -131,7 +136,7 @@ describe('TelegramChannelAdapter', () => {
       text: async () => noLinkHtml,
     });
 
-    const jobs = await adapter.fetchJobs();
+    const jobs = await adapter.fetchJobs({ since: FIXTURE_SINCE });
     const hasTelegramUrl = jobs.some(j => j.url.includes('t.me/TestChannel/'));
     expect(hasTelegramUrl).toBe(true);
   });
@@ -142,7 +147,7 @@ describe('TelegramChannelAdapter', () => {
       text: async () => TELEGRAM_HTML,
     });
 
-    const jobs = await adapter.fetchJobs();
+    const jobs = await adapter.fetchJobs({ since: FIXTURE_SINCE });
     const titles = jobs.map(j => j.title.toLowerCase());
     expect(titles.every(t => !t.includes('happy weekend'))).toBe(true);
   });
@@ -161,7 +166,7 @@ describe('TelegramChannelAdapter', () => {
       text: async () => TELEGRAM_HTML,
     });
 
-    const jobs = await adapter.fetchJobs();
+    const jobs = await adapter.fetchJobs({ since: FIXTURE_SINCE });
     expect(jobs[0].postedDate).toBeInstanceOf(Date);
   });
 
@@ -171,7 +176,7 @@ describe('TelegramChannelAdapter', () => {
       text: async () => TELEGRAM_HTML,
     });
 
-    const jobs = await adapter.fetchJobs();
+    const jobs = await adapter.fetchJobs({ since: FIXTURE_SINCE });
     expect(jobs.every(j => j.employmentType === 'FULL_TIME')).toBe(true);
   });
 
@@ -181,7 +186,7 @@ describe('TelegramChannelAdapter', () => {
       text: async () => TELEGRAM_HTML,
     });
 
-    const jobs = await adapter.fetchJobs();
+    const jobs = await adapter.fetchJobs({ since: FIXTURE_SINCE });
     expect(jobs.every(j => j.location === 'Addis Ababa, Ethiopia')).toBe(true);
   });
 });

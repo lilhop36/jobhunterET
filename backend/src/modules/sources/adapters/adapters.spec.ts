@@ -583,7 +583,11 @@ describe('EthiojobsAdapter', () => {
     expect(jobs[0].company).toBe('EthioTech');
     expect(jobs[0].location).toBe('Addis Ababa');
     expect(jobs[0].locationClass).toBe('ETHIOPIA_LOCAL');
-    expect(jobs[0].skills).toEqual(['React', 'TypeScript']);
+    // Catalogs are categories, not skills — the adapter deliberately leaves
+    // `skills` empty and lets the intelligence layer extract them from the
+    // description (see ethiojobs.adapter.ts::toRaw).
+    expect(jobs[0].categories).toEqual(['React', 'TypeScript']);
+    expect(jobs[0].skills).toEqual([]);
     expect(jobs[0].experienceLevel).toBe('ENTRY');
     expect(jobs[0].url).toContain('/jobs/junior-frontend-dev');
   });
@@ -778,7 +782,8 @@ describe('GeezJobsAdapter', () => {
       <div class="job-content">Design beautiful interfaces.</div>
     </body></html>`);
 
-    const jobs = await adapter.fetchJobs();
+    // The JSON-LD fixture is dated August 2026, so the window is explicit.
+    const jobs = await adapter.fetchJobs({ since: new Date('2026-08-01T00:00:00Z') });
     expect(jobs.length).toBeGreaterThanOrEqual(1);
     expect(jobs[0].title).toBe('Senior Developer - EthioTech');
     expect(jobs[0].company).toBe('EthioTech');
@@ -970,9 +975,10 @@ describe('Shared adapter utilities', () => {
       expect(deriveExperience('VP of Product')).toBe('LEAD');
     });
 
-    it('defaults to MID for unspecified titles', () => {
-      expect(deriveExperience('Software Developer')).toBe('MID');
-      expect(deriveExperience('Full Stack Engineer')).toBe('MID');
+    it('returns UNKNOWN for titles with no seniority indicator', () => {
+      // The adapter prefers UNKNOWN over assuming a level it cannot verify.
+      expect(deriveExperience('Software Developer')).toBe('UNKNOWN');
+      expect(deriveExperience('Full Stack Engineer')).toBe('UNKNOWN');
     });
 
     it('"intern" keyword takes priority over "senior" (intern regex runs first)', () => {
@@ -997,11 +1003,12 @@ describe('Shared adapter utilities', () => {
       expect(mapEmployment('Intern')).toBe('INTERNSHIP');
     });
 
-    it('defaults to FULL_TIME for null/undefined/unknown', () => {
-      expect(mapEmployment(null)).toBe('FULL_TIME');
-      expect(mapEmployment(undefined)).toBe('FULL_TIME');
+    it('maps explicit full-time values and reports unknown input as UNKNOWN', () => {
+      // An absent value is not evidence of full-time employment.
+      expect(mapEmployment(null)).toBe('UNKNOWN');
+      expect(mapEmployment(undefined)).toBe('UNKNOWN');
       expect(mapEmployment('full_time')).toBe('FULL_TIME');
-      expect(mapEmployment('')).toBe('FULL_TIME');
+      expect(mapEmployment('')).toBe('UNKNOWN');
     });
   });
 
