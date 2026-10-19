@@ -11,6 +11,7 @@
  */
 
 import { Logger } from '@nestjs/common';
+import { assertSafeHttpUrl } from '../../common/utils/url-safety';
 
 const logger = new Logger('JobFidelity');
 
@@ -69,6 +70,18 @@ export async function checkUrlLiveness(
     let lastResponse: Response | undefined;
 
     while (redirects <= URL_MAX_REDIRECTS) {
+      // SSRF guard: validate the target (and every redirect hop) before it is
+      // fetched. Ingested URLs are attacker-influenced data.
+      try {
+        await assertSafeHttpUrl(currentUrl);
+      } catch (error) {
+        logger.warn(
+          `Refusing to check unsafe URL ${currentUrl}: ${(error as Error).message}`,
+        );
+        clearTimeout(timeout);
+        return { urlStatus: 'UNSAFE', finalUrl: currentUrl };
+      }
+
       const res = await fetch(currentUrl, {
         method: 'HEAD',
         signal: controller.signal,

@@ -1,4 +1,4 @@
-import { normalizeUrl, decodeHtmlEntities, cleanDescription, scoreDescriptionQuality, extractApplyMethod, normalizeSalary, normalizeCompany, buildFingerprint, truncateHtml, extractDeadlineFromDescription } from "./job-fidelity";
+import { checkUrlLiveness, normalizeUrl, decodeHtmlEntities, cleanDescription, scoreDescriptionQuality, extractApplyMethod, normalizeSalary, normalizeCompany, buildFingerprint, truncateHtml, extractDeadlineFromDescription } from "./job-fidelity";
 
 describe("normalizeUrl (FR-012f)", () => {
   it("strips tracking params", () => { expect(normalizeUrl("https://example.com/job?utm_source=google&id=123")).toBe("https://example.com/job?id=123"); });
@@ -56,4 +56,20 @@ describe("extractDeadlineFromDescription (FR-012h)", () => {
   it("month-first", () => { const r = extractDeadlineFromDescription("Deadline September 6, 2026."); expect(r).toBeInstanceOf(Date); expect(r!.getFullYear()).toBe(2026); });
   it("day-first", () => { const r = extractDeadlineFromDescription("Closing date: 15 August 2026"); expect(r).toBeInstanceOf(Date); expect(r!.getFullYear()).toBe(2026); });
   it("null without keyword", () => { expect(extractDeadlineFromDescription("Regular posting")).toBeNull(); });
+});
+describe('checkUrlLiveness — SSRF guard (FR-013)', () => {
+  it('refuses cloud metadata without making a request', async () => {
+    const result = await checkUrlLiveness('http://169.254.169.254/latest/meta-data/');
+    expect(result.urlStatus).toBe('UNSAFE');
+  });
+
+  it('refuses loopback and private targets', async () => {
+    expect((await checkUrlLiveness('http://127.0.0.1:3000/')).urlStatus).toBe('UNSAFE');
+    expect((await checkUrlLiveness('http://10.0.0.1/')).urlStatus).toBe('UNSAFE');
+    expect((await checkUrlLiveness('http://[::1]/')).urlStatus).toBe('UNSAFE');
+  });
+
+  it('refuses non-http schemes', async () => {
+    expect((await checkUrlLiveness('file:///etc/passwd')).urlStatus).toBe('UNSAFE');
+  });
 });
