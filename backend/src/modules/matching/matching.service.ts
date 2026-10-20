@@ -37,13 +37,13 @@ export interface UnmatchedOutcome {
 }
 
 @Injectable()
-export class MatchingService extends MatchingEngine {
+export class MatchingService {
+  private readonly engine = new MatchingEngine();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
-  ) {
-    super();
-  }
+  ) {}
 
   async buildProfileInput(userId: string): Promise<ProfileInput> {
     const profile = await this.prisma.candidateProfile.findUnique({
@@ -97,7 +97,7 @@ export class MatchingService extends MatchingEngine {
     const prof = await this.buildProfileInput(userId);
     const out = new Map<string, MatchResult>();
     for (const job of jobs) {
-      out.set(job.id, this.scoreJob(this.toJobInput(job), prof));
+      out.set(job.id, this.engine.scoreJob(this.toJobInput(job), prof));
     }
     return out;
   }
@@ -155,9 +155,12 @@ export class MatchingService extends MatchingEngine {
         const prof = profiles.get(user.id);
         if (!prof) continue;
         for (const job of jobs) {
+          // Skip junior/entry-level roles for experienced candidates (>=3 yrs).
+          // ponytail: hard-coded 3yr threshold; make per-user preference if needed.
+          if (prof.years >= 3 && (job.experienceLevel === 'ENTRY' || job.experienceLevel === 'INTERN')) continue;
           const key = `${user.id}:${job.id}`;
           if (existingKeys.has(key)) continue;
-          const result = this.scoreJob(this.toJobInput(job), prof);
+          const result = this.engine.scoreJob(this.toJobInput(job), prof);
           rows.push({
             userId: user.id,
             jobId: job.id,
@@ -267,9 +270,21 @@ export class MatchingService extends MatchingEngine {
       include: { skills: { include: { skill: true } } },
     })) as unknown as JobWithSkills[];
 
-    const scored = jobs.map((job) => ({
+    // Exclude junior/entry-level roles for experienced candidates.
+    // ponytail: hard-coded 3yr threshold; make per-user preference if needed.
+    const excludedIds = prof.years >= 3
+      ? jobs.filter((j) => j.experienceLevel === 'ENTRY' || j.experienceLevel === 'INTERN').map((j) => j.id)
+      : [];
+    if (excludedIds.length) {
+      await this.prisma.jobMatch.deleteMany({ where: { userId, jobId: { in: excludedIds } } });
+    }
+    const eligibleJobs = prof.years >= 3
+      ? jobs.filter((j) => j.experienceLevel !== 'ENTRY' && j.experienceLevel !== 'INTERN')
+      : jobs;
+
+    const scored = eligibleJobs.map((job) => ({
       jobId: job.id,
-      result: this.scoreJob(this.toJobInput(job), prof),
+      result: this.engine.scoreJob(this.toJobInput(job), prof),
     }));
 
     const existing = await this.prisma.jobMatch.findMany({

@@ -4,6 +4,7 @@ import { SourcesController } from './sources.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { MatchingModule } from '../matching/matching.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { EventsModule } from '../events/events.module';
 import { ReliefWebAdapter } from './adapters/reliefweb.adapter';
 import { RemotiveAdapter } from './adapters/remotive.adapter';
 import { ArbeitnowAdapter } from './adapters/arbeitnow.adapter';
@@ -21,7 +22,7 @@ import { JobSourceAdapter } from './adapters/job-source.adapter';
 import { TELEGRAM_ADAPTERS } from './adapters/telegram-tokens';
 
 @Module({
-  imports: [PrismaModule, MatchingModule, NotificationsModule],
+  imports: [PrismaModule, MatchingModule, NotificationsModule, EventsModule],
   controllers: [SourcesController],
   providers: [
     SourcesService,

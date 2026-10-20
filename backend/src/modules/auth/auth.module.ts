@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { MatchingModule } from '../matching/matching.module';
 
 /**
  * SEC-001 hardening: use JWT_SECRET from env when available.
@@ -39,6 +40,7 @@ function resolveJwtSecret(): string {
 @Module({
   imports: [
     PrismaModule,
+    MatchingModule,
     JwtModule.registerAsync({
       useFactory: () => ({
         secret: resolveJwtSecret(),
