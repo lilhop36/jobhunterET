@@ -34,8 +34,8 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth();
-  const { data, err, loading, reload } = useApi<DashboardData>('/api/dashboard');
+  const { user, token } = useAuth();
+  const { data, err, loading, reload } = useApi<DashboardData>(token ? '/api/dashboard' : null);
 
   const { data: matchesPage, loading: matchesLoading, reload: reloadMatches } = useApi<{ items: CarouselMatch[] }>(
     data ? '/api/matches' : null,

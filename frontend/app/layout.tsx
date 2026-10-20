@@ -13,10 +13,12 @@ import '../styles/globals.css';
 function Shell({ children }: { children: ReactNode }) {
   const { token } = useAuth();
   const path = usePathname();
-  const { data, loading, reload } = useApi<{ unread: number; completion: number }>('/api/dashboard');
+  const dashboardPath =
+    token && path !== '/login' && path !== '/register' ? '/api/dashboard' : null;
+  const { data, loading, reload } = useApi<{ unread: number; completion: number }>(dashboardPath);
 
   useEffect(() => {
-    if (!token || path === '/login' || path === '/register') return;
+    if (!dashboardPath) return;
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, path]);

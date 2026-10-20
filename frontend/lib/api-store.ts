@@ -60,9 +60,10 @@ async function fetchJson(path: string): Promise<any> {
   const url = API_BASE ? `${API_BASE}${path}` : path;
   const res = await fetch(url, { headers });
   if (res.status === 401) {
+    const hadToken = !!tk;
     localStorage.removeItem('jh_token');
     localStorage.removeItem('jh_user');
-    window.location.href = '/login';
+    if (hadToken && typeof window !== 'undefined') window.location.href = '/login';
     throw new Error('Session expired — please log in');
   }
   const data = await res.json().catch(() => null);
