@@ -1,0 +1,20 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3211:3211"
+      - "3210:3210"
+    environment:
+      - NODE_ENV=production
+      - PORT=3210
+      - BACKEND_PORT=3210
+      - FRONTEND_PORT=3211
+      - DATABASE_URL=file:/app/data/prod.db
+      - CV_UPLOAD_DIR=/app/data/uploads/cv
+      - JWT_SECRET=${JWT_SECRET:-}
+    volumes:
+      - appdata:/app/data
+    restart: unless-stopped
+
+volumes:
+  appdata:

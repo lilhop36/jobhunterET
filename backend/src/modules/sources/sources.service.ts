@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, BadRequestException, ConflictException, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, BadRequestException, ConflictException, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MatchingService } from '../matching/matching.service';
@@ -34,11 +34,12 @@ const HEALTH_WINDOW = 10;
 const HEALTH_AUTO_DISABLE_THRESHOLD = 50; // percent
 
 @Injectable()
-export class SourcesService implements OnModuleInit {
+export class SourcesService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SourcesService.name);
   private readonly adapters: Record<string, JobSourceAdapter>;
   private readonly queue: CollectionQueue;
   private readonly sourceConfigMap: Record<string, SourceDefinition> = {};
+  private bootTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -102,6 +103,24 @@ export class SourcesService implements OnModuleInit {
     } catch (err: any) {
       this.logger.warn(`[CONFIG] ensureConfigDrivenSources skipped: ${err.message}`);
     }
+
+    // On-boot collection: kick off the first fetch shortly after startup so a
+    // fresh deploy populates jobs without waiting for the first 30-min tick.
+    this.bootTimer = setTimeout(() => {
+      this.collectDue()
+        .then((r) => {
+          if (r.enqueued > 0) this.logger.log(`[BOOT] On-boot collection enqueued ${r.enqueued} sources [${r.due.join(', ')}]`);
+        })
+        .catch((e) => this.logger.warn(`[BOOT] On-boot collection failed: ${e?.message ?? e}`));
+    }, 10_000);
+  }
+
+  onModuleDestroy() {
+    if (this.bootTimer) {
+      clearTimeout(this.bootTimer);
+      this.bootTimer = undefined;
+    }
+  }
   }
 
   /** Create JobSource rows for dynamically-registered Telegram channels. */
