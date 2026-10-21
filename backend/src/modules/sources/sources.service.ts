@@ -121,7 +121,6 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
       this.bootTimer = undefined;
     }
   }
-  }
 
   /** Create JobSource rows for dynamically-registered Telegram channels. */
   private async ensureTelegramSources() {
