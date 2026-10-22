@@ -5,8 +5,8 @@
   "private": true,
   "scripts": {
     "build": "nest build && node scripts/copy-assets.js",
-    "start": "nest start",
-    "start:dev": "node scripts/copy-assets.js && nest start --watch",
+    "start": "cross-env NODE_USE_ENV_PROXY=1 nest start",
+    "start:dev": "node scripts/copy-assets.js && cross-env NODE_USE_ENV_PROXY=1 nest start --watch",
     "start:prod": "sh start.sh",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -56,6 +56,7 @@
     "@types/node": "^20.14.0",
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
+    "cross-env": "^10.1.0",
     "jest": "^29.7.0",
     "prisma": "^5.20.0",
     "ts-jest": "^29.4.12",
