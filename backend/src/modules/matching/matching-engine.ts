@@ -169,22 +169,71 @@ export function satisfiesPrerequisites(targetSkill: string, userSkills: string[]
   return prereqs.every((p) => userSkills.includes(normalizeSkill(p)));
 }
 
+// Words that are too generic to establish role relevance on their own.
+// A synonym hit must be qualified by one of these context words elsewhere
+// in the title (e.g. "Software Developer", "Senior Web Engineer").
+const GENERIC_ROLE_WORDS = new Set(['developer', 'engineer', 'programmer', 'coder']);
+const TECH_QUALIFIERS = new Set([
+  'software', 'web', 'backend', 'back-end', 'frontend', 'front-end',
+  'fullstack', 'full-stack', 'mobile', 'app', 'api', 'data', 'ai',
+  'ml', 'machine', 'devops', 'cloud', 'qa', 'security', 'embedded',
+  'games', 'game', 'ios', 'android', '.net', 'java', 'python',
+]);
+
+/** True when every token of `phrase` appears as a whole word in `tokens`. */
+function containsPhrase(tokens: string[], phrase: string): boolean {
+  const pt = phrase.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!pt.length) return false;
+  for (let i = 0; i + pt.length <= tokens.length; i++) {
+    let ok = true;
+    for (let j = 0; j < pt.length; j++) {
+      if (tokens[i + j] !== pt[j]) { ok = false; break; }
+    }
+    if (ok) return true;
+  }
+  return false;
+}
+
+/** Tokenize a title into lowercase word tokens (non-alphanumerics split). */
+function tokenize(text: string): string[] {
+  return text.toLowerCase().split(/[^a-z0-9+#.]+/).filter(Boolean);
+}
+
 /**
  * Get the role similarity score between a job title and a target role.
+ * Uses normalized, token-aware matching: synonyms must appear as whole
+ * phrases, and bare generic words ("developer", "engineer") only count
+ * when the title also contains a technical qualifier. This prevents
+ * unrelated titles like "Learning Designer and Developer" from earning
+ * software-engineering role credit through substring luck.
  */
 export function roleSimilarity(jobTitle: string, targetRole: string): number {
   const t = jobTitle.toLowerCase();
+  const tokens = tokenize(jobTitle);
   // Normalize underscores to spaces and strip stray quotes so that
   // user-stored roles like '"backend_developer"' or 'backend_developer'
   // match knowledge-base keys like 'backend developer'.
-  const tr = targetRole.toLowerCase().replace(/["']/g, '').replace(/_/g, ' ');
+  const tr = targetRole.toLowerCase().replace(/["']/g, '').replace(/_/g, ' ').trim();
 
-  if (t.includes(tr)) return 1;
+  // If the target role itself is a bare generic word ("developer",
+  // "engineer"), it still needs technical context in the title.
+  const qualifierPresent = tokens.some((w) => TECH_QUALIFIERS.has(w));
+  if (containsPhrase(tokens, tr)) {
+    if (!(GENERIC_ROLE_WORDS.has(tr) && !qualifierPresent)) return 1;
+  }
 
   const words = ROLE_SYNONYMS[tr] || [tr];
   let best = 0;
-  for (const w of words) {
-    if (t.includes(w)) best = Math.max(best, 0.75);
+  for (const w of [...words, tr]) {
+    // Single generic words use token-aware matching (needs technical
+    // context); multi-word phrases keep substring matching so that
+    // hyphenated titles like "Senior Fullstack Engineer" still match
+    // the "full-stack" synonym.
+    const single = w.trim().split(/\s+/).length === 1;
+    if (single ? !containsPhrase(tokens, w) : !t.includes(w)) continue;
+    // Generic single-word synonyms need technical context to count.
+    if (single && GENERIC_ROLE_WORDS.has(w.trim()) && !qualifierPresent) continue;
+    best = Math.max(best, 0.75);
   }
 
   if (best === 0) {
@@ -291,11 +340,12 @@ function matchSkills(
     }
   }
 
-  // When the job has no extractable skills, default to a generous neutral
-  // (0.65) so that role + location alignment can push scores above threshold.
-  // Many Ethiopian HTML-scraped jobs have empty skill arrays — penalizing
-  // the candidate for missing employer data is unfair.
-  const skillFrac = totalWeight > 0 ? earnedWeight / totalWeight : 0.65;
+  // A job with no extractable skills carries NO evidence about skill fit.
+  // Missing employer data must not be treated as positive evidence, so we
+  // use a conservative neutral (0.4) instead of the old generous 0.65.
+  // The relevance gate below still lets genuinely role-aligned jobs with
+  // empty skill arrays reach useful scores via their other dimensions.
+  const skillFrac = totalWeight > 0 ? earnedWeight / totalWeight : 0.4;
 
   return { direct, transferable, related, missing, skillFrac };
 }
@@ -307,12 +357,19 @@ function matchRoleProfile(
   jobTitle: string,
   userSkills: string[],
 ): { roleMatch: number; roleProfile: string | null } {
-  const titleLower = jobTitle.toLowerCase();
+  const tokens = tokenize(jobTitle);
   const userNorm = [...new Set(userSkills.map(normalizeSkill))];
 
   for (const [role, profile] of Object.entries(ROLE_PROFILES)) {
     const roleWords = ROLE_SYNONYMS[role] || [role];
-    const isMatch = roleWords.some((w) => titleLower.includes(w));
+    // Token-aware phrase matching (same rules as roleSimilarity) so that
+    // generic words alone cannot activate a role profile.
+    const qualifierPresent = tokens.some((w) => TECH_QUALIFIERS.has(w));
+    const isMatch = roleWords.some((w) => {
+      const single = w.trim().split(/\s+/).length === 1;
+      if (single && GENERIC_ROLE_WORDS.has(w.trim()) && !qualifierPresent) return false;
+      return single ? containsPhrase(tokens, w) : jobTitle.toLowerCase().includes(w);
+    });
     if (!isMatch) continue;
 
     let coreHits = 0;
@@ -366,6 +423,8 @@ export interface ScoreBreakdown {
 export interface MatchResult {
   score: number;
   roleTarget: string | null;
+  eligible: boolean;
+  ineligibleReasons: string[];
   parts: ScoreBreakdown[];
   matchedSkills: string[];
   transferableSkills: string[];
@@ -420,7 +479,7 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
   else if (roleBest >= 0.6) reasons.push(`Closely related to your "${roleTarget}" goal`);
 
   // ── 2. Skills (30%) — with transferability ────────────────────────
-  
+
   const { direct, transferable, related, missing, skillFrac } = matchSkills(
     job.skills || [],
     prof.skills,
@@ -430,6 +489,43 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
   if (transferable.length) reasons.push(`Transferable: ${transferable.join(', ')}`);
   if (related.length) reasons.push(`Related via graph: ${related.join(', ')}`);
   if (missing.length) reasons.push(`Missing: ${missing.join(', ')}`);
+
+  // ── Hard eligibility filters (checked before any scoring) ─────────
+  // These are constraints, not preferences: excluded jobs get score 0
+  // and eligible=false so callers can drop them from recommendations.
+  const ineligibleReasons: string[] = [];
+
+  // Remote-only seekers must not receive on-site jobs at all.
+  // Only applies when the posting explicitly declares ONSITE — unknown
+  // workPlace values are treated as non-strict to avoid over-filtering.
+  if (prof.remote && job.workPlace === 'ONSITE') {
+    ineligibleReasons.push('On-site role — you only want remote work');
+  }
+
+  // Excluding on-site work must also exclude international on-site jobs,
+  // not just penalize them by a few points.
+  if (
+    prof.excludeOnsite &&
+    job.workPlace === 'ONSITE' &&
+    !job.locationClass.includes('LOCAL')
+  ) {
+    ineligibleReasons.push('International on-site role — you excluded on-site work');
+  }
+
+  // Relevance gate: without evidence that the job relates to one of the
+  // candidate's target roles or core skills, generic bonuses (location,
+  // experience, freshness, neutral salary) must not add up to a high
+  // recommendation score.
+  const hasCoreSkillOverlap =
+    direct.length + transferable.length + related.length > 0;
+  if (!hasCoreSkillOverlap && roleBest < 0.5) {
+    ineligibleReasons.push('No role or skill alignment with your target roles');
+  }
+
+  const eligible = ineligibleReasons.length === 0;
+  if (!eligible) {
+    reasons.push(...ineligibleReasons);
+  }
 
   // ── 3. Experience (15%) ───────────────────────────────────────────
   const reqYears = EXP_YEARS[job.experienceLevel] ?? 2;
@@ -546,6 +642,8 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
     reasons.push('Seniority above your stated experience (−5)');
   }
   if (job.workPlace === 'ONSITE' && !job.locationClass.includes('LOCAL') && prof.excludeOnsite) {
+    // Soft reminder only when the job is still eligible; hard-excluded
+    // jobs never reach this point with a meaningful score.
     pts -= 6;
     reasons.push('On-site only conflicts with your preference (−6)');
   }
@@ -554,7 +652,10 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
     reasons.push('Low parse confidence — details may be incomplete');
   }
 
-  const score = clamp(Math.round(pts), 0, 100);
+  const rawScore = clamp(Math.round(pts), 0, 100);
+  // Hard-ineligible jobs are reported as score 0 so they can never rank
+  // into recommendations or cross any notification threshold.
+  const score = eligible ? rawScore : 0;
 
   // ── Build breakdown ────────────────────────────────────────────────
   const parts: ScoreBreakdown[] = [
@@ -568,19 +669,26 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
   ];
 
   // ── Summary ────────────────────────────────────────────────────────
-  const bits: string[] = [];
-  if (roleTarget) bits.push(`matches your ${roleTarget} goal`);
-  const allMatched = direct.length + transferable.length;
-  if (job.skills?.length) bits.push(`${allMatched} of ${job.skills.length} skills`);
-  if (transferable.length) bits.push(`${transferable.length} transferable`);
-  if (job.locationClass.includes('REMOTE')) bits.push('remote');
-  else if (job.locationClass === 'ETHIOPIA_LOCAL') bits.push('local (Ethiopia)');
-  if (job.experienceLevel === 'ENTRY') bits.push('junior level');
-  const summary = 'Matches your profile — ' + bits.join(', ') + '.';
+  let summary: string;
+  if (!eligible) {
+    summary = ineligibleReasons.join('; ') + '.';
+  } else {
+    const bits: string[] = [];
+    if (roleTarget) bits.push(`matches your ${roleTarget} goal`);
+    const allMatched = direct.length + transferable.length;
+    if (job.skills?.length) bits.push(`${allMatched} of ${job.skills.length} skills`);
+    if (transferable.length) bits.push(`${transferable.length} transferable`);
+    if (job.locationClass.includes('REMOTE')) bits.push('remote');
+    else if (job.locationClass === 'ETHIOPIA_LOCAL') bits.push('local (Ethiopia)');
+    if (job.experienceLevel === 'ENTRY') bits.push('junior level');
+    summary = 'Matches your profile — ' + bits.join(', ') + '.';
+  }
 
   return {
     score,
     roleTarget,
+    eligible,
+    ineligibleReasons,
     parts,
     matchedSkills: direct,
     transferableSkills: transferable,
