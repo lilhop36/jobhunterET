@@ -14,7 +14,9 @@ function makeProfile(overrides: Partial<ProfileInput> = {}): ProfileInput {
     skills: ['Node.js', 'TypeScript', 'PostgreSQL'],
     targetRoles: [{ role: 'Backend Developer', priority: 'HIGH' }],
     locationTiers: { Ethiopia: 'HIGH', Remote: 'HIGH' },
-    remote: true,
+    // Default profiles are open to on-site Ethiopian work; remote-only is
+    // an explicit preference tested separately.
+    remote: false,
     employmentTypes: ['FULL_TIME'],
     years: 2,
     minSalary: 0,
@@ -86,6 +88,25 @@ describe('roleSimilarity (FR-018 role compatibility)', () => {
   it('falls back to a small engineer/developer overlap', () => {
     expect(roleSimilarity('Software Engineer', 'Full Stack Developer')).toBe(0.75); // explicit synonym
     expect(roleSimilarity('Frontend Developer', 'Backend Developer')).toBe(0);
+  });
+
+  it('does not reward generic words without technical context (audit Finding 1)', () => {
+    // "developer" appears as a whole word, but the title has no software
+    // qualifier — it must NOT earn Software Engineer role credit.
+    expect(roleSimilarity('Learning Designer and Developer', 'Software Engineer')).toBe(0);
+    expect(roleSimilarity('Business Development Executive', 'Software Engineer')).toBe(0);
+    expect(roleSimilarity('Social Worker', 'Software Engineer')).toBe(0);
+    expect(roleSimilarity('Banking Officer', 'Software Engineer')).toBe(0);
+    // Bare generic target roles need technical context too.
+    expect(roleSimilarity('Learning Designer and Developer', 'developer')).toBe(0);
+    // But genuine software titles still match.
+    expect(roleSimilarity('Software Developer', 'Software Engineer')).toBe(0.75);
+    expect(roleSimilarity('Productivity Engineer', 'Software Engineer')).toBe(0);
+    // "engineer" alone is generic — even next to a real word it needs a
+    // software-domain qualifier (audit acceptance criterion).
+    expect(roleSimilarity('Developer Productivity Engineer', 'Software Engineer')).toBe(0);
+    // A recognized software synonym phrase ("full stack") does qualify.
+    expect(roleSimilarity('Full Stack Developer', 'Software Engineer')).toBe(0.75);
   });
 });
 
@@ -185,6 +206,80 @@ describe('scoreJob — penalties and confidence (FR-020 / FR-012c)', () => {
       makeProfile({ excludeOnsite: true }),
     );
     expect(excluded.score).toBeLessThan(base.score);
+  });
+
+  it('hard-excludes international on-site jobs when excludeOnsite is set (audit Finding 2)', () => {
+    const r = scoreJob(
+      makeJob({ locationClass: 'INTERNATIONAL_ONSITE', workPlace: 'ONSITE' }),
+      makeProfile({ excludeOnsite: true }),
+    );
+    expect(r.eligible).toBe(false);
+    expect(r.ineligibleReasons.some((x) => x.includes('excluded on-site'))).toBe(true);
+    expect(r.score).toBe(0);
+  });
+
+  it('hard-excludes on-site jobs for remote-only seekers (audit Finding 2)', () => {
+    const onsite = scoreJob(makeJob({ workPlace: 'ONSITE' }), makeProfile({ remote: true }));
+    expect(onsite.eligible).toBe(false);
+    expect(onsite.score).toBe(0);
+    // Remote postings remain eligible for remote-only seekers.
+    const remote = scoreJob(
+      makeJob({ workPlace: 'REMOTE', locationClass: 'ETHIOPIA_REMOTE' }),
+      makeProfile({ remote: true }),
+    );
+    expect(remote.eligible).toBe(true);
+    expect(remote.score).toBeGreaterThan(0);
+  });
+});
+
+describe('scoreJob — relevance gate (audit Findings 1 & 8)', () => {
+  const seProfile = () =>
+    makeProfile({ targetRoles: [{ role: 'Software Engineer', priority: 'HIGH' }] });
+
+  function unrelatedJob(title: string, overrides: Partial<JobInput> = {}): JobInput {
+    return makeJob({
+      title,
+      skills: [], // no extracted skills — must not become positive evidence
+      ...overrides,
+    });
+  }
+
+  it.each([
+    'Learning Designer and Developer',
+    'Social Worker',
+    'Banking Officer',
+    'Business Development Executive',
+    'Graphic Designer',
+    'HR Officer',
+  ])('gates out unrelated role "%s" for a Software Engineer profile', (title) => {
+    const r = scoreJob(unrelatedJob(title), seProfile());
+    expect(r.eligible).toBe(false);
+    expect(r.score).toBe(0);
+  });
+
+  it('does not treat missing job skills as matching evidence', () => {
+    // Same unrelated title WITH real foreign-domain skills also fails the gate.
+    const r = scoreJob(
+      unrelatedJob('Social Worker', { skills: ['Counseling', 'Community Outreach'] }),
+      seProfile(),
+    );
+    expect(r.eligible).toBe(false);
+    expect(r.missingSkills.length).toBe(2);
+  });
+
+  it('still scores genuinely role-aligned jobs with empty skill arrays', () => {
+    // Ethiopian HTML-scraped jobs often lack skills; they must not be lost
+    // entirely just because of that.
+    const r = scoreJob(unrelatedJob('Backend Developer'), makeProfile());
+    expect(r.eligible).toBe(true);
+    expect(r.score).toBeGreaterThanOrEqual(60);
+  });
+
+  it('keeps strong local backend match in expected range', () => {
+    const r = scoreJob(makeJob(), makeProfile());
+    expect(r.eligible).toBe(true);
+    expect(r.score).toBeGreaterThanOrEqual(88);
+    expect(r.score).toBeLessThanOrEqual(95);
   });
 });
 

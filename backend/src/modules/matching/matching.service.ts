@@ -161,6 +161,9 @@ export class MatchingService {
           const key = `${user.id}:${job.id}`;
           if (existingKeys.has(key)) continue;
           const result = this.engine.scoreJob(this.toJobInput(job), prof);
+          // Hard eligibility filters (remote-only, excludeOnsite, relevance
+          // gate): never persist or notify ineligible jobs.
+          if (!result.eligible) continue;
           rows.push({
             userId: user.id,
             jobId: job.id,
@@ -275,17 +278,24 @@ export class MatchingService {
     const excludedIds = prof.years >= 3
       ? jobs.filter((j) => j.experienceLevel === 'ENTRY' || j.experienceLevel === 'INTERN').map((j) => j.id)
       : [];
-    if (excludedIds.length) {
-      await this.prisma.jobMatch.deleteMany({ where: { userId, jobId: { in: excludedIds } } });
-    }
-    const eligibleJobs = prof.years >= 3
-      ? jobs.filter((j) => j.experienceLevel !== 'ENTRY' && j.experienceLevel !== 'INTERN')
-      : jobs;
 
-    const scored = eligibleJobs.map((job) => ({
+    // Hard eligibility filters (remote-only, excludeOnsite, relevance gate):
+    // jobs that became ineligible must have their stale matches removed and
+    // must not be re-persisted — this is how previously inflated matches
+    // (e.g. unrelated "Learning Designer" rows) get cleaned on recalculation.
+    const scored = jobs.map((job) => ({
       jobId: job.id,
       result: this.engine.scoreJob(this.toJobInput(job), prof),
     }));
+    const ineligibleIds = scored.filter((s) => !s.result.eligible).map((s) => s.jobId);
+
+    const removeIds = [...new Set([...excludedIds, ...ineligibleIds])];
+    if (removeIds.length) {
+      await this.prisma.jobMatch.deleteMany({ where: { userId, jobId: { in: removeIds } } });
+    }
+
+    const removeSet = new Set(removeIds);
+    const kept = scored.filter((s) => !removeSet.has(s.jobId));
 
     const existing = await this.prisma.jobMatch.findMany({
       where: { userId, jobId: { in: jobs.map((j) => j.id) } },
@@ -296,7 +306,7 @@ export class MatchingService {
     const newRows: Prisma.JobMatchCreateManyInput[] = [];
     const updateOps: { jobId: string; data: any }[] = [];
 
-    for (const { jobId, result } of scored) {
+    for (const { jobId, result } of kept) {
       const data = this.toMatchData(result);
       if (existingIds.has(jobId)) {
         updateOps.push({ jobId, data });

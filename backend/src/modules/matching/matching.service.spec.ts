@@ -50,7 +50,9 @@ function makeService(notifyResult: 'SENT' | 'WEB' | 'SKIPPED' = 'SENT') {
 function stubEligibleUser(prisma: any) {
   prisma.user.findMany.mockResolvedValue([{ id: 'u1', matchThreshold: 70 }]);
   prisma.candidateProfile.findMany.mockResolvedValue([
-    { userId: 'u1', remote: true, employmentTypes: ['FULL_TIME'], years: 2, minSalary: 0, excludeOnsite: false },
+    // remote:false — the stub job is ONSITE; remote-only seekers would be
+    // hard-excluded by the eligibility filters (audit Finding 2).
+    { userId: 'u1', remote: false, employmentTypes: ['FULL_TIME'], years: 2, minSalary: 0, excludeOnsite: false },
   ]);
   prisma.candidateSkill.findMany.mockResolvedValue([{ userId: 'u1', skill: { name: 'Node.js' } }]);
   prisma.targetRole.findMany.mockResolvedValue([{ userId: 'u1', role: 'Backend Developer', priority: 'HIGH' }]);
