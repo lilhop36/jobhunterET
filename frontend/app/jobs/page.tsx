@@ -119,7 +119,7 @@ export default function JobsPage() {
 
       <form className="card" onSubmit={search} style={{ display: 'flex', gap: 10 }}>
         <input
-          placeholder="Search title, company, skill… (e.g. Node.js)"
+          placeholder="Search title, company, skill… (e.g. Accountant)"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />

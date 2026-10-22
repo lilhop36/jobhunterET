@@ -46,6 +46,7 @@ model CandidateProfile {
   remote          Boolean  @default(false)
   minSalary       Int      @default(0)
   excludeOnsite   Boolean  @default(false)
+  excludeEntryLevel Boolean @default(false)
   employmentTypes String[] @default([])
   onboardDone     Boolean  @default(false)
   createdAt       DateTime @default(now())

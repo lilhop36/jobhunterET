@@ -70,6 +70,7 @@ export class MatchingService {
       years: profile?.years ?? 0,
       minSalary: profile?.minSalary ?? 0,
       excludeOnsite: !!profile?.excludeOnsite,
+      excludeEntryLevel: !!profile?.excludeEntryLevel,
     };
   }
 
@@ -155,9 +156,6 @@ export class MatchingService {
         const prof = profiles.get(user.id);
         if (!prof) continue;
         for (const job of jobs) {
-          // Skip junior/entry-level roles for experienced candidates (>=3 yrs).
-          // ponytail: hard-coded 3yr threshold; make per-user preference if needed.
-          if (prof.years >= 3 && (job.experienceLevel === 'ENTRY' || job.experienceLevel === 'INTERN')) continue;
           const key = `${user.id}:${job.id}`;
           if (existingKeys.has(key)) continue;
           const result = this.engine.scoreJob(this.toJobInput(job), prof);
@@ -252,6 +250,7 @@ export class MatchingService {
         years: p.years,
         minSalary: p.minSalary,
         excludeOnsite: !!p.excludeOnsite,
+        excludeEntryLevel: !!p.excludeEntryLevel,
       });
     }
     return out;
@@ -273,13 +272,8 @@ export class MatchingService {
       include: { skills: { include: { skill: true } } },
     })) as unknown as JobWithSkills[];
 
-    // Exclude junior/entry-level roles for experienced candidates.
-    // ponytail: hard-coded 3yr threshold; make per-user preference if needed.
-    const excludedIds = prof.years >= 3
-      ? jobs.filter((j) => j.experienceLevel === 'ENTRY' || j.experienceLevel === 'INTERN').map((j) => j.id)
-      : [];
-
-    // Hard eligibility filters (remote-only, excludeOnsite, relevance gate):
+    // Hard eligibility filters (remote-only, excludeOnsite, entry-level
+    // preference, relevance gate):
     // jobs that became ineligible must have their stale matches removed and
     // must not be re-persisted — this is how previously inflated matches
     // (e.g. unrelated "Learning Designer" rows) get cleaned on recalculation.
@@ -289,7 +283,7 @@ export class MatchingService {
     }));
     const ineligibleIds = scored.filter((s) => !s.result.eligible).map((s) => s.jobId);
 
-    const removeIds = [...new Set([...excludedIds, ...ineligibleIds])];
+    const removeIds = [...new Set(ineligibleIds)];
     if (removeIds.length) {
       await this.prisma.jobMatch.deleteMany({ where: { userId, jobId: { in: removeIds } } });
     }

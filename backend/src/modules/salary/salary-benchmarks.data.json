@@ -1,0 +1,454 @@
+[
+  {
+    "role": "Frontend Developer",
+    "level": "ENTRY",
+    "etb": {
+      "min": 15000,
+      "median": 25000,
+      "max": 40000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 400,
+      "median": 700,
+      "max": 1200,
+      "currency": "USD"
+    },
+    "notes": "React/Next.js skills command premium"
+  },
+  {
+    "role": "Frontend Developer",
+    "level": "MID",
+    "etb": {
+      "min": 30000,
+      "median": 50000,
+      "max": 80000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 800,
+      "median": 1500,
+      "max": 2500,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Frontend Developer",
+    "level": "SENIOR",
+    "etb": {
+      "min": 60000,
+      "median": 90000,
+      "max": 140000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 1500,
+      "median": 2500,
+      "max": 4000,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Backend Developer",
+    "level": "ENTRY",
+    "etb": {
+      "min": 18000,
+      "median": 28000,
+      "max": 45000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 500,
+      "median": 800,
+      "max": 1300,
+      "currency": "USD"
+    },
+    "notes": "Node.js/NestJS most in-demand"
+  },
+  {
+    "role": "Backend Developer",
+    "level": "MID",
+    "etb": {
+      "min": 35000,
+      "median": 55000,
+      "max": 90000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 900,
+      "median": 1600,
+      "max": 2800,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Backend Developer",
+    "level": "SENIOR",
+    "etb": {
+      "min": 70000,
+      "median": 100000,
+      "max": 160000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 1800,
+      "median": 3000,
+      "max": 5000,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Full Stack Developer",
+    "level": "ENTRY",
+    "etb": {
+      "min": 15000,
+      "median": 25000,
+      "max": 40000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 400,
+      "median": 700,
+      "max": 1200,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Full Stack Developer",
+    "level": "MID",
+    "etb": {
+      "min": 35000,
+      "median": 55000,
+      "max": 85000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 900,
+      "median": 1600,
+      "max": 2500,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Full Stack Developer",
+    "level": "SENIOR",
+    "etb": {
+      "min": 65000,
+      "median": 95000,
+      "max": 150000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 1700,
+      "median": 2800,
+      "max": 4500,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Software Engineer",
+    "level": "ENTRY",
+    "etb": {
+      "min": 15000,
+      "median": 25000,
+      "max": 40000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 400,
+      "median": 700,
+      "max": 1200,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Software Engineer",
+    "level": "MID",
+    "etb": {
+      "min": 35000,
+      "median": 55000,
+      "max": 90000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 900,
+      "median": 1600,
+      "max": 2800,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Software Engineer",
+    "level": "SENIOR",
+    "etb": {
+      "min": 70000,
+      "median": 100000,
+      "max": 160000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 1800,
+      "median": 3000,
+      "max": 5000,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Software Engineer",
+    "level": "LEAD",
+    "etb": {
+      "min": 90000,
+      "median": 130000,
+      "max": 200000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 2500,
+      "median": 4000,
+      "max": 6500,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "DevOps Engineer",
+    "level": "MID",
+    "etb": {
+      "min": 35000,
+      "median": 60000,
+      "max": 95000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 1000,
+      "median": 1800,
+      "max": 3000,
+      "currency": "USD"
+    },
+    "notes": "AWS/Docker/K8s highly valued"
+  },
+  {
+    "role": "DevOps Engineer",
+    "level": "SENIOR",
+    "etb": {
+      "min": 70000,
+      "median": 110000,
+      "max": 170000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 2000,
+      "median": 3200,
+      "max": 5000,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Data Analyst",
+    "level": "ENTRY",
+    "etb": {
+      "min": 12000,
+      "median": 20000,
+      "max": 35000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 350,
+      "median": 600,
+      "max": 1000,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Data Analyst",
+    "level": "MID",
+    "etb": {
+      "min": 25000,
+      "median": 40000,
+      "max": 65000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 700,
+      "median": 1200,
+      "max": 2000,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Data Engineer",
+    "level": "MID",
+    "etb": {
+      "min": 35000,
+      "median": 55000,
+      "max": 85000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 900,
+      "median": 1600,
+      "max": 2500,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Machine Learning Engineer",
+    "level": "MID",
+    "etb": {
+      "min": 40000,
+      "median": 65000,
+      "max": 100000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 1100,
+      "median": 2000,
+      "max": 3200,
+      "currency": "USD"
+    },
+    "notes": "Rare skill premium in Ethiopia"
+  },
+  {
+    "role": "Mobile Developer",
+    "level": "ENTRY",
+    "etb": {
+      "min": 15000,
+      "median": 25000,
+      "max": 40000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 400,
+      "median": 700,
+      "max": 1200,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Mobile Developer",
+    "level": "MID",
+    "etb": {
+      "min": 30000,
+      "median": 50000,
+      "max": 80000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 800,
+      "median": 1500,
+      "max": 2500,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "QA Engineer",
+    "level": "ENTRY",
+    "etb": {
+      "min": 12000,
+      "median": 20000,
+      "max": 35000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 350,
+      "median": 600,
+      "max": 1000,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "QA Engineer",
+    "level": "MID",
+    "etb": {
+      "min": 25000,
+      "median": 40000,
+      "max": 65000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 700,
+      "median": 1200,
+      "max": 2000,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Project Manager",
+    "level": "MID",
+    "etb": {
+      "min": 30000,
+      "median": 50000,
+      "max": 80000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 800,
+      "median": 1500,
+      "max": 2500,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Product Manager",
+    "level": "MID",
+    "etb": {
+      "min": 35000,
+      "median": 60000,
+      "max": 100000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 1000,
+      "median": 1800,
+      "max": 3000,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "UI Designer",
+    "level": "MID",
+    "etb": {
+      "min": 20000,
+      "median": 35000,
+      "max": 55000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 600,
+      "median": 1000,
+      "max": 1700,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "IT Support",
+    "level": "ENTRY",
+    "etb": {
+      "min": 8000,
+      "median": 15000,
+      "max": 25000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 250,
+      "median": 450,
+      "max": 700,
+      "currency": "USD"
+    }
+  },
+  {
+    "role": "Systems Administrator",
+    "level": "MID",
+    "etb": {
+      "min": 25000,
+      "median": 40000,
+      "max": 65000,
+      "currency": "ETB"
+    },
+    "usd": {
+      "min": 700,
+      "median": 1200,
+      "max": 2000,
+      "currency": "USD"
+    }
+  }
+]

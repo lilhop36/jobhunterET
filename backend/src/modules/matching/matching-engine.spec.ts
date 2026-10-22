@@ -21,6 +21,7 @@ function makeProfile(overrides: Partial<ProfileInput> = {}): ProfileInput {
     years: 2,
     minSalary: 0,
     excludeOnsite: false,
+    excludeEntryLevel: false,
     ...overrides,
   };
 }
@@ -90,22 +91,26 @@ describe('roleSimilarity (FR-018 role compatibility)', () => {
     expect(roleSimilarity('Frontend Developer', 'Backend Developer')).toBe(0);
   });
 
-  it('does not reward generic words without technical context (audit Finding 1)', () => {
-    // "developer" appears as a whole word, but the title has no software
-    // qualifier — it must NOT earn Software Engineer role credit.
+  it('matches whole words only, for any profession', () => {
+    expect(roleSimilarity('Senior Accountant', 'Accountant')).toBe(1);
+    expect(roleSimilarity('Head Nurse', 'Nurse')).toBe(1);
+    expect(roleSimilarity('Regional Sales Manager', 'Sales Manager')).toBe(1);
+    expect(roleSimilarity('Site Engineer', 'Engineer')).toBe(1);
+    // Word boundaries still apply: "accounting" is not "accountant".
+    expect(roleSimilarity('Accounting Clerk', 'Accountant')).toBe(0);
+  });
+
+  it('does not reward unrelated titles (audit Finding 1)', () => {
     expect(roleSimilarity('Learning Designer and Developer', 'Software Engineer')).toBe(0);
     expect(roleSimilarity('Business Development Executive', 'Software Engineer')).toBe(0);
     expect(roleSimilarity('Social Worker', 'Software Engineer')).toBe(0);
     expect(roleSimilarity('Banking Officer', 'Software Engineer')).toBe(0);
-    // Bare generic target roles need technical context too.
-    expect(roleSimilarity('Learning Designer and Developer', 'developer')).toBe(0);
-    // But genuine software titles still match.
+    // A generic target role matches its literal word, whichever field it
+    // belongs to (a "Developer" target is not software-only).
+    expect(roleSimilarity('Learning Designer and Developer', 'developer')).toBe(1);
     expect(roleSimilarity('Software Developer', 'Software Engineer')).toBe(0.75);
     expect(roleSimilarity('Productivity Engineer', 'Software Engineer')).toBe(0);
-    // "engineer" alone is generic — even next to a real word it needs a
-    // software-domain qualifier (audit acceptance criterion).
     expect(roleSimilarity('Developer Productivity Engineer', 'Software Engineer')).toBe(0);
-    // A recognized software synonym phrase ("full stack") does qualify.
     expect(roleSimilarity('Full Stack Developer', 'Software Engineer')).toBe(0.75);
   });
 });
@@ -273,6 +278,30 @@ describe('scoreJob — relevance gate (audit Findings 1 & 8)', () => {
     const r = scoreJob(unrelatedJob('Backend Developer'), makeProfile());
     expect(r.eligible).toBe(true);
     expect(r.score).toBeGreaterThanOrEqual(60);
+  });
+
+  it('scores a non-technical profession on the same rules', () => {
+    const prof = makeProfile({
+      skills: ['Accounting', 'Excel', 'IFRS'],
+      targetRoles: [{ role: 'Accountant', priority: 'HIGH' }],
+    });
+    const job = makeJob({
+      title: 'Senior Accountant',
+      // Lower-case/differently-cased skills must still match plain text.
+      skills: ['accounting', 'EXCEL', 'ifrs'],
+    });
+    const r = scoreJob(job, prof);
+    expect(r.eligible).toBe(true);
+    expect(r.score).toBeGreaterThan(70);
+    expect(r.matchedSkills).toEqual(['Accounting', 'Excel', 'IFRS']);
+  });
+
+  it('hides entry-level roles only when the candidate opts in', () => {
+    const job = makeJob({ experienceLevel: 'ENTRY' });
+    expect(scoreJob(job, makeProfile()).eligible).toBe(true);
+    const r = scoreJob(job, makeProfile({ excludeEntryLevel: true }));
+    expect(r.eligible).toBe(false);
+    expect(r.ineligibleReasons.some((x) => x.includes('Entry-level'))).toBe(true);
   });
 
   it('keeps strong local backend match in expected range', () => {

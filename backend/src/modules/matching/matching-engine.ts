@@ -169,20 +169,18 @@ export function satisfiesPrerequisites(targetSkill: string, userSkills: string[]
   return prereqs.every((p) => userSkills.includes(normalizeSkill(p)));
 }
 
-// Words that are too generic to establish role relevance on their own.
-// A synonym hit must be qualified by one of these context words elsewhere
-// in the title (e.g. "Software Developer", "Senior Web Engineer").
-const GENERIC_ROLE_WORDS = new Set(['developer', 'engineer', 'programmer', 'coder']);
-const TECH_QUALIFIERS = new Set([
-  'software', 'web', 'backend', 'back-end', 'frontend', 'front-end',
-  'fullstack', 'full-stack', 'mobile', 'app', 'api', 'data', 'ai',
-  'ml', 'machine', 'devops', 'cloud', 'qa', 'security', 'embedded',
-  'games', 'game', 'ios', 'android', '.net', 'java', 'python',
-]);
+/** Tokenize text into lowercase word tokens. Hyphens, underscores and
+ *  punctuation separate tokens, except for "+", "#" and "." which are part
+ *  of skill names like "c++", "c#" and "node.js". */
+function tokenize(text: string): string[] {
+  return text.toLowerCase().split(/[^a-z0-9+#.]+/).filter(Boolean);
+}
 
-/** True when every token of `phrase` appears as a whole word in `tokens`. */
+/** True when every token of `phrase` appears as a whole word in `tokens`.
+ *  This is profession-neutral: "accountant" matches "senior accountant" but
+ *  never "accounting", and "full-stack" matches "full stack". */
 function containsPhrase(tokens: string[], phrase: string): boolean {
-  const pt = phrase.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const pt = tokenize(phrase);
   if (!pt.length) return false;
   for (let i = 0; i + pt.length <= tokens.length; i++) {
     let ok = true;
@@ -194,53 +192,32 @@ function containsPhrase(tokens: string[], phrase: string): boolean {
   return false;
 }
 
-/** Tokenize a title into lowercase word tokens (non-alphanumerics split). */
-function tokenize(text: string): string[] {
-  return text.toLowerCase().split(/[^a-z0-9+#.]+/).filter(Boolean);
-}
-
 /**
  * Get the role similarity score between a job title and a target role.
- * Uses normalized, token-aware matching: synonyms must appear as whole
- * phrases, and bare generic words ("developer", "engineer") only count
- * when the title also contains a technical qualifier. This prevents
- * unrelated titles like "Learning Designer and Developer" from earning
- * software-engineering role credit through substring luck.
+ * Token-aware phrase matching so results do not depend on the candidate's
+ * profession (an accountant, nurse or driver matches exactly like a
+ * developer does).
  */
 export function roleSimilarity(jobTitle: string, targetRole: string): number {
-  const t = jobTitle.toLowerCase();
   const tokens = tokenize(jobTitle);
   // Normalize underscores to spaces and strip stray quotes so that
   // user-stored roles like '"backend_developer"' or 'backend_developer'
   // match knowledge-base keys like 'backend developer'.
   const tr = targetRole.toLowerCase().replace(/["']/g, '').replace(/_/g, ' ').trim();
 
-  // If the target role itself is a bare generic word ("developer",
-  // "engineer"), it still needs technical context in the title.
-  const qualifierPresent = tokens.some((w) => TECH_QUALIFIERS.has(w));
-  if (containsPhrase(tokens, tr)) {
-    if (!(GENERIC_ROLE_WORDS.has(tr) && !qualifierPresent)) return 1;
-  }
+  if (containsPhrase(tokens, tr)) return 1;
 
   const words = ROLE_SYNONYMS[tr] || [tr];
   let best = 0;
   for (const w of [...words, tr]) {
-    // Single generic words use token-aware matching (needs technical
-    // context); multi-word phrases keep substring matching so that
-    // hyphenated titles like "Senior Fullstack Engineer" still match
-    // the "full-stack" synonym.
-    const single = w.trim().split(/\s+/).length === 1;
-    if (single ? !containsPhrase(tokens, w) : !t.includes(w)) continue;
-    // Generic single-word synonyms need technical context to count.
-    if (single && GENERIC_ROLE_WORDS.has(w.trim()) && !qualifierPresent) continue;
+    if (!containsPhrase(tokens, w)) continue;
     best = Math.max(best, 0.75);
   }
 
   if (best === 0) {
     const profile = ROLE_PROFILES[tr];
     if (profile) {
-      const titleWords = t.split(/\s+/);
-      for (const word of titleWords) {
+      for (const word of tokens) {
         if (word.length > 3) {
           for (const coreSkill of profile.core) {
             const coreNorm = normalizeSkill(coreSkill);
@@ -297,6 +274,9 @@ function matchSkills(
 ): { direct: string[]; transferable: string[]; related: string[]; missing: string[]; skillFrac: number } {
   const userNorm = [...new Set(userSkills.map(normalizeSkill))];
   const jobNorm = [...new Set(jobSkills.map(normalizeSkill))];
+  // Skills outside the tech knowledge base are matched as plain text, so
+  // compare them case-insensitively ("Accounting" == "accounting").
+  const userKeys = new Set(userNorm.map((s) => s.toLowerCase()));
 
   const direct: string[] = [];
   const transferable: string[] = [];
@@ -304,7 +284,7 @@ function matchSkills(
   const missing: string[] = [];
 
   for (const js of jobNorm) {
-    if (userNorm.includes(js)) {
+    if (userKeys.has(js.toLowerCase())) {
       direct.push(js);
     } else {
       let bestTransfer = 0;
@@ -362,14 +342,8 @@ function matchRoleProfile(
 
   for (const [role, profile] of Object.entries(ROLE_PROFILES)) {
     const roleWords = ROLE_SYNONYMS[role] || [role];
-    // Token-aware phrase matching (same rules as roleSimilarity) so that
-    // generic words alone cannot activate a role profile.
-    const qualifierPresent = tokens.some((w) => TECH_QUALIFIERS.has(w));
-    const isMatch = roleWords.some((w) => {
-      const single = w.trim().split(/\s+/).length === 1;
-      if (single && GENERIC_ROLE_WORDS.has(w.trim()) && !qualifierPresent) return false;
-      return single ? containsPhrase(tokens, w) : jobTitle.toLowerCase().includes(w);
-    });
+    // Token-aware phrase matching (same rules as roleSimilarity).
+    const isMatch = roleWords.some((w) => containsPhrase(tokens, w));
     if (!isMatch) continue;
 
     let coreHits = 0;
@@ -398,6 +372,8 @@ export interface ProfileInput {
   years: number;
   minSalary: number;
   excludeOnsite: boolean;
+  /** Hide ENTRY/INTERN postings for candidates who are past that stage. */
+  excludeEntryLevel: boolean;
 }
 
 export interface JobInput {
@@ -510,6 +486,15 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
     !job.locationClass.includes('LOCAL')
   ) {
     ineligibleReasons.push('International on-site role — you excluded on-site work');
+  }
+
+  // Candidate preference, not a profession-wide rule: some users want
+  // entry-level/internship postings, some have outgrown them.
+  if (
+    prof.excludeEntryLevel &&
+    (job.experienceLevel === 'ENTRY' || job.experienceLevel === 'INTERN')
+  ) {
+    ineligibleReasons.push('Entry-level role — you hide entry-level jobs');
   }
 
   // Relevance gate: without evidence that the job relates to one of the

@@ -53,6 +53,7 @@ function makeProfile(overrides: Partial<ProfileInput> = {}): ProfileInput {
     years: 2,
     minSalary: 400,
     excludeOnsite: false,
+    excludeEntryLevel: false,
     ...overrides,
   };
 }

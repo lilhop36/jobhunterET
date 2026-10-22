@@ -196,6 +196,7 @@ async function main() {
       years: demoUser.profile.years,
       minSalary: demoUser.profile.minSalary,
       excludeOnsite: Boolean(demoUser.profile.excludeOnsite),
+      excludeEntryLevel: Boolean(demoUser.profile.excludeEntryLevel),
     };
 
     let created = 0;

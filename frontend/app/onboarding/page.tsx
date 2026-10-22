@@ -17,40 +17,6 @@ interface LocRow {
   tier: Priority;
 }
 
-const ROLE_SUGGESTIONS = [
-  'Backend Developer',
-  'Frontend Developer',
-  'Full Stack Developer',
-  'Software Engineer',
-  'DevOps Engineer',
-  'Data Engineer',
-  'Data Analyst',
-  'QA Engineer',
-  'Mobile Developer',
-  'Project Manager',
-];
-
-const SKILL_SUGGESTIONS = [
-  'Node.js',
-  'TypeScript',
-  'JavaScript',
-  'PostgreSQL',
-  'NestJS',
-  'React',
-  'Next.js',
-  'Express',
-  'Python',
-  'Git',
-  'Docker',
-  'REST API',
-  'GraphQL',
-  'AWS',
-  'Redis',
-  'SQL',
-  'MongoDB',
-  'Tailwind CSS',
-];
-
 const LOCATION_SUGGESTIONS: { region: string; tier: Priority }[] = [
   { region: 'Ethiopia', tier: 'HIGH' },
   { region: 'Remote', tier: 'HIGH' },
@@ -84,6 +50,8 @@ export default function OnboardingPage() {
   const [remote, setRemote] = useState(true);
   const [employmentTypes, setEmploymentTypes] = useState<string[]>(['FULL_TIME']);
   const [saving, setSaving] = useState(false);
+  const [roleDraft, setRoleDraft] = useState('');
+  const [skillDraft, setSkillDraft] = useState('');
   const [err, setErr] = useState<string | null>(null);
 
   // Resume: prefill from the existing profile so the wizard is resumable.
@@ -114,6 +82,20 @@ export default function OnboardingPage() {
 
   const toggleSkill = (s: string) =>
     setSkills((list) => (list.includes(s) ? list.filter((x) => x !== s) : [...list, s]));
+
+  const addRole = () => {
+    const r = roleDraft.trim();
+    if (!r) return;
+    if (!roles.some((x) => x.role.toLowerCase() === r.toLowerCase())) toggleRole(r);
+    setRoleDraft('');
+  };
+
+  const addSkill = () => {
+    const s = skillDraft.trim();
+    if (!s) return;
+    if (!skills.some((x) => x.toLowerCase() === s.toLowerCase())) setSkills([...skills, s]);
+    setSkillDraft('');
+  };
 
   const toggleLoc = (region: string) => {
     setLocTiers((ls) => {
@@ -199,7 +181,7 @@ export default function OnboardingPage() {
           <div className="card">
             <h2>1. Your target roles</h2>
             <label>Professional title</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Software Engineer" />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Accountant, Nurse, Teacher, Developer" />
             <label>Target roles — tap a chip to add; tap again to cycle priority</label>
             <div className="flex flex-wrap gap-1.5">
               {roles.map((r) => (
@@ -210,15 +192,24 @@ export default function OnboardingPage() {
               ))}
               {roles.length === 0 && <span className="muted" style={{ fontSize: 13 }}>Nothing added yet.</span>}
             </div>
-            <p className="muted" style={{ fontSize: 12.5, margin: '10px 0 6px' }}>
-              Try adding:
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {ROLE_SUGGESTIONS.filter((r) => !roles.some((x) => x.role === r)).map((r) => (
-                <button key={r} className="btn ghost small" style={{ minHeight: 32 }} onClick={() => toggleRole(r)}>
-                  <Plus className="h-3.5 w-3.5" /> {r}
-                </button>
-              ))}
+            <label htmlFor="role-draft">Add a target role</label>
+            <div className="flex gap-1.5">
+              <input
+                id="role-draft"
+                value={roleDraft}
+                onChange={(e) => setRoleDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addRole();
+                  }
+                }}
+                placeholder="e.g. Accountant, Nurse, Teacher, Developer"
+                style={{ flex: 1 }}
+              />
+              <button className="btn ghost small" style={{ minHeight: 38 }} onClick={addRole}>
+                <Plus className="h-3.5 w-3.5" /> Add
+              </button>
             </div>
           </div>
         )}
@@ -228,7 +219,7 @@ export default function OnboardingPage() {
           <div className="card">
             <h2>2. Your skills</h2>
             <p className="muted" style={{ marginTop: 0, fontSize: 13.5 }}>
-              Tap the skills you have — variations like "JS" and "JavaScript" count the same.
+              Add the skills you have - variations like "JS" and "JavaScript" count the same.
             </p>
             <div className="flex flex-wrap gap-1.5">
               {skills.map((s) => (
@@ -239,15 +230,24 @@ export default function OnboardingPage() {
               ))}
               {skills.length === 0 && <span className="muted" style={{ fontSize: 13 }}>Nothing selected yet.</span>}
             </div>
-            <p className="muted" style={{ fontSize: 12.5, margin: '10px 0 6px' }}>
-              Try adding:
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {SKILL_SUGGESTIONS.filter((s) => !skills.includes(s)).map((s) => (
-                <button key={s} className="btn ghost small" style={{ minHeight: 32 }} onClick={() => toggleSkill(s)}>
-                  <Plus className="h-3.5 w-3.5" /> {s}
-                </button>
-              ))}
+            <label htmlFor="skill-draft">Add a skill</label>
+            <div className="flex gap-1.5">
+              <input
+                id="skill-draft"
+                value={skillDraft}
+                onChange={(e) => setSkillDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addSkill();
+                  }
+                }}
+                placeholder="e.g. Bookkeeping, Patient care, Excel"
+                style={{ flex: 1 }}
+              />
+              <button className="btn ghost small" style={{ minHeight: 38 }} onClick={addSkill}>
+                <Plus className="h-3.5 w-3.5" /> Add
+              </button>
             </div>
           </div>
         )}

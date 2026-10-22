@@ -8,6 +8,11 @@ const assets = [
     label: 'knowledge-base.json',
   },
   {
+    src: path.join(__dirname, '..', 'src', 'modules', 'salary', 'salary-benchmarks.data.json'),
+    dest: path.join(__dirname, '..', 'dist', 'modules', 'salary', 'salary-benchmarks.data.json'),
+    label: 'salary-benchmarks.data.json',
+  },
+  {
     src: path.join(__dirname, '..', 'src', 'modules', 'sources', 'source-configs.json'),
     dest: path.join(__dirname, '..', 'dist', 'modules', 'sources', 'source-configs.json'),
     label: 'source-configs.json',

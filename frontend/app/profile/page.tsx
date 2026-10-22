@@ -13,6 +13,7 @@ interface Profile {
   remote: boolean;
   minSalary: number;
   excludeOnsite: boolean;
+  excludeEntryLevel: boolean;
   employmentTypes: string[];
   onboardDone: boolean;
   skills: string[];
@@ -65,6 +66,7 @@ export default function ProfilePage() {
         }
         p.remote = !!p.remote;
         p.excludeOnsite = !!p.excludeOnsite;
+        p.excludeEntryLevel = !!p.excludeEntryLevel;
         p.onboardDone = !!p.onboardDone;
       }
       setProfile(p);
@@ -95,6 +97,7 @@ export default function ProfilePage() {
         remote: profile.remote,
         minSalary: Number(profile.minSalary) || 0,
         excludeOnsite: profile.excludeOnsite,
+        excludeEntryLevel: profile.excludeEntryLevel,
         employmentTypes: profile.employmentTypes.filter(Boolean),
         skills: profile.skills,
         targetRoles: profile.targetRoles.map((t) => ({ role: t.role, priority: t.priority })),
@@ -305,6 +308,14 @@ export default function ProfilePage() {
                     onChange={(e) => set('excludeOnsite', e.target.checked)}
                   />
                   Exclude on-site roles outside Ethiopia
+                </label>
+                <label className="checkbox-line">
+                  <input
+                    type="checkbox"
+                    checked={profile.excludeEntryLevel}
+                    onChange={(e) => set('excludeEntryLevel', e.target.checked)}
+                  />
+                  Hide entry-level and internship roles
                 </label>
               </div>
 

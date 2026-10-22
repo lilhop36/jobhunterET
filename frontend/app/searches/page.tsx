@@ -164,11 +164,11 @@ export default function SearchesPage() {
         <div className="grid grid-2">
           <div>
             <label>Name</label>
-            <input placeholder="e.g. Backend roles in Addis" value={name} onChange={(e) => setName(e.target.value)} />
+            <input placeholder="e.g. Accounting roles in Addis" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div>
             <label>Keywords (optional)</label>
-            <input placeholder="e.g. Node.js, backend" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input placeholder="e.g. accountant, nurse, teacher, developer" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
         </div>
         <div className="grid grid-2">

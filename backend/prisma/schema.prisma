@@ -54,6 +54,7 @@ model CandidateProfile {
   remote          Int      @default(0)
   minSalary       Int      @default(0)
   excludeOnsite   Int      @default(0)
+  excludeEntryLevel Int    @default(0)
   // SQLite: employmentTypes stored as JSON array string
   employmentTypes String   @default("[]")
   onboardDone     Int      @default(0)

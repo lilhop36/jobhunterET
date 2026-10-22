@@ -66,6 +66,7 @@ async function main() {
       years: profile?.years ?? 0,
       minSalary: profile?.minSalary ?? 0,
       excludeOnsite: !!profile?.excludeOnsite,
+      excludeEntryLevel: !!profile?.excludeEntryLevel,
     };
 
     const threshold = user.matchThreshold ?? 65;

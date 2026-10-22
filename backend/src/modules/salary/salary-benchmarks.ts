@@ -1,3 +1,5 @@
+import benchmarksData from './salary-benchmarks.data.json';
+
 /**
  * Salary benchmarks for the Ethiopian tech market (ETB/month and USD/month).
  * Sources: local job boards, freelancer surveys, NGO pay scales (2024-2026).
@@ -23,193 +25,14 @@ export interface RoleBenchmark {
  * Static FX conversion: 1 USD ≈ 57 ETB (approximate, update periodically).
  * For production, fetch from an FX API.
  */
-export const USD_TO_ETB = 57;
+export const USD_TO_ETB = Number(process.env.USD_TO_ETB_RATE ?? 57);
 
 /**
  * Benchmark data — keyed by normalized role + level string.
  * Levels: ENTRY, MID, SENIOR, LEAD
  */
-export const BENCHMARKS: RoleBenchmark[] = [
-  // ── Software Engineering ──────────────────────────────
-  {
-    role: 'Frontend Developer',
-    level: 'ENTRY',
-    etb: { min: 15_000, median: 25_000, max: 40_000, currency: 'ETB' },
-    usd: { min: 400, median: 700, max: 1200, currency: 'USD' },
-    notes: 'React/Next.js skills command premium',
-  },
-  {
-    role: 'Frontend Developer',
-    level: 'MID',
-    etb: { min: 30_000, median: 50_000, max: 80_000, currency: 'ETB' },
-    usd: { min: 800, median: 1500, max: 2500, currency: 'USD' },
-  },
-  {
-    role: 'Frontend Developer',
-    level: 'SENIOR',
-    etb: { min: 60_000, median: 90_000, max: 140_000, currency: 'ETB' },
-    usd: { min: 1500, median: 2500, max: 4000, currency: 'USD' },
-  },
-  {
-    role: 'Backend Developer',
-    level: 'ENTRY',
-    etb: { min: 18_000, median: 28_000, max: 45_000, currency: 'ETB' },
-    usd: { min: 500, median: 800, max: 1300, currency: 'USD' },
-    notes: 'Node.js/NestJS most in-demand',
-  },
-  {
-    role: 'Backend Developer',
-    level: 'MID',
-    etb: { min: 35_000, median: 55_000, max: 90_000, currency: 'ETB' },
-    usd: { min: 900, median: 1600, max: 2800, currency: 'USD' },
-  },
-  {
-    role: 'Backend Developer',
-    level: 'SENIOR',
-    etb: { min: 70_000, median: 100_000, max: 160_000, currency: 'ETB' },
-    usd: { min: 1800, median: 3000, max: 5000, currency: 'USD' },
-  },
-  {
-    role: 'Full Stack Developer',
-    level: 'ENTRY',
-    etb: { min: 15_000, median: 25_000, max: 40_000, currency: 'ETB' },
-    usd: { min: 400, median: 700, max: 1200, currency: 'USD' },
-  },
-  {
-    role: 'Full Stack Developer',
-    level: 'MID',
-    etb: { min: 35_000, median: 55_000, max: 85_000, currency: 'ETB' },
-    usd: { min: 900, median: 1600, max: 2500, currency: 'USD' },
-  },
-  {
-    role: 'Full Stack Developer',
-    level: 'SENIOR',
-    etb: { min: 65_000, median: 95_000, max: 150_000, currency: 'ETB' },
-    usd: { min: 1700, median: 2800, max: 4500, currency: 'USD' },
-  },
-  {
-    role: 'Software Engineer',
-    level: 'ENTRY',
-    etb: { min: 15_000, median: 25_000, max: 40_000, currency: 'ETB' },
-    usd: { min: 400, median: 700, max: 1200, currency: 'USD' },
-  },
-  {
-    role: 'Software Engineer',
-    level: 'MID',
-    etb: { min: 35_000, median: 55_000, max: 90_000, currency: 'ETB' },
-    usd: { min: 900, median: 1600, max: 2800, currency: 'USD' },
-  },
-  {
-    role: 'Software Engineer',
-    level: 'SENIOR',
-    etb: { min: 70_000, median: 100_000, max: 160_000, currency: 'ETB' },
-    usd: { min: 1800, median: 3000, max: 5000, currency: 'USD' },
-  },
-  {
-    role: 'Software Engineer',
-    level: 'LEAD',
-    etb: { min: 90_000, median: 130_000, max: 200_000, currency: 'ETB' },
-    usd: { min: 2500, median: 4000, max: 6500, currency: 'USD' },
-  },
-  // ── DevOps / Infra ────────────────────────────────────
-  {
-    role: 'DevOps Engineer',
-    level: 'MID',
-    etb: { min: 35_000, median: 60_000, max: 95_000, currency: 'ETB' },
-    usd: { min: 1000, median: 1800, max: 3000, currency: 'USD' },
-    notes: 'AWS/Docker/K8s highly valued',
-  },
-  {
-    role: 'DevOps Engineer',
-    level: 'SENIOR',
-    etb: { min: 70_000, median: 110_000, max: 170_000, currency: 'ETB' },
-    usd: { min: 2000, median: 3200, max: 5000, currency: 'USD' },
-  },
-  // ── Data / ML ─────────────────────────────────────────
-  {
-    role: 'Data Analyst',
-    level: 'ENTRY',
-    etb: { min: 12_000, median: 20_000, max: 35_000, currency: 'ETB' },
-    usd: { min: 350, median: 600, max: 1000, currency: 'USD' },
-  },
-  {
-    role: 'Data Analyst',
-    level: 'MID',
-    etb: { min: 25_000, median: 40_000, max: 65_000, currency: 'ETB' },
-    usd: { min: 700, median: 1200, max: 2000, currency: 'USD' },
-  },
-  {
-    role: 'Data Engineer',
-    level: 'MID',
-    etb: { min: 35_000, median: 55_000, max: 85_000, currency: 'ETB' },
-    usd: { min: 900, median: 1600, max: 2500, currency: 'USD' },
-  },
-  {
-    role: 'Machine Learning Engineer',
-    level: 'MID',
-    etb: { min: 40_000, median: 65_000, max: 100_000, currency: 'ETB' },
-    usd: { min: 1100, median: 2000, max: 3200, currency: 'USD' },
-    notes: 'Rare skill premium in Ethiopia',
-  },
-  // ── Mobile ────────────────────────────────────────────
-  {
-    role: 'Mobile Developer',
-    level: 'ENTRY',
-    etb: { min: 15_000, median: 25_000, max: 40_000, currency: 'ETB' },
-    usd: { min: 400, median: 700, max: 1200, currency: 'USD' },
-  },
-  {
-    role: 'Mobile Developer',
-    level: 'MID',
-    etb: { min: 30_000, median: 50_000, max: 80_000, currency: 'ETB' },
-    usd: { min: 800, median: 1500, max: 2500, currency: 'USD' },
-  },
-  // ── QA ────────────────────────────────────────────────
-  {
-    role: 'QA Engineer',
-    level: 'ENTRY',
-    etb: { min: 12_000, median: 20_000, max: 35_000, currency: 'ETB' },
-    usd: { min: 350, median: 600, max: 1000, currency: 'USD' },
-  },
-  {
-    role: 'QA Engineer',
-    level: 'MID',
-    etb: { min: 25_000, median: 40_000, max: 65_000, currency: 'ETB' },
-    usd: { min: 700, median: 1200, max: 2000, currency: 'USD' },
-  },
-  // ── PM / Design ───────────────────────────────────────
-  {
-    role: 'Project Manager',
-    level: 'MID',
-    etb: { min: 30_000, median: 50_000, max: 80_000, currency: 'ETB' },
-    usd: { min: 800, median: 1500, max: 2500, currency: 'USD' },
-  },
-  {
-    role: 'Product Manager',
-    level: 'MID',
-    etb: { min: 35_000, median: 60_000, max: 100_000, currency: 'ETB' },
-    usd: { min: 1000, median: 1800, max: 3000, currency: 'USD' },
-  },
-  {
-    role: 'UI Designer',
-    level: 'MID',
-    etb: { min: 20_000, median: 35_000, max: 55_000, currency: 'ETB' },
-    usd: { min: 600, median: 1000, max: 1700, currency: 'USD' },
-  },
-  // ── IT / Support ──────────────────────────────────────
-  {
-    role: 'IT Support',
-    level: 'ENTRY',
-    etb: { min: 8_000, median: 15_000, max: 25_000, currency: 'ETB' },
-    usd: { min: 250, median: 450, max: 700, currency: 'USD' },
-  },
-  {
-    role: 'Systems Administrator',
-    level: 'MID',
-    etb: { min: 25_000, median: 40_000, max: 65_000, currency: 'ETB' },
-    usd: { min: 700, median: 1200, max: 2000, currency: 'USD' },
-  },
-];
+export const BENCHMARKS: RoleBenchmark[] = benchmarksData as RoleBenchmark[];
+
 
 /**
  * Level aliases → canonical level.

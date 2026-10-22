@@ -15,6 +15,7 @@ export interface ProfileView {
   remote: boolean;
   minSalary: number;
   excludeOnsite: boolean;
+  excludeEntryLevel: boolean;
   employmentTypes: string[];
   onboardDone: boolean;
   skills: string[];
@@ -49,6 +50,7 @@ export class ProfileService {
       remote: Boolean(p.remote),
       minSalary: p.minSalary,
       excludeOnsite: Boolean(p.excludeOnsite),
+      excludeEntryLevel: Boolean(p.excludeEntryLevel),
       employmentTypes: this.prisma.jsonArray(p.employmentTypes),
       onboardDone: Boolean(p.onboardDone),
       skills: skills.map((s) => s.skill.name),
@@ -60,7 +62,7 @@ export class ProfileService {
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
     const data: any = {};
-    for (const k of ['title', 'summary', 'years', 'remote', 'minSalary', 'excludeOnsite', 'employmentTypes', 'onboardDone'] as const) {
+    for (const k of ['title', 'summary', 'years', 'remote', 'minSalary', 'excludeOnsite', 'excludeEntryLevel', 'employmentTypes', 'onboardDone'] as const) {
       if (dto[k] !== undefined) {
         let val = dto[k];
         if (k === 'employmentTypes' && Array.isArray(val)) val = this.prisma.json(val);
