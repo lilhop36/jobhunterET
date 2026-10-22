@@ -272,6 +272,49 @@ describe('scoreJob — relevance gate (audit Findings 1 & 8)', () => {
     expect(r.missingSkills.length).toBe(2);
   });
 
+  it('does not let one incidental industry tag imply relevance', () => {
+    // Job boards often include industry tags as skills. For a biomedical
+    // engineer, a marketing job tagged "Medical Devices" is still a
+    // marketing job, not a match.
+    const r = scoreJob(
+      unrelatedJob('Performance Marketing Manager', {
+        skills: ['marketing', 'Medical Devices', 'remote'],
+      }),
+      makeProfile({
+        skills: ['Biomedical Engineering', 'Medical Devices', 'ISO 13485'],
+        targetRoles: [{ role: 'Biomedical Engineer', priority: 'HIGH' }],
+      }),
+    );
+    expect(r.eligible).toBe(false);
+    expect(r.score).toBe(0);
+  });
+
+  it('matches biomedical engineering roles and skills', () => {
+    expect(roleSimilarity('Biomedical Engineer', 'Biomedical Engineer')).toBe(1);
+    expect(roleSimilarity('Clinical Engineer', 'Biomedical Engineer')).toBe(0.75);
+    expect(roleSimilarity('Medical Device Engineer', 'Biomedical Engineer')).toBe(0.75);
+    expect(roleSimilarity('BME - Hospital Equipment', 'Biomedical Engineer')).toBe(0.75);
+
+    const r = scoreJob(
+      makeJob({
+        title: 'Clinical Engineer (Biomedical)',
+        skills: ['Clinical Engineering', 'Medical Devices', 'Preventive Maintenance', 'ISO 13485'],
+        locationClass: 'ETHIOPIA_LOCAL',
+        location: 'Addis Ababa, Ethiopia',
+        employmentType: 'FULL_TIME',
+        experienceLevel: 'MID',
+      }),
+      makeProfile({
+        skills: ['Biomedical Engineering', 'Medical Devices', 'ISO 13485', 'Electronics'],
+        targetRoles: [{ role: 'Biomedical Engineer', priority: 'HIGH' }],
+      }),
+    );
+    expect(r.eligible).toBe(true);
+    expect(r.roleTarget).toBe('Biomedical Engineer');
+    expect(r.matchedSkills).toEqual(['Medical Devices', 'ISO 13485']);
+    expect(r.score).toBeGreaterThan(70);
+  });
+
   it('still scores genuinely role-aligned jobs with empty skill arrays', () => {
     // Ethiopian HTML-scraped jobs often lack skills; they must not be lost
     // entirely just because of that.

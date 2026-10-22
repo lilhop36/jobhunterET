@@ -2,6 +2,110 @@
   "version": "2.0.0",
 
   "skills": {
+    "Biomedical Engineering": {
+      "category": "biomedical",
+      "aliases": ["bme", "biomedical", "bioengineering", "biomedical engineering"],
+      "related": ["Medical Devices", "Clinical Engineering", "Biomechanics", "Medical Imaging", "Electronics"],
+      "prerequisites": [],
+      "roles": ["biomedical_engineer", "clinical_engineer", "medical_device_engineer"],
+      "transferability": { "Medical Devices": 0.60, "Clinical Engineering": 0.60, "Biomechanics": 0.40 }
+    },
+    "Medical Devices": {
+      "category": "biomedical",
+      "aliases": ["medical device", "medical equipment", "medical equipment engineering"],
+      "related": ["Biomedical Engineering", "Clinical Engineering", "ISO 13485", "Electronics", "Preventive Maintenance"],
+      "prerequisites": [],
+      "roles": ["biomedical_engineer", "medical_device_engineer", "clinical_engineer"],
+      "transferability": { "Clinical Engineering": 0.55, "Preventive Maintenance": 0.50, "Electronics": 0.35 }
+    },
+    "Clinical Engineering": {
+      "category": "biomedical",
+      "aliases": ["clinical engineer", "hospital engineering", "clinical equipment"],
+      "related": ["Medical Devices", "Preventive Maintenance", "Biomedical Engineering", "Electronics"],
+      "prerequisites": [],
+      "roles": ["clinical_engineer", "biomedical_engineer"],
+      "transferability": { "Medical Devices": 0.55, "Preventive Maintenance": 0.50 }
+    },
+    "ISO 13485": {
+      "category": "biomedical",
+      "aliases": ["iso13485", "iso 13485", "medical device quality"],
+      "related": ["GMP", "Quality Assurance", "Medical Devices"],
+      "prerequisites": [],
+      "roles": ["medical_device_engineer", "biomedical_engineer"],
+      "transferability": { "GMP": 0.60, "Quality Assurance": 0.50 }
+    },
+    "GMP": {
+      "category": "biomedical",
+      "aliases": ["gmp", "good manufacturing practice"],
+      "related": ["ISO 13485", "Quality Assurance"],
+      "prerequisites": [],
+      "roles": ["medical_device_engineer"],
+      "transferability": { "ISO 13485": 0.60 }
+    },
+    "Quality Assurance": {
+      "category": "biomedical",
+      "aliases": ["quality assurance", "quality control", "qa qc"],
+      "related": ["ISO 13485", "GMP"],
+      "prerequisites": [],
+      "roles": ["medical_device_engineer", "biomedical_engineer"],
+      "transferability": { "ISO 13485": 0.50, "GMP": 0.50 }
+    },
+    "Biomechanics": {
+      "category": "biomedical",
+      "aliases": ["biomechanical", "biomechanics"],
+      "related": ["Biomedical Engineering", "SolidWorks", "MATLAB"],
+      "prerequisites": [],
+      "roles": ["biomedical_engineer"],
+      "transferability": { "Medical Devices": 0.35, "MATLAB": 0.30, "SolidWorks": 0.30 }
+    },
+    "Medical Imaging": {
+      "category": "biomedical",
+      "aliases": ["medical imaging", "mri", "ct scan", "ultrasound", "radiology"],
+      "related": ["Signal Processing", "MATLAB", "Medical Devices"],
+      "prerequisites": [],
+      "roles": ["biomedical_engineer", "clinical_engineer"],
+      "transferability": { "Signal Processing": 0.45, "MATLAB": 0.35 }
+    },
+    "Preventive Maintenance": {
+      "category": "biomedical",
+      "aliases": ["preventive maintenance", "planned maintenance", "equipment maintenance"],
+      "related": ["Medical Devices", "Clinical Engineering"],
+      "prerequisites": [],
+      "roles": ["clinical_engineer", "biomedical_engineer"],
+      "transferability": { "Medical Devices": 0.45 }
+    },
+    "SolidWorks": {
+      "category": "biomedical",
+      "aliases": ["solidworks", "cad", "computer-aided design"],
+      "related": ["Biomechanics", "Biomedical Engineering"],
+      "prerequisites": [],
+      "roles": ["biomedical_engineer"],
+      "transferability": { "Biomechanics": 0.30 }
+    },
+    "MATLAB": {
+      "category": "biomedical",
+      "aliases": ["matlab", "octave"],
+      "related": ["Signal Processing", "Medical Imaging", "Biomechanics", "Python"],
+      "prerequisites": [],
+      "roles": ["biomedical_engineer"],
+      "transferability": { "Signal Processing": 0.40, "Python": 0.35 }
+    },
+    "Signal Processing": {
+      "category": "biomedical",
+      "aliases": ["signal processing", "dsp"],
+      "related": ["MATLAB", "Medical Imaging"],
+      "prerequisites": [],
+      "roles": ["biomedical_engineer"],
+      "transferability": { "MATLAB": 0.40, "Medical Imaging": 0.45 }
+    },
+    "Electronics": {
+      "category": "biomedical",
+      "aliases": ["electronics", "electronic engineering", "circuit design"],
+      "related": ["Medical Devices", "Signal Processing", "Biomedical Engineering"],
+      "prerequisites": [],
+      "roles": ["biomedical_engineer", "medical_device_engineer", "clinical_engineer"],
+      "transferability": { "Signal Processing": 0.30, "Medical Devices": 0.35 }
+    },
     "JavaScript": {
       "category": "languages",
       "aliases": ["js", "javascript", "ecmascript", "es6", "es2015"],
@@ -1125,6 +1229,7 @@
   },
 
   "categories": {
+    "biomedical": ["Biomedical Engineering", "Medical Devices", "Clinical Engineering", "ISO 13485", "GMP", "Quality Assurance", "Biomechanics", "Medical Imaging", "Preventive Maintenance", "SolidWorks", "MATLAB", "Signal Processing", "Electronics"],
     "languages": ["JavaScript", "TypeScript", "Python", "Java", "C#", "Go", "Rust", "PHP", "Ruby", "Swift", "Kotlin", "Dart"],
     "frontend": ["React", "Next.js", "Vue", "Nuxt.js", "Angular", "AngularJS", "Svelte", "Remix", "Astro", "HTML", "CSS", "Tailwind CSS", "SASS", "Redux", "Zustand", "TanStack Query", "React Hook Form", "Vite"],
     "backend": ["NestJS", "Express", "Fastify", "Django", "Django REST Framework", "Flask", "FastAPI", "Rails", "Laravel", "Spring Boot", "Node.js"],
@@ -1209,7 +1314,17 @@
     "Playwright": { "Cypress": 0.70, "Selenium": 0.50, "Puppeteer": 0.60 },
     "Cypress": { "Playwright": 0.70, "Selenium": 0.50 },
     "GitHub Actions": { "GitLab CI": 0.70, "Jenkins": 0.55, "CircleCI": 0.65 },
-    "Figma": { "Adobe XD": 0.70, "Sketch": 0.60 }
+    "Figma": { "Adobe XD": 0.70, "Sketch": 0.60 },
+    "Biomedical Engineering": { "Medical Devices": 0.60, "Clinical Engineering": 0.60, "Biomechanics": 0.40, "Medical Imaging": 0.40 },
+    "Medical Devices": { "Clinical Engineering": 0.55, "Preventive Maintenance": 0.50, "Biomedical Engineering": 0.60 },
+    "Clinical Engineering": { "Medical Devices": 0.55, "Preventive Maintenance": 0.50, "Biomedical Engineering": 0.60 },
+    "ISO 13485": { "GMP": 0.60, "Quality Assurance": 0.50 },
+    "GMP": { "ISO 13485": 0.60 },
+    "Biomechanics": { "Medical Devices": 0.35, "MATLAB": 0.30, "SolidWorks": 0.30 },
+    "Medical Imaging": { "Signal Processing": 0.45, "MATLAB": 0.35, "Medical Devices": 0.30 },
+    "Preventive Maintenance": { "Medical Devices": 0.45 },
+    "MATLAB": { "Signal Processing": 0.40, "Python": 0.35 },
+    "Signal Processing": { "MATLAB": 0.40, "Medical Imaging": 0.45 }
   },
 
   "prerequisites": {
@@ -1244,6 +1359,21 @@
   },
 
   "roleProfiles": {
+    "biomedical_engineer": {
+      "core": ["Biomedical Engineering", "Medical Devices", "Electronics", "Problem Solving", "Preventive Maintenance"],
+      "common": ["Clinical Engineering", "MATLAB", "SolidWorks", "Biomechanics", "ISO 13485"],
+      "advanced": ["Medical Imaging", "Signal Processing", "GMP", "Quality Assurance"]
+    },
+    "clinical_engineer": {
+      "core": ["Clinical Engineering", "Medical Devices", "Preventive Maintenance", "Electronics", "Problem Solving"],
+      "common": ["Biomedical Engineering", "ISO 13485", "Quality Assurance", "MATLAB"],
+      "advanced": ["Medical Imaging", "Signal Processing", "GMP"]
+    },
+    "medical_device_engineer": {
+      "core": ["Medical Devices", "ISO 13485", "Quality Assurance", "Biomedical Engineering"],
+      "common": ["GMP", "Electronics", "SolidWorks", "Biomechanics"],
+      "advanced": ["Medical Imaging", "Signal Processing", "MATLAB"]
+    },
     "backend_developer": {
       "core": ["REST API", "SQL", "Git", "Problem Solving", "Debugging"],
       "common": ["Node.js", "Python", "Java", "Docker", "PostgreSQL", "Testing"],
@@ -1317,6 +1447,11 @@
   },
 
   "roleSynonyms": {
+    "biomedical engineer": ["biomedical engineer", "bme", "biomedical engineering", "biomedical engineering officer", "medical engineer", "medical device engineer", "clinical engineer"],
+    "clinical engineer": ["clinical engineer", "clinical engineering", "hospital engineer", "biomedical technician", "medical equipment engineer"],
+    "medical device engineer": ["medical device engineer", "medical devices engineer", "device engineer", "product development engineer medical"],
+    "medical technologist": ["medical technologist", "lab technologist", "clinical laboratory scientist", "medical laboratory technologist"],
+    "pharmacist": ["pharmacist", "pharmacy", "clinical pharmacist", "hospital pharmacist"],
     "backend developer": ["backend", "back-end", "back end", "api", "node", "server-side", "server side"],
     "frontend developer": ["frontend", "front-end", "front end", "ui developer", "react", "web developer", "client-side"],
     "full stack developer": ["full stack", "fullstack", "full-stack", "software engineer", "web developer", "software developer"],
@@ -1368,6 +1503,10 @@
   },
 
   "negativeSignals": {
+    "biomedical_engineer": {
+      "coreSkills": ["Biomedical Engineering", "Medical Devices", "Clinical Engineering", "Electronics", "ISO 13485", "MATLAB"],
+      "weakEvidence": ["React", "Node.js", "Docker", "Kubernetes", "HTML", "CSS", "WordPress"]
+    },
     "devops_engineer": {
       "coreSkills": ["Linux", "Docker", "Kubernetes", "CI/CD", "Terraform", "Cloud"],
       "weakEvidence": ["React", "Next.js", "HTML", "CSS", "Vue", "Angular", "Figma", "UI Design"]
@@ -1409,6 +1548,15 @@
 
   "aliases": {
     "node": "Node.js", "nodejs": "Node.js", "node.js": "Node.js",
+    "bme": "Biomedical Engineering", "biomedical": "Biomedical Engineering", "bioengineering": "Biomedical Engineering",
+    "medical device": "Medical Devices", "medical equipment": "Medical Devices",
+    "clinical engineer": "Clinical Engineering", "hospital engineering": "Clinical Engineering",
+    "iso13485": "ISO 13485", "iso 13485": "ISO 13485",
+    "gmp": "GMP", "good manufacturing practice": "GMP",
+    "qa qc": "Quality Assurance", "quality control": "Quality Assurance",
+    "biomechanical": "Biomechanics", "mri": "Medical Imaging", "ct scan": "Medical Imaging", "ultrasound": "Medical Imaging",
+    "planned maintenance": "Preventive Maintenance", "equipment maintenance": "Preventive Maintenance",
+    "cad": "SolidWorks", "dsp": "Signal Processing", "matlab": "MATLAB",
     "ts": "TypeScript", "typescript": "TypeScript",
     "js": "JavaScript", "javascript": "JavaScript",
     "reactjs": "React", "react.js": "React",

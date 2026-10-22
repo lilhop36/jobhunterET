@@ -111,6 +111,13 @@
     "aliases": ["industrial"],
     "keywords": ["industrial engineer", "production", "quality control", "lean"]
   },
+  "engineering.biomedical": {
+    "id": "engineering.biomedical",
+    "label": "Biomedical Engineering",
+    "parent": "engineering",
+    "aliases": ["bme", "biomedical", "bioengineering", "clinical engineering"],
+    "keywords": ["biomedical engineer", "medical devices", "clinical engineer", "hospital equipment", "prosthetics", "medical imaging", "biomechanics", "biosafety", "medical equipment maintenance"]
+  },
   "finance-accounting": {
     "id": "finance-accounting",
     "label": "Finance & Accounting",

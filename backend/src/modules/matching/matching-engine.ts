@@ -500,10 +500,12 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
   // Relevance gate: without evidence that the job relates to one of the
   // candidate's target roles or core skills, generic bonuses (location,
   // experience, freshness, neutral salary) must not add up to a high
-  // recommendation score.
-  const hasCoreSkillOverlap =
-    direct.length + transferable.length + related.length > 0;
-  if (!hasCoreSkillOverlap && roleBest < 0.5) {
+  // recommendation score. A single incidental tag is not enough evidence:
+  // boards often tag jobs with an industry ("Medical Devices") that has
+  // nothing to do with the role, so require role alignment or at least two
+  // skill signals.
+  const skillSignals = direct.length + transferable.length + related.length;
+  if (skillSignals < 2 && roleBest < 0.5) {
     ineligibleReasons.push('No role or skill alignment with your target roles');
   }
 
