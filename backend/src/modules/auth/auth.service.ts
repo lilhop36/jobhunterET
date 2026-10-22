@@ -22,26 +22,7 @@ export class AuthService {
   ) {}
 
   private async hash(pw: string): Promise<string> {
-    return bcrypt.hash(pw, 10);
-  }
-
-  /**
-   * FR-001 role-assignment precedence:
-   * - If ADMIN_EMAILS is non-empty, only emails in that list become ADMIN.
-   * - If ADMIN_EMAILS is empty, the first user ever registered becomes ADMIN.
-   * - All other registrations become USER.
-   */
-  private decideRole(email: string, isFirstUser: boolean): 'USER' | 'ADMIN' {
-    const list = (process.env.ADMIN_EMAILS || '')
-      .split(',')
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean);
-    if (list.length > 0) {
-      // When the list is configured, only listed emails become ADMIN.
-      return list.includes(email.toLowerCase()) ? 'ADMIN' : 'USER';
-    }
-    // Empty list: first user is ADMIN, rest are USER.
-    return isFirstUser ? 'ADMIN' : 'USER';
+    return bcrypt.hash(pw, 12);
   }
 
   async register(dto: RegisterDto) {
@@ -56,8 +37,22 @@ export class AuthService {
       throw new ForbiddenException('Invalid invite code');
     }
 
-    const count = await this.prisma.user.count();
-    const role = this.decideRole(dto.email, count === 0);
+    // Determine role atomically to avoid a race on "first user".
+    const role = await this.prisma.$transaction(async (tx) => {
+      const count = await tx.user.count();
+      const list = (process.env.ADMIN_EMAILS || '')
+        .split(',')
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean);
+      if (list.length > 0) return list.includes(dto.email.toLowerCase()) ? 'ADMIN' : 'USER';
+      if (count === 0) {
+        if (!requiredCode) {
+          this.logger.warn('[AUTH] First user becoming ADMIN with no invite code configured — set ADMIN_EMAILS or REGISTRATION_INVITE_CODE for production.');
+        }
+        return 'ADMIN';
+      }
+      return 'USER';
+    });
 
     let user;
     try {
@@ -70,6 +65,9 @@ export class AuthService {
         },
       });
     } catch (err: any) {
+      if (err?.code === 'P2002') {
+        throw new ConflictException('Email already registered');
+      }
       this.logger.warn(`[AUTH] Nested profile create failed: ${err.message} — creating user without profile`);
       user = await this.prisma.user.create({
         data: {

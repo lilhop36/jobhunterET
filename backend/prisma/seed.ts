@@ -74,7 +74,7 @@ async function main() {
     const user = await prisma.user.create({
       data: {
         email,
-        passwordHash: await bcrypt.hash('demo1234', 10),
+        passwordHash: await bcrypt.hash('demo1234', 12),
         role: 'ADMIN',
         matchThreshold: 70,
         profile: {

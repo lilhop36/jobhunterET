@@ -39,7 +39,7 @@ export class JwtAuthGuard implements CanActivate {
     // FR-002h: reject tokens issued before the user's invalidation timestamp.
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, role: true, status: true, tokenInvalidatedAt: true },
+      select: { id: true, email: true, role: true, status: true, tokenInvalidatedAt: true, lastActiveAt: true },
     });
     if (!user || user.status === 'DISABLED' || user.status === 'DELETED') {
       throw new UnauthorizedException('Account is not active');
@@ -48,11 +48,14 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Token has been invalidated — please log in again');
     }
 
-    // FR-001a: update lastActiveAt on authenticated activity.
-    await this.prisma.user.update({
-      where: { id: payload.sub },
-      data: { lastActiveAt: new Date() },
-    });
+    // FR-001a: update lastActiveAt on authenticated activity (throttled to 5 min).
+    const now = new Date();
+    if (!user.lastActiveAt || now.getTime() - user.lastActiveAt.getTime() >= 5 * 60 * 1000) {
+      await this.prisma.user.update({
+        where: { id: payload.sub },
+        data: { lastActiveAt: now },
+      });
+    }
 
     req.user = { id: user.id, email: user.email, role: user.role };
     return true;

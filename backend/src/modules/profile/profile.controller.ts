@@ -46,7 +46,21 @@ export class ProfileController {
   }
 
   @Post('cv')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', {
+    limits: { fileSize: MAX_BYTES },
+    fileFilter: (_req, file, cb) => {
+      const allowedMime = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ];
+      const allowedExt = ['.pdf', '.docx'];
+      const ext = (file.originalname || '').toLowerCase().slice((file.originalname || '').lastIndexOf('.'));
+      if (!allowedExt.includes(ext) || !allowedMime.includes(file.mimetype)) {
+        return cb(new BadRequestException('Only .pdf or .docx files are allowed'), false);
+      }
+      cb(null, true);
+    },
+  }))
   async uploadCv(@CurrentUser() user: AuthUser, @UploadedFile() file: any) {
     if (!file) throw new BadRequestException('No file provided');
     if (file.size > MAX_BYTES) throw new BadRequestException('File exceeds 5 MB limit');

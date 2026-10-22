@@ -37,9 +37,13 @@ async function bootstrap() {
   // otherwise allow all origins so the app works without env var config.
   const corsOrigin = process.env.CORS_ORIGIN;
   const allowedOrigins = corsOrigin
-    ? corsOrigin.split(',').map((s) => s.trim())
+    ? corsOrigin.split(',').map((s) => s.trim()).filter(Boolean)
     : [];
   const isDev = process.env.NODE_ENV !== 'production';
+  if (!isDev && allowedOrigins.length === 0) {
+    console.error('[main] CORS_ORIGIN must be set in production. Refusing to start with permissive CORS.');
+    process.exit(1);
+  }
   app.enableCors({
     origin: isDev || allowedOrigins.length === 0
       ? true
