@@ -1,0 +1,40 @@
+ABEBE KEBEDE
+Software Engineer
+Addis Ababa, Ethiopia
++251 911 234 567 | abebe.kebede@gmail.com
+https://github.com/abebek
+https://linkedin.com/in/abebek
+
+Professional Summary
+Software engineer with 5 years of experience building web applications for Ethiopian fintech.
+
+Work Experience
+Senior Software Engineer
+Commercial Bank of Ethiopia, Addis Ababa
+2021 - Present
+- Built internal payment dashboards with React and Node.js.
+- Led a team of 3 developers.
+
+Software Developer
+Ethio Telecom
+2019 - 2021
+- Maintained billing services in Java.
+
+Education
+BSc in Computer Science
+Addis Ababa University
+2015 - 2019
+
+Skills
+JavaScript, TypeScript, React, Node.js, PostgreSQL, Git, Docker, AWS
+
+Languages
+Amharic - Native
+English - Fluent
+
+Certifications
+AWS Certified Cloud Practitioner, Amazon, 2022
+
+Projects
+JobPilot - A job aggregation platform for Ethiopia
+https://github.com/abebek/jobpilot

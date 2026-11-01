@@ -15,10 +15,15 @@
     "postgresql": "optional / not the current production target"
   },
   "prisma": {
-    "modelCount": 23,
+    "modelCount": 28,
     "models": [
       "User",
       "CandidateProfile",
+      "CandidateEducation",
+      "CandidateExperience",
+      "CandidateProject",
+      "CandidateCertification",
+      "CandidateLanguage",
       "CvFile",
       "TelegramLink",
       "Skill",
@@ -65,8 +70,8 @@
       "telegram"
     ],
     "moduleFileCount": 20,
-    "specFileCount": 33,
-    "testDeclarations": 381,
+    "specFileCount": 35,
+    "testDeclarations": 401,
     "tests": [
       {
         "file": "account.service.spec.ts",
@@ -98,6 +103,10 @@
       },
       {
         "file": "category-mapper.spec.ts",
+        "declarations": 9
+      },
+      {
+        "file": "cv-parser.spec.ts",
         "declarations": 9
       },
       {
@@ -169,8 +178,12 @@
         "declarations": 6
       },
       {
-        "file": "profile.service.spec.ts",
+        "file": "profile-import.spec.ts",
         "declarations": 4
+      },
+      {
+        "file": "profile.service.spec.ts",
+        "declarations": 11
       },
       {
         "file": "rate-limiter.spec.ts",

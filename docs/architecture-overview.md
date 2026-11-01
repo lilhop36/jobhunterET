@@ -17,14 +17,14 @@ JobHunter is an automated job-matching agent for the Ethiopian tech market. It c
 |---|---|
 | Stack | Next.js 15.5, React 19.2, NestJS 10.4, Prisma 5.20, TypeScript 5.5 |
 | Production database | SQLite (Prisma provider: sqlite; Docker URL: `file:/app/data/prod.db`) |
-| Prisma models | 23 — User, CandidateProfile, CvFile, TelegramLink, Skill, CandidateSkill, TargetRole, LocationPreference, JobSource, JobSourceListing, SourceRun, SourceRunCategory, Job, JobSkill, JobMatch, Application, ApplicationTransition, Notification, SearchProfile, Digest, MatchCycle, SystemLog, BotState |
+| Prisma models | 28 — User, CandidateProfile, CandidateEducation, CandidateExperience, CandidateProject, CandidateCertification, CandidateLanguage, CvFile, TelegramLink, Skill, CandidateSkill, TargetRole, LocationPreference, JobSource, JobSourceListing, SourceRun, SourceRunCategory, Job, JobSkill, JobMatch, Application, ApplicationTransition, Notification, SearchProfile, Digest, MatchCycle, SystemLog, BotState |
 | NestJS feature modules | 18 — account, admin, applications, auth, dashboard, digest, events, jobs, lifecycle, matches, matching, notifications, profile, salary, saved-jobs, searches, sources, telegram |
 | Frontend page routes | 18 |
 | Web job sources | 12 — ReliefWeb (Ethiopia), Remotive, Arbeitnow, EthioJobs, Ethio NGO Jobs, GeezJobs, ET Careers, Jobicy, RemoteOK, Landing.jobs, Hagere Jobs, ElelanaJobs |
 | Telegram channels | 3 — ElelanaJobs (Telegram), ShegerJobs (Telegram), EthioJobVacancy (Telegram) |
 | Adapter classes | 13 (12 web + 1 parameterized Telegram) |
 | Collection endpoints | 15 (12 web + 3 Telegram) |
-| Test spec files | 33 (381 `it`/`test` declarations; parameterized cases expand at runtime) |
+| Test spec files | 35 (401 `it`/`test` declarations; parameterized cases expand at runtime) |
 | CI jobs | 6 — lint-and-typecheck, test-backend, build-frontend, security, architecture, runtime-verification |
 
 <!-- END GENERATED OVERVIEW FACTS -->
@@ -157,7 +157,7 @@ Notifications are deduplicated per `(user, job)` pair and rate-limited per chat.
 | Module | Purpose | Key Files |
 |--------|---------|-----------|
 | `auth` | Registration, login, JWT, roles, rate limiting | `auth.service.ts`, `auth.controller.ts` |
-| `profile` | User profiles, CV upload (magic-byte validation, versioning) | `profile.service.ts` |
+| `profile` | Structured candidate profile, supporting documents, CV import with review-before-save | `profile.service.ts`, `cv/cv-parser.ts`, `cv/cv-text.ts` |
 | `matching` | Scoring engine + knowledge base | `matching-engine.ts`, `matching.service.ts` |
 | `sources` | 12 adapter classes, collection queue, health scoring | `adapters/`, `source-classifier.ts` |
 | `telegram` | Bot polling, linking, commands, inline buttons, rate limiting | `telegram.service.ts` |
@@ -177,13 +177,26 @@ Notifications are deduplicated per `(user, job)` pair and rate-limited per chat.
 
 `PrismaModule` is infrastructure, and `health` is a controller-only module; neither is a feature module.
 
+### CV import: review before save
+
+`POST /api/profile/cv/import` extracts text from the active CV (`pdf-parse` for PDF,
+`mammoth` for DOCX) and returns a **draft** parsed by `cv/cv-parser.ts`. Nothing is written:
+the candidate reviews the draft, applies it to the editor, edits it, and only then does
+`PATCH /api/profile` persist anything. The parser is deliberately conservative — an
+unreadable line becomes a `warnings[]` entry rather than a guessed value — and a scanned
+PDF is rejected with a message pointing at manual entry. Structured sections use
+replace-all semantics: sending `education` (or any other section) replaces the stored rows
+inside the same transaction as the profile fields.
+
 ---
 
-## Data Model (22 Prisma Models)
+## Data Model (28 Prisma Models)
 
 ```
-User ──┬── CandidateProfile
-       ├── CvFile
+User ──┬── CandidateProfile ── CandidateEducation / CandidateExperience /
+       │                      CandidateProject / CandidateCertification /
+       │                      CandidateLanguage
+       ├── CvFile (kind: CV | CERTIFICATE | PORTFOLIO | OTHER)
        ├── TargetRole
        ├── LocationPreference
        ├── CandidateSkill ── Skill
@@ -213,7 +226,7 @@ Saved jobs are not a separate table: saving is represented by an `Application` r
 | `/login`, `/register` | Auth forms with invite code support |
 | `/onboarding` | 3-step wizard (roles → skills → locations), resumable |
 | `/dashboard` | Stats, match carousel, daily digest, SSE live updates |
-| `/profile` | Full CRUD, CV upload with progress bar, completion meter |
+| `/profile` | Personal details, education, experience, projects, certifications, languages, documents, CV import review, completion meter |
 | `/settings` | Threshold slider, Telegram linking, password change, pause |
 | `/jobs` | Search, tag-based filtering, infinite scroll |
 | `/jobs/[id]` | Job detail with match score, save/apply actions |

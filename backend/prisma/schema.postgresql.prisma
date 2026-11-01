@@ -33,6 +33,11 @@ model User {
   searches            SearchProfile[]
   targetRoles         TargetRole[]
   telegramLink        TelegramLink?
+  education           CandidateEducation[]
+  experiences         CandidateExperience[]
+  projects            CandidateProject[]
+  certifications      CandidateCertification[]
+  languages           CandidateLanguage[]
 
   @@index([status, lastActiveAt])
 }
@@ -42,6 +47,14 @@ model CandidateProfile {
   userId          String   @unique
   title           String?
   summary         String?
+  // Personal details — confirmed by the candidate, never inferred silently
+  fullName        String?
+  phone           String?
+  city            String?
+  country         String?  @default("Ethiopia")
+  linkedinUrl     String?
+  githubUrl       String?
+  portfolioUrl    String?
   years           Int      @default(0)
   remote          Boolean  @default(false)
   minSalary       Int      @default(0)
@@ -54,6 +67,70 @@ model CandidateProfile {
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model CandidateEducation {
+  id          String @id @default(cuid())
+  userId      String
+  institution String
+  degree      String?
+  field       String?
+  startYear   Int?
+  endYear     Int?
+  grade       String?
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CandidateExperience {
+  id          String  @id @default(cuid())
+  userId      String
+  title       String
+  company     String
+  location    String?
+  startYear   Int?
+  endYear     Int?
+  current     Boolean @default(false)
+  description String?
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CandidateProject {
+  id          String  @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  url         String?
+  year        Int?
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CandidateCertification {
+  id            String  @id @default(cuid())
+  userId        String
+  name          String
+  issuer        String?
+  year          Int?
+  credentialUrl String?
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CandidateLanguage {
+  id          String @id @default(cuid())
+  userId      String
+  language    String
+  // NATIVE | FLUENT | INTERMEDIATE | BASIC
+  proficiency String @default("INTERMEDIATE")
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, language])
+}
+
 model CvFile {
   id           String   @id @default(cuid())
   userId       String
@@ -62,9 +139,13 @@ model CvFile {
   sizeBytes    Int
   uploadedAt   DateTime @default(now())
   active       Boolean  @default(true)
+  // CV | CERTIFICATE | PORTFOLIO | OTHER
+  kind         String   @default("CV")
+  label        String?
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([userId, kind])
 }
 
 model TelegramLink {

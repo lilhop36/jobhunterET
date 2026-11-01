@@ -105,7 +105,7 @@ JobHunter is a **full-stack, multi-user job search agent** built for the Ethiopi
 | Stack | Next.js 15.5, React 19.2, NestJS 10.4, Prisma 5.20, TypeScript 5.5 |
 | Database | SQLite (authoritative, single-node) |
 | Job sources | 12 web sources + 3 Telegram channels (13 adapter classes) |
-| Backend | 18 feature modules, 33 spec files / 381 test declarations |
+| Backend | 18 feature modules, 35 spec files / 401 test declarations |
 | Frontend | 18 page routes |
 | CI | 6 jobs |
 
@@ -253,7 +253,7 @@ jobhunterET/
 - **Production DevOps** — GitHub Actions CI (6 gates, including a browser runtime-verification gate), Vercel deployment, SQLite-first with an optional PostgreSQL schema
 - **Telegram Bot integration** — inline keyboards, rate limiting, deep-link account linking
 - **Security best practices** — JWT with token revocation, bcrypt, Helmet, RBAC, rate limiting
-- **381 test declarations across 33 spec files** — unit tests, integration tests, and e2e coverage
+- **401 test declarations across 35 spec files** — unit tests, integration tests, and e2e coverage
 
 ---
 

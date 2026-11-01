@@ -22,21 +22,26 @@
 ## Inventory
 | Fact | Value |
 |---|---|
-| Prisma models | 23 |
+| Prisma models | 28 |
 | NestJS feature modules | 18 |
 | Frontend page routes | 18 |
 | Web job sources | 12 |
 | Telegram channels | 3 |
 | Collection endpoints | 15 |
 | Adapter classes | 13 |
-| Test spec files | 33 |
-| Test declarations | 381 |
+| Test spec files | 35 |
+| Test declarations | 401 |
 | CI jobs | 6 |
 
 ## Prisma models
 
 - `User`
 - `CandidateProfile`
+- `CandidateEducation`
+- `CandidateExperience`
+- `CandidateProject`
+- `CandidateCertification`
+- `CandidateLanguage`
 - `CvFile`
 - `TelegramLink`
 - `Skill`
@@ -148,6 +153,7 @@ Match cycle default: `10m` (override with `MATCH_CYCLE_INTERVAL`).
 | `auth.service.spec.ts` | 9 |
 | `backup.service.spec.ts` | 5 |
 | `category-mapper.spec.ts` | 9 |
+| `cv-parser.spec.ts` | 9 |
 | `digest.service.spec.ts` | 8 |
 | `elelanajobs.adapter.spec.ts` | 7 |
 | `ethiopia-eligibility.spec.ts` | 13 |
@@ -165,7 +171,8 @@ Match cycle default: `10m` (override with `MATCH_CYCLE_INTERVAL`).
 | `notifications.service.spec.ts` | 7 |
 | `parse-port.spec.ts` | 3 |
 | `prisma.service.spec.ts` | 6 |
-| `profile.service.spec.ts` | 4 |
+| `profile-import.spec.ts` | 4 |
+| `profile.service.spec.ts` | 11 |
 | `rate-limiter.spec.ts` | 5 |
 | `security.spec.ts` | 14 |
 | `sources.controller.spec.ts` | 4 |
@@ -173,4 +180,4 @@ Match cycle default: `10m` (override with `MATCH_CYCLE_INTERVAL`).
 | `telegram-channel.spec.ts` | 11 |
 | `telegram.service.spec.ts` | 16 |
 | `url-safety.spec.ts` | 11 |
-| **Total** | **381** |
+| **Total** | **401** |
