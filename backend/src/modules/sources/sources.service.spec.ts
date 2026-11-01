@@ -23,7 +23,11 @@ function rawJob(overrides: Partial<RawJob> = {}): RawJob {
 function createService() {
   const prisma: any = {
     jobSource: { findUnique: jest.fn(), update: jest.fn(), findMany: jest.fn() },
-    job: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+    job: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn().mockResolvedValue({ id: 'j-new' }), update: jest.fn(), updateMany: jest.fn() },
+    jobSourceListing: {
+      upsert: jest.fn().mockResolvedValue({}),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     skill: { upsert: jest.fn().mockResolvedValue({ id: 'skill-1' }) },
     sourceRun: { create: jest.fn().mockResolvedValue({}) },
     user: { findMany: jest.fn().mockResolvedValue([]) },
@@ -195,6 +199,92 @@ describe('SourcesService.persist — upsert, dedup, reactivation (FR-014 / FR-01
     const update = prisma.job.update.mock.calls[0][0];
     expect(update.data.status).toBe('ACTIVE');
     expect(update.data.statusChangedAt).toBeNull();
+  });
+
+  it('groups the same opening advertised on another board under one canonical job', async () => {
+    const { service, prisma } = createService();
+    prisma.job.findUnique.mockResolvedValue(null);
+    prisma.job.findFirst.mockResolvedValue({ id: 'j-canonical', status: 'ACTIVE', eligibility: 'ELIGIBLE' });
+
+    const result = await (service as any).persist(
+      'elelana',
+      rawJob({
+        sourceJobId: '48053-p1',
+        title: 'Branch Manager “D”',
+        company: 'Kebron Hill Micro finance Institute S.C',
+        location: 'Addis Ababa, Ethiopia',
+        url: 'https://elelanajobs.com/2026/10/31/kebron-hill/',
+      }),
+    );
+
+    // The board's posting becomes a listing on the existing canonical row, not
+    // a second near-duplicate opportunity.
+    expect(result.status).toBe('DUPLICATE');
+    expect(prisma.job.create).not.toHaveBeenCalled();
+    expect(prisma.job.findFirst).toHaveBeenCalledWith({
+      where: {
+        crossSourceKey: 'kebron hill micro finance institute s c|branch manager d|addis ababa ethiopia',
+        sourceId: { not: 'elelana' },
+        eligibility: { in: ['ELIGIBLE', 'REVIEW'] },
+      },
+      select: { id: true, status: true, eligibility: true },
+    });
+    expect(prisma.jobSourceListing.upsert).toHaveBeenCalledWith({
+      where: { sourceId_sourceJobId: { sourceId: 'elelana', sourceJobId: '48053-p1' } },
+      create: expect.objectContaining({
+        jobId: 'j-canonical',
+        url: 'https://elelanajobs.com/2026/10/31/kebron-hill/',
+      }),
+      update: expect.objectContaining({ jobId: 'j-canonical' }),
+    });
+  });
+
+  it('promotes a REVIEW canonical row when the new listing proves Ethiopia eligibility', async () => {
+    const { service, prisma } = createService();
+    prisma.job.findUnique.mockResolvedValue(null);
+    prisma.job.findFirst.mockResolvedValue({ id: 'j-canonical', status: 'ACTIVE', eligibility: 'REVIEW' });
+
+    await (service as any).persist('elelana', rawJob({ sourceJobId: 'el-1' }));
+
+    const update = prisma.job.update.mock.calls[0][0];
+    expect(update.data.eligibility).toBe('ELIGIBLE');
+    expect(update.data.eligibilityReason).toContain('Ethiopia');
+  });
+
+  it('never merges a REJECTED posting into a canonical job', async () => {
+    const { service, prisma } = createService();
+    prisma.job.findUnique.mockResolvedValue(null);
+
+    const result = await (service as any).persist(
+      'elelana',
+      rawJob({ location: 'Nairobi, Kenya', locationClass: 'INTERNATIONAL_ONSITE' }),
+    );
+
+    expect(result.status).toBe('CREATED');
+    expect(prisma.job.create.mock.calls[0][0].data.eligibility).toBe('REJECTED');
+    // No cross-source lookup happened at all.
+    expect(prisma.job.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('records a listing row for a newly created canonical job', async () => {
+    const { service, prisma } = createService();
+    prisma.job.findUnique.mockResolvedValue(null);
+    prisma.job.findFirst.mockResolvedValue(null);
+
+    await (service as any).persist('reliefweb', rawJob());
+
+    const data = prisma.job.create.mock.calls[0][0].data;
+    expect(data.crossSourceKey).toBe('acme|backend developer|addis ababa ethiopia');
+    expect(prisma.jobSourceListing.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          jobId: 'j-new',
+          sourceId: 'reliefweb',
+          sourceJobId: 'rw-1',
+          url: 'https://example.com/job/1',
+        }),
+      }),
+    );
   });
 });
 
@@ -679,5 +769,27 @@ describe('SourcesService � Ethiopia-only eligibility policy at ingestion', () 
     expect(result.sources).not.toContain('remotive');
     expect(result.sources).not.toContain('jobicy');
     expect(result.sources).toContain('ethiojobs');
+  });
+});
+
+describe('SourcesService ghost detection across boards (Phase 4)', () => {
+  it('keeps a canonical job alive while another board still lists it', async () => {
+    const { service, prisma, reliefweb } = createService();
+    prisma.jobSource.findUnique.mockResolvedValue({ id: 'reliefweb', name: 'ReliefWeb', status: 'ACTIVE' });
+    reliefweb.fetchJobs.mockResolvedValue([]);
+    prisma.job.findMany.mockResolvedValue([
+      { id: 'j-canonical', sourceJobId: 'rw-1', missedCycles: 2 },
+    ]);
+    // ElelanaJobs saw the same opening two days ago.
+    prisma.jobSourceListing.findMany.mockResolvedValue([{ jobId: 'j-canonical' }]);
+
+    await service.collect('reliefweb');
+
+    expect(prisma.jobSourceListing.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ sourceId: { not: 'reliefweb' } }),
+      }),
+    );
+    expect(prisma.job.updateMany).not.toHaveBeenCalled();
   });
 });

@@ -126,6 +126,8 @@ export class JobsService {
       include: {
         source: true,
         skills: { include: { skill: true } },
+        // Phase 4: every original board listing behind this canonical job
+        listings: { include: { source: { select: { name: true } } }, orderBy: { firstSeenAt: 'asc' } },
         matches: userId ? { where: { userId } } : false,
         apps: userId ? { where: { userId } } : false,
       },
@@ -155,6 +157,14 @@ export class JobsService {
       description: j.description,
       skills: j.skills.map((s: any) => s.skill.name),
       source: { id: j.source.id, name: j.source.name, tier: j.source.priorityTier },
+      // Phase 4: alternate boards carrying the same opening (empty on list rows)
+      listings: (j.listings ?? []).map((l: any) => ({
+        sourceId: l.sourceId,
+        sourceName: l.source?.name ?? null,
+        url: l.url,
+        firstSeenAt: l.firstSeenAt,
+        lastSeenAt: l.lastSeenAt,
+      })),
       postedDate: j.postedDate,
       deadline: j.deadline,
       firstSeenAt: j.firstSeenAt,

@@ -27,6 +27,7 @@
     "collect:report": "ts-node scripts/collection-coverage-report.ts",
     "duplicates:report": "node scripts/duplicate-report.js",
     "eligibility:backfill": "ts-node --transpile-only scripts/backfill-eligibility.ts",
+    "listings:backfill": "ts-node --transpile-only scripts/backfill-listings.ts",
     "backfill:categories": "ts-node scripts/backfill-categories.ts"
   },
   "dependencies": {

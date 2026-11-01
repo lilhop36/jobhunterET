@@ -17,14 +17,14 @@ JobHunter is an automated job-matching agent for the Ethiopian tech market. It c
 |---|---|
 | Stack | Next.js 15.5, React 19.2, NestJS 10.4, Prisma 5.20, TypeScript 5.5 |
 | Production database | SQLite (Prisma provider: sqlite; Docker URL: `file:/app/data/prod.db`) |
-| Prisma models | 22 — User, CandidateProfile, CvFile, TelegramLink, Skill, CandidateSkill, TargetRole, LocationPreference, JobSource, SourceRun, SourceRunCategory, Job, JobSkill, JobMatch, Application, ApplicationTransition, Notification, SearchProfile, Digest, MatchCycle, SystemLog, BotState |
+| Prisma models | 23 — User, CandidateProfile, CvFile, TelegramLink, Skill, CandidateSkill, TargetRole, LocationPreference, JobSource, JobSourceListing, SourceRun, SourceRunCategory, Job, JobSkill, JobMatch, Application, ApplicationTransition, Notification, SearchProfile, Digest, MatchCycle, SystemLog, BotState |
 | NestJS feature modules | 18 — account, admin, applications, auth, dashboard, digest, events, jobs, lifecycle, matches, matching, notifications, profile, salary, saved-jobs, searches, sources, telegram |
-| Frontend page routes | 19 |
+| Frontend page routes | 18 |
 | Web job sources | 12 — ReliefWeb (Ethiopia), Remotive, Arbeitnow, EthioJobs, Ethio NGO Jobs, GeezJobs, ET Careers, Jobicy, RemoteOK, Landing.jobs, Hagere Jobs, ElelanaJobs |
 | Telegram channels | 3 — ElelanaJobs (Telegram), ShegerJobs (Telegram), EthioJobVacancy (Telegram) |
 | Adapter classes | 13 (12 web + 1 parameterized Telegram) |
 | Collection endpoints | 15 (12 web + 3 Telegram) |
-| Test spec files | 33 (376 `it`/`test` declarations; parameterized cases expand at runtime) |
+| Test spec files | 33 (381 `it`/`test` declarations; parameterized cases expand at runtime) |
 | CI jobs | 6 — lint-and-typecheck, test-backend, build-frontend, security, architecture, runtime-verification |
 
 <!-- END GENERATED OVERVIEW FACTS -->
@@ -114,13 +114,13 @@ Raw jobs pass through the fidelity pipeline (`job-fidelity.spec.ts` tested):
 
 ### Stage 3: Deduplication
 
-Deduplication is **per source**, not cross-source:
-
 1. **Database level**: a unique constraint on `(sourceId, sourceJobId)` prevents the same posting from being stored twice with the same source ID.
-2. **Fingerprint level**: after the fidelity pipeline computes `fingerprint`, `persist()` looks for an existing job with the same `(sourceId, fingerprint)`. A match refreshes `lastSeenAt`, resets `missedCycles`, reactivates a REMOVED row, and keeps that row out of ghost reconciliation instead of creating a second copy. This covers the same posting served under different `sourceJobId` values, such as Arbeitnow's regional domains. The lookup is skipped when the description is empty, because an empty description is not distinctive enough to serve as a dedup key.
-3. **Within a run**: `dedupeWithinRun()` groups by `sourceJobId` and merges `sourceCategories` and `discoveredVia` when a job is found through several category pages.
+2. **Fingerprint level (same source)**: after the fidelity pipeline computes `fingerprint`, `persist()` looks for an existing job with the same `(sourceId, fingerprint)`. A match refreshes `lastSeenAt`, resets `missedCycles`, reactivates a REMOVED row, and keeps that row out of ghost reconciliation instead of creating a second copy. This covers the same posting served under different `sourceJobId` values, such as Arbeitnow's regional domains. The lookup is skipped when the description is empty, because an empty description is not distinctive enough to serve as a dedup key.
+3. **Cross-source fingerprint level**: `persist()` also derives `crossSourceKey` — normalized company + title + location, with the description left out because boards rewrite it. When another board already produced a job with the same key, the incoming posting is attached as a `JobSourceListing` on that canonical job (one row per board, so every original link survives) instead of creating a second opportunity. `REJECTED` postings never merge, and the canonical row keeps the more permissive Ethiopia decision. Matching is exact, never fuzzy, so a near-miss stays a separate job rather than collapsing two real openings.
+4. **Ghost reconciliation**: a canonical job is not expired while another board's listing has seen it inside the same freshness window.
+5. **Within a run**: `dedupeWithinRun()` groups by `sourceJobId` and merges `sourceCategories` and `discoveredVia` when a job is found through several category pages.
 
-Cross-source fingerprint grouping is **not implemented**; it is a backlog item for when duplicate postings across boards become a user-visible problem. Historical same-source groups can be inventoried read-only with `npm run duplicates:report`; `--apply` merges safe groups after a verified backup.
+Historical same-source groups can be inventoried read-only with `npm run duplicates:report`; `--apply` merges safe groups after a verified backup. Rows stored before cross-source grouping existed get their key and listing from `npm run listings:backfill`.
 
 A related case the fingerprint key cannot reach is **content twins**: some sources publish one page per
 city for the same opening, so each variant has its own `sourceJobId`, its own URL, and a description that

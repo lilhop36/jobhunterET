@@ -15,7 +15,7 @@ export interface JobDetail {
   url: string;
   description: string | null;
   skills: string[];
-  source: { name: string; tier: string };
+  source: { id: string; name: string; tier: string };
   postedDate: string;
   deadline: string | null;
   status: string;
@@ -26,6 +26,8 @@ export interface JobDetail {
   urlStatus: string | null;
   descriptionQuality: number | null;
   descriptionSource: string | null;
+  /** Phase 4: every board that carried this opening (canonical source included). */
+  listings?: { sourceId: string; sourceName: string | null; url: string }[];
   saved: boolean;
   application: { stage: string; stageSince: string } | null;
   match: {

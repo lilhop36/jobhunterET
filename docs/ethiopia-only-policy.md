@@ -43,6 +43,10 @@ Evidence rules:
 - **Telegram adapter** — reads only an explicitly labelled location field
   (`Location:`, `Duty Station:`, …). An unlabelled post is `Unknown` → `REVIEW`;
   it is no longer assumed to be Addis Ababa.
+- **Cross-source deduplication** — a posting that merges onto a canonical job
+  from another board carries its own eligibility decision, and a `REJECTED`
+  posting is never allowed to merge. A `REVIEW` canonical row is only promoted
+  when the incoming listing brings positive Ethiopian evidence.
 
 Rows stored before the policy existed default to `REVIEW`. Classify them once:
 
@@ -50,6 +54,15 @@ Rows stored before the policy existed default to `REVIEW`. Classify them once:
 cd backend
 npm run eligibility:backfill -- --dry-run   # inspect counts
 npm run eligibility:backfill                # apply
+```
+
+Rows stored before cross-source grouping existed need their dedup key and
+listing row once (safe to re-run):
+
+```bash
+cd backend
+npm run listings:backfill -- --dry-run
+npm run listings:backfill
 ```
 
 ## Sources

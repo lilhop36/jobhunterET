@@ -16,6 +16,7 @@ import type { JobDetail } from './types';
 export function JobMetadata({ job }: { job: JobDetail }) {
   const dl = fmtDeadline(job.deadline);
   const salaryStr = fmtSalary(job.salary, job.salaryMax ?? null, job.currency);
+  const otherListings = (job.listings ?? []).filter((l) => l.sourceId !== job.source.id);
 
   return (
     <div className="card kv-card">
@@ -97,6 +98,20 @@ export function JobMetadata({ job }: { job: JobDetail }) {
           </>
         )}
       </div>
+
+      {otherListings.length > 0 && (
+        <p className="muted" style={{ marginTop: 12, fontSize: '0.85em' }}>
+          Also posted on:{' '}
+          {otherListings.map((l, i) => (
+            <span key={l.sourceId + l.url}>
+              {i > 0 && ' · '}
+              <a href={l.url} target="_blank" rel="noopener noreferrer">
+                {l.sourceName ?? l.sourceId}
+              </a>
+            </span>
+          ))}
+        </p>
+      )}
 
       <div style={{ marginTop: 18 }}>
         <div className="apply-cta-bar">

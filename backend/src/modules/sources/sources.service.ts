@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MatchingService } from '../matching/matching.service';
 import { normalizeSkill } from '../matching/matching-engine';
-import { runFidelityPipeline } from '../jobs/job-fidelity';
+import { runFidelityPipeline, buildCrossSourceKey } from '../jobs/job-fidelity';
 import { JobSourceAdapter, RawJob, CollectionResult } from './adapters/job-source.adapter';
 import { ReliefWebAdapter } from './adapters/reliefweb.adapter';
 import { RemotiveAdapter } from './adapters/remotive.adapter';
@@ -27,6 +27,9 @@ import sourceConfigs from './source-configs.json';
 import { SourceConfigs, SourceDefinition, QueueConfig } from './source-configs.types';
 
 const BACKOFF_THRESHOLD = Math.max(1, Number(process.env.SOURCE_BACKOFF_THRESHOLD ?? 3));
+
+/** Phase 4: when a cross-source listing disagrees, keep the stronger decision. */
+const ELIGIBILITY_RANK: Record<string, number> = { REJECTED: 0, REVIEW: 1, ELIGIBLE: 2 };
 
 /** Config-driven fallback chain (from source-configs.json). */
 const FALLBACK_CHAIN: Record<string, string[]> = (sourceConfigs as SourceConfigs).fallbackChains ?? {};
@@ -449,6 +452,7 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
           eligibilityReason: eligibility.reason,
         },
       });
+      await this.recordListing(existing.id, sourceId, j);
       return { status: 'DUPLICATE', descQuality: null, linkChecked: false, urlStatus: 'OK' };
     }
 
@@ -497,12 +501,59 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
           eligibilityReason: eligibility.reason,
         },
       });
+      await this.recordListing(sameFingerprint.id, sourceId, j);
       return {
         status: 'DUPLICATE',
         descQuality: null,
         linkChecked: false,
         urlStatus: 'OK',
         matchedSourceJobId: sameFingerprint.sourceJobId ?? undefined,
+      };
+    }
+
+    /*
+     * Phase 4: the same opening advertised on another Ethiopian board. Group on
+     * the normalized company+title+location key and attach this board's listing
+     * to the existing canonical job instead of creating a near-duplicate row.
+     * REJECTED postings never merge: an out-of-scope job must not be able to
+     * ride an in-scope canonical row into the feed.
+     */
+    const crossSourceKey = buildCrossSourceKey(fidelity.company, fidelity.title, fidelity.location);
+    const crossSourceMatch =
+      crossSourceKey && eligibility.status !== 'REJECTED'
+        ? await this.prisma.job.findFirst({
+            where: {
+              crossSourceKey,
+              sourceId: { not: sourceId },
+              eligibility: { in: ['ELIGIBLE', 'REVIEW'] },
+            },
+            select: { id: true, status: true, eligibility: true },
+          })
+        : null;
+
+    if (crossSourceMatch) {
+      const wasRemoved = crossSourceMatch.status === 'REMOVED';
+      // Keep the more permissive decision: a REVIEW canonical row is promoted
+      // once a listing arrives with positive Ethiopian evidence.
+      const promote = ELIGIBILITY_RANK[eligibility.status] > ELIGIBILITY_RANK[crossSourceMatch.eligibility];
+      await this.prisma.job.update({
+        where: { id: crossSourceMatch.id },
+        data: {
+          lastSeenAt: new Date(),
+          missedCycles: 0,
+          status: wasRemoved ? 'ACTIVE' : crossSourceMatch.status,
+          statusChangedAt: wasRemoved ? null : undefined,
+          eligibility: promote ? eligibility.status : crossSourceMatch.eligibility,
+          eligibilityReason: promote ? eligibility.reason : undefined,
+        },
+      });
+      await this.recordListing(crossSourceMatch.id, sourceId, j);
+      return {
+        status: 'DUPLICATE',
+        descQuality: null,
+        linkChecked: false,
+        urlStatus: 'OK',
+        matchedSourceJobId: j.sourceJobId,
       };
     }
 
@@ -513,7 +564,7 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
       skillIds.push(s.id);
     }
 
-    await this.prisma.job.create({
+    const created = await this.prisma.job.create({
       data: {
         title: fidelity.title,
         company: fidelity.company,
@@ -550,6 +601,8 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
         finalUrl: fidelity.finalUrl,
         // FR-014: fingerprint for dedup
         fingerprint: fidelity.fingerprint,
+        // Phase 4: groups the same opening across boards
+        crossSourceKey: crossSourceKey || null,
         // Canonical categories
         categories: this.prisma.json(mapSourceCategories(sourceId, j.sourceCategories ?? [], j)),
         // Ethiopia-only scope decision
@@ -561,12 +614,28 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
+    await this.recordListing(created.id, sourceId, j);
+
     return {
       status: 'CREATED',
       descQuality: fidelity.descriptionQuality,
       linkChecked: fidelity.urlCheckedAt !== null,
       urlStatus: fidelity.urlStatus,
     };
+  }
+
+  /**
+   * Phase 4: remember where a canonical job was seen. One row per
+   * (source, sourceJobId) keeps every board's original link, even after the
+   * posting is grouped under another board's canonical row.
+   */
+  private async recordListing(jobId: string, sourceId: string, j: RawJob): Promise<void> {
+    const now = new Date();
+    await this.prisma.jobSourceListing.upsert({
+      where: { sourceId_sourceJobId: { sourceId, sourceJobId: j.sourceJobId } },
+      create: { jobId, sourceId, sourceJobId: j.sourceJobId, url: j.url, firstSeenAt: now, lastSeenAt: now },
+      update: { jobId, url: j.url, lastSeenAt: now },
+    });
   }
 
   /**
@@ -781,8 +850,27 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
       where,
       select: { id: true, sourceJobId: true, missedCycles: true },
     });
-    const unseen = stored.filter((j) => !seenIds.has(j.sourceJobId!));
+    let unseen = stored.filter((j) => !seenIds.has(j.sourceJobId!));
     if (!unseen.length) return;
+
+    /*
+     * Phase 4: a canonical job may also be listed by another board. If that
+     * board has seen it inside this source's own freshness window, the job is
+     * still live and must not be ghosted for disappearing from this one.
+     */
+    const stillListed = await this.prisma.jobSourceListing.findMany({
+      where: {
+        jobId: { in: unseen.map((j) => j.id) },
+        sourceId: { not: sourceId },
+        lastSeenAt: { gte: coverage.since },
+      },
+      select: { jobId: true },
+    });
+    if (stillListed.length) {
+      const kept = new Set(stillListed.map((l) => l.jobId));
+      unseen = unseen.filter((j) => !kept.has(j.id));
+      if (!unseen.length) return;
+    }
 
     await this.prisma.job.updateMany({
       where: { id: { in: unseen.map((j) => j.id) } },

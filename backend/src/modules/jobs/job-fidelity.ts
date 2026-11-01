@@ -493,6 +493,23 @@ export function normalizeCompany(name: string): string {
 }
 
 /**
+ * Phase 4: key for grouping the same opening across boards. Same normalized
+ * company + title + location, ignoring the description (boards routinely
+ * rewrite it) and the source. No fuzzy matching: a near-miss stays separate
+ * rather than risking two real jobs collapsed into one.
+ */
+export function buildCrossSourceKey(company: string, title: string, location: string): string {
+  const clean = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const parts = [clean(normalizeCompany(company)), clean(title), clean(location)];
+  return parts.every(Boolean) ? parts.join('|') : '';
+}
+
+/**
  * FR-014: Build a fingerprint for deduplication.
  * Uses company + title + location + normalized description (first 500 chars).
  */

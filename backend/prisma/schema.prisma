@@ -139,8 +139,27 @@ model JobSource {
   lastHealthCheckAt   DateTime?    @map("last_health_check_at")
   jobs                Job[]
   runs                SourceRun[]
+  listings            JobSourceListing[]
 
   @@map("JobSource")
+}
+
+/// One original posting on one board. A Job is the canonical opportunity; when
+/// the same opening is advertised on several boards each board keeps its own
+/// listing row, so every original link survives deduplication.
+model JobSourceListing {
+  id          String    @id @default(cuid())
+  jobId       String
+  sourceId    String
+  sourceJobId String
+  url         String
+  firstSeenAt DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  source      JobSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, sourceJobId])
+  @@index([jobId])
 }
 
 model SourceRun {
@@ -234,11 +253,16 @@ model Job {
   // Ethiopia-only ingestion policy: ELIGIBLE | REVIEW | REJECTED
   eligibility           String         @default("REVIEW")
   eligibilityReason     String?
+  // Cross-source deduplication key (normalized company|title|location). Two
+  // boards advertising the same opening share it, so one canonical Job serves
+  // both listings.
+  crossSourceKey        String?
   apps                 Application[]
   source               JobSource          @relation(fields: [sourceId], references: [id])
   matches              JobMatch[]
   skills               JobSkill[]
   notifications        Notification[]
+  listings             JobSourceListing[]
 
   @@unique([sourceId, sourceJobId])
   @@index([status])
@@ -248,6 +272,7 @@ model Job {
   @@index([status, deadline])
   @@index([status, urlStatus])
   @@index([eligibility])
+  @@index([crossSourceKey])
 }
 
 model JobSkill {

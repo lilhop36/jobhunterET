@@ -22,15 +22,15 @@
 ## Inventory
 | Fact | Value |
 |---|---|
-| Prisma models | 22 |
+| Prisma models | 23 |
 | NestJS feature modules | 18 |
-| Frontend page routes | 19 |
+| Frontend page routes | 18 |
 | Web job sources | 12 |
 | Telegram channels | 3 |
 | Collection endpoints | 15 |
 | Adapter classes | 13 |
 | Test spec files | 33 |
-| Test declarations | 376 |
+| Test declarations | 381 |
 | CI jobs | 6 |
 
 ## Prisma models
@@ -44,6 +44,7 @@
 - `TargetRole`
 - `LocationPreference`
 - `JobSource`
+- `JobSourceListing`
 - `SourceRun`
 - `SourceRunCategory`
 - `Job`
@@ -102,7 +103,6 @@ Adapter classes (13): `arbeitnow.adapter.ts`, `elelanajobs.adapter.ts`, `etcaree
 
 ## Frontend routes
 
-- `/`
 - `/admin/dashboard`
 - `/admin/users`
 - `/applications`
@@ -169,8 +169,8 @@ Match cycle default: `10m` (override with `MATCH_CYCLE_INTERVAL`).
 | `rate-limiter.spec.ts` | 5 |
 | `security.spec.ts` | 14 |
 | `sources.controller.spec.ts` | 4 |
-| `sources.service.spec.ts` | 36 |
+| `sources.service.spec.ts` | 41 |
 | `telegram-channel.spec.ts` | 11 |
 | `telegram.service.spec.ts` | 16 |
 | `url-safety.spec.ts` | 11 |
-| **Total** | **376** |
+| **Total** | **381** |
