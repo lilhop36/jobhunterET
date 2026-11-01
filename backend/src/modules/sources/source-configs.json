@@ -19,6 +19,7 @@
     },
     {
       "id": "remotive",
+      "enabled": false,
       "name": "Remotive",
       "adapter": "remotive",
       "type": "JSON_API",
@@ -36,6 +37,7 @@
     },
     {
       "id": "arbeitnow",
+      "enabled": false,
       "name": "Arbeitnow",
       "adapter": "arbeitnow",
       "type": "JSON_API",
@@ -214,6 +216,7 @@
     },
     {
       "id": "jobicy",
+      "enabled": false,
       "name": "Jobicy",
       "adapter": "jobicy",
       "type": "JSON_API",
@@ -245,6 +248,7 @@
     },
     {
       "id": "remoteok",
+      "enabled": false,
       "name": "RemoteOK",
       "adapter": "remoteok",
       "type": "JSON_API",
@@ -262,6 +266,7 @@
     },
     {
       "id": "landingjobs",
+      "enabled": false,
       "name": "Landing.jobs",
       "adapter": "landingjobs",
       "type": "JSON_API",

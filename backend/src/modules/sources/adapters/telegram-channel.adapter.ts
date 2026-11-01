@@ -16,6 +16,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { JobSourceAdapter, RawJob, deriveExperience, FETCH_TIMEOUT_MS } from './job-source.adapter';
+import { classifyLocationText, isEthiopianLocation } from '../../eligibility/ethiopia-eligibility';
 
 interface TelegramPost {
   id: string;
@@ -140,11 +141,15 @@ export class TelegramChannelAdapter implements JobSourceAdapter {
     // Extract education/requirements for description
     const description = this.extractDescription(text);
 
+    // Scope: never inherit Addis Ababa by default — an unlabelled foreign post
+    // would otherwise enter the Ethiopian feed. Unknown stays unknown (REVIEW).
+    const location = this.extractLocation(text);
+
     return {
       title,
       company,
-      location: 'Addis Ababa, Ethiopia',
-      locationClass: 'ETHIOPIA_LOCAL',
+      location,
+      locationClass: classifyLocationText(location) as RawJob['locationClass'],
       employmentType: 'FULL_TIME',
       experienceLevel: deriveExperience(title),
       workPlace: 'ONSITE',
@@ -154,10 +159,19 @@ export class TelegramChannelAdapter implements JobSourceAdapter {
       postedDate: new Date(post.date),
       deadline: deadline ?? undefined,
       description,
-      country: 'Ethiopia',
+      country: isEthiopianLocation(location) ? 'Ethiopia' : undefined,
       parseConfidence: 65, // Lower confidence since we're parsing unstructured Telegram posts
       rawData: { channel: this.channelUsername, postId: post.id, views: post.views },
     };
+  }
+
+  private extractLocation(text: string): string {
+    // Only an explicit, labelled field is trusted. A place name anywhere in the
+    // body can belong to the employer ("Safaricom Ethiopia"), not the job.
+    const labelled = text.match(
+      /(?:location|duty station|place of work|work location|job location)\s*[:\-]\s*([^\n|;]{2,60})/i,
+    );
+    return labelled ? labelled[1].trim().replace(/\s+/g, ' ') : 'Unknown';
   }
 
   private extractTitle(text: string): string | null {

@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PASSWORD_COST } from '../src/common/security/password-policy';
 import { SKILL_DICT, scoreJob } from '../src/modules/matching/matching-engine';
+import { evaluateEthiopiaEligibility } from '../src/modules/eligibility/ethiopia-eligibility';
 
 const prisma = new PrismaClient();
 
@@ -145,6 +146,16 @@ async function main() {
         employmentType: j.employmentType as any,
         experienceLevel: j.experienceLevel as any,
         workPlace: j.locationClass.includes('REMOTE') ? 'REMOTE' : 'ONSITE',
+        ...(() => {
+          const decision = evaluateEthiopiaEligibility({
+            title: j.title,
+            location: j.location,
+            description: j.desc,
+            workPlace: j.locationClass.includes('REMOTE') ? 'REMOTE' : 'ONSITE',
+            locationClass: j.locationClass,
+          });
+          return { eligibility: decision.status, eligibilityReason: decision.reason };
+        })(),
         salary: j.salary,
         url: 'https://example.com/job',
         sourceId: j.sourceId,
@@ -176,7 +187,7 @@ async function main() {
 
   if (demoUser?.profile && demoUser.matches.length === 0) {
     const jobs = await prisma.job.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: 'ACTIVE', eligibility: 'ELIGIBLE' },
       include: { skills: { include: { skill: true } } },
     });
 

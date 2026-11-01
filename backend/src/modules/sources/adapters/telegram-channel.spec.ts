@@ -87,7 +87,8 @@ describe('TelegramChannelAdapter', () => {
 
     expect(jobs.length).toBe(2); // post 103 is too short / non-job
     expect(jobs[0].sourceJobId).toContain('TestChannel');
-    expect(jobs[0].locationClass).toBe('ETHIOPIA_LOCAL');
+    // No location field in the fixture: unknown, never auto-labelled Ethiopia.
+    expect(jobs[0].locationClass).toBe('UNKNOWN');
     expect(jobs[0].parseConfidence).toBe(65);
   });
 
@@ -180,13 +181,31 @@ describe('TelegramChannelAdapter', () => {
     expect(jobs.every(j => j.employmentType === 'FULL_TIME')).toBe(true);
   });
 
-  it('sets default location to Addis Ababa, Ethiopia', async () => {
+  it('leaves an unlabelled location unknown instead of assuming Addis Ababa', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       text: async () => TELEGRAM_HTML,
     });
 
     const jobs = await adapter.fetchJobs({ since: FIXTURE_SINCE });
-    expect(jobs.every(j => j.location === 'Addis Ababa, Ethiopia')).toBe(true);
+    expect(jobs.every(j => j.location === 'Unknown')).toBe(true);
+    expect(jobs.every(j => j.country === undefined)).toBe(true);
+  });
+
+  it('reads an explicit foreign location so the eligibility policy can reject it', async () => {
+    const foreignHtml = TELEGRAM_HTML.replace(
+      '<p>Education: BA in Accounting</p>',
+      '<p>Location: Kampala, Uganda</p><p>Education: BA in Accounting</p>',
+    );
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => foreignHtml,
+    });
+
+    const jobs = await adapter.fetchJobs({ since: FIXTURE_SINCE });
+    const foreign = jobs.find(j => j.location.includes('Kampala'));
+    expect(foreign).toBeDefined();
+    expect(foreign!.locationClass).toBe('INTERNATIONAL_ONSITE');
+    expect(foreign!.country).toBeUndefined();
   });
 });

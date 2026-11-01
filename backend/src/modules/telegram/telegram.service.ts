@@ -254,8 +254,13 @@ export class TelegramService implements OnModuleInit {
   }
 
   private async pollOnce() {
+    // SEC-007: the 5s long-poll is the server's promise, not a guarantee. This runs inside
+    // runExclusive('telegram-poll'), so a response that never arrives would hold the poll slot
+    // and stop the bot answering anyone. The cap sits well above the long-poll window so a
+    // normal empty poll is never the thing that trips it.
     const res = await fetch(
       `https://api.telegram.org/bot${this.botToken}/getUpdates?offset=${this.updateOffset}&timeout=5`,
+      { signal: AbortSignal.timeout(20_000) },
     );
     if (!res.ok) return;
     const body = (await res.json()) as { result?: TelegramUpdate[] };

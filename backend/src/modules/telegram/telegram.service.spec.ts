@@ -215,6 +215,27 @@ describe('TelegramService.poll — BUG-002 offset persistence + reentrancy', () 
 
     expect(upsert).not.toHaveBeenCalled();
   });
+
+  it('SEC-007: pollOnce caps the long-poll so a silent Bot API cannot hold the poll slot', async () => {
+    const prisma = {
+      botState: { findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn() },
+    } as any;
+    const svc = new TelegramService(prisma, applicationsMock);
+    (svc as any).botToken = 'test-token';
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: [] }),
+    } as any);
+
+    await (svc as any).pollOnce();
+
+    // The `timeout=5` in the URL is what the server is asked to honour, not what the client
+    // waits for. Without the signal the only backstop is a socket that never closes, and poll()
+    // holds runExclusive('telegram-poll') while it waits — so the bot stops answering everyone.
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(init.signal!.aborted).toBe(false);
+  });
 });
 /**
  * FR-030 (SRS §22) from the Telegram side: the [Reject] button on a match alert

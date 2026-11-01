@@ -105,7 +105,7 @@ JobHunter is a **full-stack, multi-user job search agent** built for the Ethiopi
 | Stack | Next.js 15.5, React 19.2, NestJS 10.4, Prisma 5.20, TypeScript 5.5 |
 | Database | SQLite (authoritative, single-node) |
 | Job sources | 11 web sources + 3 Telegram channels (12 adapter classes) |
-| Backend | 18 feature modules, 28 spec files / 330 test declarations |
+| Backend | 18 feature modules, 32 spec files / 369 test declarations |
 | Frontend | 19 page routes |
 | CI | 6 jobs |
 
@@ -204,14 +204,19 @@ Match Categories: 90-100 Excellent · 80-89 Strong · 70-79 Good
 
 ## 🌍 Job Sources
 
-### Ethiopia (Priority 1)
-EthioJobs · Ethio NGO Jobs · GeezJobs · ET Careers · ReliefWeb · Hagere Jobs
+### Ethiopia (enabled)
+EthioJobs · Ethio NGO Jobs · GeezJobs · ET Careers · ReliefWeb (Ethiopia feed) · Hagere Jobs
 
-### Remote (Priority 2)
-Remotive · Arbeitnow · Jobicy · RemoteOK · Landing.jobs
+### International (disabled)
+Remotive · Arbeitnow · Jobicy · RemoteOK · Landing.jobs — adapters stay registered,
+switched off by `enabled: false` in `source-configs.json`.
 
 ### Telegram channels
 ElelanaJobs · ShegerJobs · EthioJobVacancy
+
+Only jobs located in Ethiopia (or remote roles explicitly open to Ethiopia) enter
+the feed. Everything else is rejected or held for review — see
+[docs/ethiopia-only-policy.md](docs/ethiopia-only-policy.md).
 
 ---
 
@@ -248,7 +253,7 @@ jobhunterET/
 - **Production DevOps** — GitHub Actions CI (6 gates, including a browser runtime-verification gate), Vercel deployment, SQLite-first with an optional PostgreSQL schema
 - **Telegram Bot integration** — inline keyboards, rate limiting, deep-link account linking
 - **Security best practices** — JWT with token revocation, bcrypt, Helmet, RBAC, rate limiting
-- **330 test declarations across 28 spec files** — unit tests, integration tests, and e2e coverage
+- **369 test declarations across 32 spec files** — unit tests, integration tests, and e2e coverage
 
 ---
 

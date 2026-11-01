@@ -20,6 +20,7 @@ export interface JobFilter {
   tag?: string;
   sort?: 'newest' | 'deadline';
   showDead?: boolean;
+  eligibility?: 'ELIGIBLE' | 'REVIEW' | 'REJECTED';
   userId?: string;
   limit?: string;
   cursor?: string;
@@ -40,7 +41,8 @@ export class JobsService {
 
   /** Keyset-paginated job list — stable (sortKey, id) ordering. */
   async list(f: JobFilter): Promise<Page<any>> {
-    const where: any = f.showDead ? {} : { status: 'ACTIVE' };
+    const where: any = { eligibility: f.eligibility ?? 'ELIGIBLE' };
+    if (!f.showDead) where.status = 'ACTIVE';
     if (f.source) where.sourceId = f.source;
     if (f.type) where.employmentType = f.type;
     if (f.workplace === 'REMOTE') where.locationClass = { contains: 'REMOTE' };
@@ -102,7 +104,7 @@ export class JobsService {
       return this.tagCountsCache.data;
     }
     const jobs = await this.prisma.job.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: 'ACTIVE', eligibility: 'ELIGIBLE' },
       select: { tags: true },
       take: 10000, // safety cap — prevents unbounded load at scale
     });

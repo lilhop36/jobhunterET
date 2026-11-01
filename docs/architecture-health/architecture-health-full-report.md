@@ -270,6 +270,35 @@ AUTH_RATE_MAX=500 AUTH_EMAIL_RATE_MAX=500 …   # the suite makes more auth call
 BACKEND_URL=… QA_ADMIN_EMAIL=… QA_ADMIN_PASSWORD=… npm run nfr:check
 ```
 
+### SEC-007, SEC-010, SEC-011: controls declared in code with no test (2026-11-01)
+
+The generated SECURITY table pairs each `SEC-xxx` control with the code that declares it and the test
+that proves it. Three rows had the code and `**none**` for evidence, which is the shape this matrix
+exists to catch: `SEC-007` (every upstream fetch capped so a hung source cannot stall the scheduler),
+`SEC-010` (SQLite stores booleans as `Int` and JSON as text, so the access layer coerces on one engine
+and must not on the other), `SEC-011` (the SSE stream authenticates like any other protected route,
+from the HttpOnly `jh_token` cookie rather than a header).
+
+Each now has a spec exercising its behaviour — `adapters/fetch-timeout.spec.ts`,
+`prisma/prisma.service.spec.ts`, `events/events.controller.spec.ts`, 15 tests — and the SEC-007 one is
+written as a tree-wide invariant rather than a single call site: it extracts every `fetch(...)` in the
+production source and fails if any lacks a `signal`. **That test found a live defect on its first
+run.** `TelegramService.pollOnce()` long-polls the Bot API with `?timeout=5` and had no signal at all,
+while the SEC-007 comment two methods above it covered sends only. A Bot API that accepts the
+connection and never answers leaves that `fetch` pending inside
+`runExclusive('telegram-poll')`, which drops every subsequent poll tick — the bot stops answering all
+users until the process restarts. It now carries `AbortSignal.timeout(20_000)`, comfortably above the
+5 s window the server is asked to hold, so a normal empty poll cannot trip it; the SEC-007 spec pins
+both the presence of the signal and the invariant that keeps the next adapter from repeating the miss.
+
+The other two are boundary tests rather than bug hunts: SEC-010 asserts the coercion in both
+directions (`bool(true)` is `1` on SQLite and stays `true` on PostgreSQL, an unparseable JSON column
+yields `[]`/`null` instead of throwing), and SEC-011 asserts the stream refuses a token that would be
+refused anywhere else — absent, unverifiable, from a deactivated account, or issued before a
+"sign out everywhere" — and opens for the cookie-only browser case. The four affected specs run green
+together (31 tests); the full-suite count is recorded in `check-output-post-remediation.txt` rather
+than here, so this section does not carry a number that a later run can silently age.
+
 ### Content twins: one posting, one page per city (2026-10-30)
 
 The Gate 6 rehearsal ran against the local `dev.db` as well as the seeded database, and on the account

@@ -21,6 +21,7 @@ import { EventsService } from '../events/events.service';
 import { CollectionQueue, QueueResult } from './collection-queue';
 import { classifyJob, getAllTags } from './source-classifier';
 import { mapSourceCategories } from './categories/category-mapper';
+import { evaluateEthiopiaEligibility } from '../eligibility/ethiopia-eligibility';
 import sourceConfigs from './source-configs.json';
 import { SourceConfigs, SourceDefinition, QueueConfig } from './source-configs.types';
 
@@ -150,6 +151,7 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
   private async ensureConfigDrivenSources() {
     const configs = (sourceConfigs as SourceConfigs).sources ?? [];
     for (const cfg of configs) {
+      const status = cfg.enabled === false ? 'DISABLED' : 'ACTIVE';
       const exists = await this.prisma.jobSource.findUnique({ where: { id: cfg.id } });
       if (!exists) {
         await this.prisma.jobSource.create({
@@ -158,12 +160,20 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
             name: cfg.name,
             type: cfg.type ?? 'HTML',
             baseUrl: cfg.baseUrl,
-            status: 'ACTIVE',
+            status,
             priorityTier: cfg.priorityTier ?? 'ETHIOPIA',
             collectionFrequency: `${cfg.frequency ?? 60} min`,
           },
         });
-        this.logger.log(`[CONFIG] Auto-created source: ${cfg.id} (${cfg.name})`);
+        this.logger.log(`[CONFIG] Auto-created source: ${cfg.id} (${cfg.name}, ${status})`);
+      } else if (cfg.enabled === false && exists.status !== 'DISABLED') {
+        // The config is authoritative for scope: an international adapter that
+        // stays registered for later re-enablement must not keep collecting.
+        await this.prisma.jobSource.update({
+          where: { id: cfg.id },
+          data: { status: 'DISABLED', lastError: 'Disabled by Ethiopia-only scope policy' },
+        });
+        this.logger.log(`[CONFIG] Disabled source by policy: ${cfg.id}`);
       }
     }
   }
@@ -226,6 +236,9 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
     const source = await this.prisma.jobSource.findUnique({ where: { id } });
     if (!source) throw new NotFoundException('Source not found');
     if (source.status !== 'ACTIVE') throw new BadRequestException('Source is not ACTIVE');
+    if (this.sourceConfigMap[id]?.enabled === false) {
+      throw new BadRequestException('Source is disabled by the Ethiopia-only scope policy');
+    }
 
     // SEC-006: skip this cycle while the source is in backoff.
     const failures = source.consecutiveFailures ?? 0;
@@ -405,6 +418,17 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
     /** Existing row matched by fingerprint when `sourceJobId` changed (regional feed variants). */
     matchedSourceJobId?: string;
   }> {
+    // Ethiopia-only scope: every ingestion path funnels through persist(), so
+    // the decision is made once, here, before a row can become recommendable.
+    const eligibility = evaluateEthiopiaEligibility({
+      title: j.title,
+      location: j.location,
+      country: j.country,
+      description: j.description,
+      workPlace: j.workPlace,
+      locationClass: j.locationClass,
+    });
+
     const existing = await this.prisma.job.findUnique({
       where: { sourceId_sourceJobId: { sourceId, sourceJobId: j.sourceJobId } },
       select: { id: true, status: true },
@@ -419,6 +443,8 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
           missedCycles: 0,
           status: wasRemoved ? 'ACTIVE' : existing.status, // FR-015: reappeared job returns to ACTIVE
           statusChangedAt: wasRemoved ? null : undefined,
+          eligibility: eligibility.status,
+          eligibilityReason: eligibility.reason,
         },
       });
       return { status: 'DUPLICATE', descQuality: null, linkChecked: false, urlStatus: 'OK' };
@@ -465,6 +491,8 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
           missedCycles: 0,
           status: wasRemoved ? 'ACTIVE' : sameFingerprint.status,
           statusChangedAt: wasRemoved ? null : undefined,
+          eligibility: eligibility.status,
+          eligibilityReason: eligibility.reason,
         },
       });
       return {
@@ -522,6 +550,9 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
         fingerprint: fidelity.fingerprint,
         // Canonical categories
         categories: this.prisma.json(mapSourceCategories(sourceId, j.sourceCategories ?? [], j)),
+        // Ethiopia-only scope decision
+        eligibility: eligibility.status,
+        eligibilityReason: eligibility.reason,
         // Classification: auto-tag based on source config + job attributes
         ...this.classifySourceJob(sourceId, j),
         skills: skillIds.length ? { create: skillIds.map((skillId) => ({ skillId })) } : undefined,
@@ -772,6 +803,11 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
     return this.sourceConfigMap[sourceId];
   }
 
+  /** Config-driven sources opt in by default; `enabled: false` removes them from the Ethiopian scope. */
+  private isEnabled(sourceId: string): boolean {
+    return this.sourceConfigMap[sourceId]?.enabled !== false;
+  }
+
   /**
    * Enqueue collection for a single source (non-blocking).
    *
@@ -780,6 +816,9 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
    * starting a second concurrent collection against the same endpoint.
    */
   enqueueCollect(sourceId: string): { enqueued: boolean; conflict?: boolean; message: string } {
+    if (!this.isEnabled(sourceId)) {
+      return { enqueued: false, message: `${sourceId} is disabled by the Ethiopia-only scope policy` };
+    }
     const source = this.adapters[sourceId];
     if (!source) {
       return { enqueued: false, message: `No adapter registered for ${sourceId}` };
@@ -798,6 +837,7 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
   collectAll(): { enqueued: number; sources: string[] } {
     const activeSources = Object.keys(this.adapters)
       .filter((id) => !id.startsWith('telegram:')) // skip Telegram for bulk
+      .filter((id) => this.isEnabled(id))
       .map((id) => ({
         id,
         priorityTier: this.sourceConfigMap[id]?.priorityTier ?? 'INTERNATIONAL',
@@ -826,6 +866,7 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
 
     for (const src of sources) {
       if (!this.adapters[src.id]) continue;
+      if (!this.isEnabled(src.id)) continue;
 
       // Get configured frequency (minutes) from source config
       const freqMinutes = this.sourceConfigMap[src.id]?.frequency ?? 60;
@@ -884,7 +925,7 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
   /** Get all tags with job counts for the category browsing page. */
   async getTagCounts() {
     const jobs = await this.prisma.job.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: 'ACTIVE', eligibility: 'ELIGIBLE' },
       select: { tags: true, id: true },
     });
     const tagCounts: Record<string, number> = {};
@@ -916,6 +957,7 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
 
     for (const src of sources) {
       if (!this.adapters[src.id]) continue;
+      if (!this.isEnabled(src.id)) continue;
       const cfg = this.sourceConfigMap[src.id];
       const deepCfg = cfg?.collection?.deep;
       if (!deepCfg?.everyMinutes) continue;

@@ -24,7 +24,7 @@ JobHunter is an automated job-matching agent for the Ethiopian tech market. It c
 | Telegram channels | 3 — ElelanaJobs (Telegram), ShegerJobs (Telegram), EthioJobVacancy (Telegram) |
 | Adapter classes | 12 (11 web + 1 parameterized Telegram) |
 | Collection endpoints | 14 (11 web + 3 Telegram) |
-| Test spec files | 28 (330 `it`/`test` declarations; parameterized cases expand at runtime) |
+| Test spec files | 32 (369 `it`/`test` declarations; parameterized cases expand at runtime) |
 | CI jobs | 6 — lint-and-typecheck, test-backend, build-frontend, security, architecture, runtime-verification |
 
 <!-- END GENERATED OVERVIEW FACTS -->

@@ -80,6 +80,7 @@ TOTAL: 23 passed, 0 failed, 4 warnings
   limits the suite needs. A first run after boot can add a fifth, on the dashboard-during-burst
   sample, which is the worst of 20 reads and so the one that shows cold-start noise.
 Login was 653ms for the first call on a snapshot (verifies the legacy cost-12 hash, writes the cost-11
-one) and 197-321ms afterwards. Backend suite: 28 suites / 382 tests, 58s. Gate 6 against the live dev
+one) and 197-321ms afterwards. Backend suite: 28 suites / 382 tests (58-83s depending on machine
+load). Gate 6 against the live dev
 stack: 6 passed (20.3s), and that run converted admin@jobhunter.et from $2a$12$ to $2b$11$ in the real
 database — the re-hash path proven in a browser, not only over HTTP.

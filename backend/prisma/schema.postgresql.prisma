@@ -220,6 +220,9 @@ model Job {
   finalUrl             String?
   tags                 Json?
   categories            Json?
+  // Ethiopia-only ingestion policy: ELIGIBLE | REVIEW | REJECTED
+  eligibility           String          @default("REVIEW")
+  eligibilityReason     String?
   apps                 Application[]
   source               JobSource          @relation(fields: [sourceId], references: [id])
   matches              JobMatch[]
@@ -233,6 +236,7 @@ model Job {
   @@index([status, matchedAt])
   @@index([status, deadline])
   @@index([status, urlStatus])
+  @@index([eligibility])
 }
 
 model JobSkill {

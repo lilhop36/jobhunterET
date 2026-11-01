@@ -29,8 +29,8 @@
 | Telegram channels | 3 |
 | Collection endpoints | 14 |
 | Adapter classes | 12 |
-| Test spec files | 28 |
-| Test declarations | 330 |
+| Test spec files | 32 |
+| Test declarations | 369 |
 | CI jobs | 6 |
 
 ## Prisma models
@@ -148,7 +148,10 @@ Match cycle default: `10m` (override with `MATCH_CYCLE_INTERVAL`).
 | `backup.service.spec.ts` | 5 |
 | `category-mapper.spec.ts` | 9 |
 | `digest.service.spec.ts` | 8 |
+| `ethiopia-eligibility.spec.ts` | 13 |
+| `events.controller.spec.ts` | 6 |
 | `exclusive.spec.ts` | 4 |
+| `fetch-timeout.spec.ts` | 3 |
 | `integration.spec.ts` | 10 |
 | `job-fidelity.spec.ts` | 31 |
 | `jobs.service.spec.ts` | 4 |
@@ -159,12 +162,13 @@ Match cycle default: `10m` (override with `MATCH_CYCLE_INTERVAL`).
 | `matching.service.spec.ts` | 4 |
 | `notifications.service.spec.ts` | 7 |
 | `parse-port.spec.ts` | 3 |
+| `prisma.service.spec.ts` | 6 |
 | `profile.service.spec.ts` | 4 |
 | `rate-limiter.spec.ts` | 5 |
 | `security.spec.ts` | 14 |
 | `sources.controller.spec.ts` | 4 |
-| `sources.service.spec.ts` | 27 |
-| `telegram-channel.spec.ts` | 10 |
-| `telegram.service.spec.ts` | 15 |
+| `sources.service.spec.ts` | 36 |
+| `telegram-channel.spec.ts` | 11 |
+| `telegram.service.spec.ts` | 16 |
 | `url-safety.spec.ts` | 11 |
-| **Total** | **330** |
+| **Total** | **369** |

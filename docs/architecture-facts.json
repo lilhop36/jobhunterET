@@ -64,8 +64,8 @@
       "telegram"
     ],
     "moduleFileCount": 20,
-    "specFileCount": 28,
-    "testDeclarations": 330,
+    "specFileCount": 32,
+    "testDeclarations": 369,
     "tests": [
       {
         "file": "account.service.spec.ts",
@@ -104,8 +104,20 @@
         "declarations": 8
       },
       {
+        "file": "ethiopia-eligibility.spec.ts",
+        "declarations": 13
+      },
+      {
+        "file": "events.controller.spec.ts",
+        "declarations": 6
+      },
+      {
         "file": "exclusive.spec.ts",
         "declarations": 4
+      },
+      {
+        "file": "fetch-timeout.spec.ts",
+        "declarations": 3
       },
       {
         "file": "integration.spec.ts",
@@ -148,6 +160,10 @@
         "declarations": 3
       },
       {
+        "file": "prisma.service.spec.ts",
+        "declarations": 6
+      },
+      {
         "file": "profile.service.spec.ts",
         "declarations": 4
       },
@@ -165,15 +181,15 @@
       },
       {
         "file": "sources.service.spec.ts",
-        "declarations": 27
+        "declarations": 36
       },
       {
         "file": "telegram-channel.spec.ts",
-        "declarations": 10
+        "declarations": 11
       },
       {
         "file": "telegram.service.spec.ts",
-        "declarations": 15
+        "declarations": 16
       },
       {
         "file": "url-safety.spec.ts",

@@ -43,10 +43,10 @@ describe('JobsService.list — keyset pagination', () => {
       expect.objectContaining({
         take: 51,
         orderBy: [{ firstSeenAt: 'desc' }, { id: 'desc' }],
-        where: { status: 'ACTIVE' },
+        where: { status: 'ACTIVE', eligibility: 'ELIGIBLE' },
       }),
     );
-    expect(job.count).toHaveBeenCalledWith({ where: { status: 'ACTIVE' } });
+    expect(job.count).toHaveBeenCalledWith({ where: { status: 'ACTIVE', eligibility: 'ELIGIBLE' } });
   });
 
   it('emits a nextCursor when more rows exist and applies it as a keyset where on the next page', async () => {
@@ -80,6 +80,7 @@ describe('JobsService.list — keyset pagination', () => {
     const where = job.findMany.mock.calls[0][0].where;
     expect(where).toEqual({
       status: 'ACTIVE',
+      eligibility: 'ELIGIBLE',
       source: { priorityTier: 'ETHIOPIA' },
       OR: expect.any(Array),
     });
@@ -99,7 +100,7 @@ describe('JobsService.tagCounts', () => {
     const res = await service.tagCounts();
 
     expect(job.findMany).toHaveBeenCalledWith({
-      where: { status: 'ACTIVE' },
+      where: { status: 'ACTIVE', eligibility: 'ELIGIBLE' },
       select: { tags: true },
       take: 10000,
     });

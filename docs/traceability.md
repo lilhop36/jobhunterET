@@ -50,7 +50,7 @@ that its code paths are exhaustively asserted.
 | Non-Functional Requirements | 9 | 4 | 0 | 44% |
 | **Total** | **85** | **76** | **4** | **94%** |
 
-Derived from 85 requirement headings in `JobHunter_SRS_v2.3.md` and 448 test titles across 33 spec files (backend + frontend e2e).
+Derived from 85 requirement headings in `JobHunter_SRS_v2.3.md` and 492 test titles across 37 spec files (backend + frontend e2e).
 **42** are cited by a `describe`/`it` title that names the ID; the remaining **34** are credited through the audited mapping in `scripts/generate-traceability.js`, whose clauses are re-resolved against real test titles on every run — a clause that matches nothing fails the check.
 Coverage = 76 tested ÷ 81 in-scope = 94%. Deferred items are excluded from the denominator and each carries a quoted SRS line; if that line changes the generator fails.
 Of those, **1** counted toward coverage are marked **Tested (partial)**: their tests are real but one SRS clause is unimplemented — each shortfall is named in the matrix and in the gaps list.
@@ -101,9 +101,9 @@ comment that names the control with the test that exercises it.
 | SEC-004 | modules/profile/profile.controller.ts | common/security/security.spec.ts · `SEC-004 — filename sanitization` |
 | SEC-005 | common/security/password-policy.ts, common/utils/rate-limiter.ts, modules/auth/auth.controller.ts, modules/auth/auth.service.ts, modules/telegram/telegram.controller.ts, modules/telegram/telegram.service.ts | common/security/security.spec.ts · `SEC-005 — password hashing policy`<br>modules/auth/auth.controller.spec.ts · `AuthController — SEC-005 rate limiting`<br>modules/auth/auth.service.spec.ts · `AuthService password cost refresh (SEC-005)`<br>modules/telegram/telegram.service.spec.ts · `TelegramService.throttle — SEC-005 atomic slot reservation` |
 | SEC-006 | modules/sources/sources.service.ts | modules/sources/sources.service.spec.ts · `records a transient failure but keeps the source ACTIVE for retry (SEC-006)`<br>modules/sources/sources.service.spec.ts · `skips collection while the source is in backoff after repeated failures (SEC-006)`<br>modules/sources/sources.service.spec.ts · `retries once the backoff window has elapsed and resets the failure streak on success (SEC-006)` |
-| SEC-007 | modules/sources/adapters/job-source.adapter.ts, modules/telegram/telegram.service.ts | **none** |
-| SEC-010 | prisma/prisma.service.ts | **none** |
-| SEC-011 | main.ts, modules/events/events.controller.ts | **none** |
+| SEC-007 | modules/sources/adapters/job-source.adapter.ts, modules/telegram/telegram.service.ts | modules/sources/adapters/fetch-timeout.spec.ts · `SEC-007 — upstream fetch timeout cap`<br>modules/telegram/telegram.service.spec.ts · `SEC-007: pollOnce caps the long-poll so a silent Bot API cannot hold the poll slot` |
+| SEC-010 | prisma/prisma.service.ts | prisma/prisma.service.spec.ts · `SEC-010 — SQLite boolean and JSON coercion` |
+| SEC-011 | main.ts, modules/events/events.controller.ts | modules/events/events.controller.spec.ts · `SEC-011 — SSE stream authentication` |
 
 <!-- END GENERATED SECURITY -->
 
@@ -291,7 +291,10 @@ places it outside the MVP.
 | backup.service.spec.ts | 5 |
 | category-mapper.spec.ts | 9 |
 | digest.service.spec.ts | 8 |
+| ethiopia-eligibility.spec.ts | 13 |
+| events.controller.spec.ts | 6 |
 | exclusive.spec.ts | 4 |
+| fetch-timeout.spec.ts | 3 |
 | integration.spec.ts | 10 |
 | job-fidelity.spec.ts | 31 |
 | jobs.service.spec.ts | 4 |
@@ -302,15 +305,16 @@ places it outside the MVP.
 | matching.service.spec.ts | 4 |
 | notifications.service.spec.ts | 7 |
 | parse-port.spec.ts | 3 |
+| prisma.service.spec.ts | 6 |
 | profile.service.spec.ts | 4 |
 | rate-limiter.spec.ts | 5 |
 | security.spec.ts | 14 |
 | sources.controller.spec.ts | 4 |
-| sources.service.spec.ts | 27 |
-| telegram-channel.spec.ts | 10 |
-| telegram.service.spec.ts | 15 |
+| sources.service.spec.ts | 36 |
+| telegram-channel.spec.ts | 11 |
+| telegram.service.spec.ts | 16 |
 | url-safety.spec.ts | 11 |
-| **Total** | **330** |
+| **Total** | **369** |
 
 <!-- END GENERATED TEST INDEX -->
 

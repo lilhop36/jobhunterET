@@ -113,7 +113,7 @@ export class MatchingService {
   ): Promise<UnmatchedOutcome> {
     const empty = { jobsEvaluated: 0, usersProcessed: 0, matchesCreated: 0, aboveThreshold: 0, sent: 0, toInbox: 0, skipped: 0 };
     const jobs = (await this.prisma.job.findMany({
-      where: { status: 'ACTIVE', matchedAt: null },
+      where: { status: 'ACTIVE', matchedAt: null, eligibility: 'ELIGIBLE' },
       orderBy: { firstSeenAt: 'asc' },
       take: limit,
       include: { skills: { include: { skill: true } } },
@@ -266,7 +266,7 @@ export class MatchingService {
   ): Promise<number> {
     const prof = await this.buildProfileInput(userId);
     const jobs = (await this.prisma.job.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: 'ACTIVE', eligibility: 'ELIGIBLE' },
       orderBy: { firstSeenAt: 'desc' },
       take: limit,
       include: { skills: { include: { skill: true } } },

@@ -22,7 +22,7 @@ function rawJob(overrides: Partial<RawJob> = {}): RawJob {
 
 function createService() {
   const prisma: any = {
-    jobSource: { findUnique: jest.fn(), update: jest.fn() },
+    jobSource: { findUnique: jest.fn(), update: jest.fn(), findMany: jest.fn() },
     job: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     skill: { upsert: jest.fn().mockResolvedValue({ id: 'skill-1' }) },
     sourceRun: { create: jest.fn().mockResolvedValue({}) },
@@ -557,9 +557,9 @@ describe('SourcesService.enqueueCollect — FR-010 manual collection lock', () =
     const { service, jobs } = withCapturedQueue();
     jest.spyOn(service, 'collectWithFallback').mockRejectedValue(new Error('socket hang up') as any);
 
-    service.enqueueCollect('jobicy');
+    service.enqueueCollect('reliefweb');
     await expect(jobs[0].execute()).rejects.toThrow('socket hang up');
-    expect(service.enqueueCollect('jobicy')).toMatchObject({ enqueued: true });
+    expect(service.enqueueCollect('reliefweb')).toMatchObject({ enqueued: true });
   });
 
   it('says "no adapter" — not conflict — for an unregistered source', () => {
@@ -568,5 +568,115 @@ describe('SourcesService.enqueueCollect — FR-010 manual collection lock', () =
       enqueued: false,
       message: 'No adapter registered for telegram:unlinked',
     });
+  });
+});
+
+/**
+ * Abdi JobPilot ET, Phase 2: Ethiopia-only scope.
+ *
+ * Persist() is the single funnel for every ingestion path (scheduled, manual,
+ * fallback, Telegram), so its stored decision is what the feed and matcher see.
+ */
+describe('SourcesService � Ethiopia-only eligibility policy at ingestion', () => {
+  it('marks an Addis Ababa job ELIGIBLE before it is stored', async () => {
+    const { service, prisma } = createService();
+    prisma.job.findUnique.mockResolvedValue(null);
+
+    await (service as any).persist('ethiojobs', rawJob({ location: 'Addis Ababa, Ethiopia' }));
+
+    const data = prisma.job.create.mock.calls[0][0].data;
+    expect(data.eligibility).toBe('ELIGIBLE');
+    expect(data.eligibilityReason).toMatch(/Ethiopia/i);
+  });
+
+  it('marks a foreign onsite job REJECTED', async () => {
+    const { service, prisma } = createService();
+    prisma.job.findUnique.mockResolvedValue(null);
+
+    await (service as any).persist(
+      'ethiojobs',
+      rawJob({ location: 'Nairobi, Kenya', country: 'Kenya', workPlace: 'ONSITE' }),
+    );
+
+    const data = prisma.job.create.mock.calls[0][0].data;
+    expect(data.eligibility).toBe('REJECTED');
+    expect(data.eligibilityReason).toContain('Kenya');
+  });
+
+  it('marks a remote job restricted to another country REJECTED', async () => {
+    const { service, prisma } = createService();
+    prisma.job.findUnique.mockResolvedValue(null);
+
+    await (service as any).persist(
+      'ethiojobs',
+      rawJob({
+        location: 'Remote',
+        workPlace: 'REMOTE',
+        description: 'Applicants must be based in the United States.',
+      }),
+    );
+
+    expect(prisma.job.create.mock.calls[0][0].data.eligibility).toBe('REJECTED');
+  });
+
+  it('marks an unestablished location REVIEW', async () => {
+    const { service, prisma } = createService();
+    prisma.job.findUnique.mockResolvedValue(null);
+
+    await (service as any).persist('ethiojobs', rawJob({ location: '', country: undefined }));
+
+    expect(prisma.job.create.mock.calls[0][0].data.eligibility).toBe('REVIEW');
+  });
+
+  it('re-evaluates eligibility when a known posting is refreshed', async () => {
+    const { service, prisma } = createService();
+    prisma.job.findUnique.mockResolvedValue({ id: 'j-1', status: 'ACTIVE' });
+
+    await (service as any).persist('ethiojobs', rawJob({ location: 'Kampala, Uganda' }));
+
+    expect(prisma.job.update.mock.calls[0][0].data).toMatchObject({
+      eligibility: 'REJECTED',
+    });
+  });
+
+  it('refuses a manual collection for a source disabled by configuration', () => {
+    const { service } = createService();
+    expect(service.enqueueCollect('remotive')).toEqual({
+      enqueued: false,
+      message: 'remotive is disabled by the Ethiopia-only scope policy',
+    });
+  });
+
+  it('refuses collect() for a disabled source even when its row is ACTIVE', async () => {
+    const { service, prisma } = createService();
+    prisma.jobSource.findUnique.mockResolvedValue({ id: 'remotive', name: 'Remotive', status: 'ACTIVE' });
+
+    await expect(service.collect('remotive')).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('excludes disabled sources from the scheduled due list', async () => {
+    const { service, prisma } = createService();
+    const jobs: { sourceId: string }[] = [];
+    (service as any).queue = { enqueueAll: (s: any[]) => { jobs.push(...s); return s.length; } };
+    prisma.jobSource.findMany.mockResolvedValue([
+      { id: 'remotive', lastSuccessfulRun: null },
+      { id: 'ethiojobs', lastSuccessfulRun: null },
+    ]);
+
+    const result = await service.collectDue();
+
+    expect(result.due).toEqual(['ethiojobs']);
+    expect(jobs.map((j: any) => j.id)).toEqual(['ethiojobs']);
+  });
+
+  it('excludes disabled sources from a bulk collectAll', () => {
+    const { service } = createService();
+    (service as any).queue = { enqueueAll: (s: any[]) => s.length };
+
+    const result = service.collectAll();
+
+    expect(result.sources).not.toContain('remotive');
+    expect(result.sources).not.toContain('jobicy');
+    expect(result.sources).toContain('ethiojobs');
   });
 });

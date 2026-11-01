@@ -64,6 +64,11 @@ export interface SourceDefinition {
   name: string;
   adapter: string;
   type: string;
+  /**
+   * Ethiopia-only scope: `false` keeps the adapter registered but removes the
+   * source from scheduled and manual collection. Omit for enabled sources.
+   */
+  enabled?: boolean;
   baseUrl: string;
   frequency: number;
   priorityTier: string;

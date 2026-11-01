@@ -143,7 +143,7 @@ export class DigestService {
   ): Promise<DigestReport> {
     const since = new Date(Date.now() - WINDOW_MS);
     const windowJobs = await this.prisma.job.findMany({
-      where: { firstSeenAt: { gte: since } },
+      where: { firstSeenAt: { gte: since }, eligibility: 'ELIGIBLE' },
       include: { skills: { include: { skill: true } }, source: { select: { name: true } } },
     });
     const active = windowJobs.filter((j) => j.status === 'ACTIVE');
