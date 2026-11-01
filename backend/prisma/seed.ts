@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcrypt';
+import { PASSWORD_COST } from '../src/common/security/password-policy';
 import { SKILL_DICT, scoreJob } from '../src/modules/matching/matching-engine';
 
 const prisma = new PrismaClient();
@@ -74,7 +75,7 @@ async function main() {
     const user = await prisma.user.create({
       data: {
         email,
-        passwordHash: await bcrypt.hash('demo1234', 12),
+        passwordHash: await bcrypt.hash('demo1234', PASSWORD_COST),
         role: 'ADMIN',
         matchThreshold: 70,
         profile: {

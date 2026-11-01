@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { parsePort } from './common/utils/parse-port';
+import { buildCorsPolicy } from './common/security/cors-policy';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 
@@ -33,26 +34,14 @@ async function bootstrap() {
   // SEC-011: parse cookies for SSE token auth
   app.use(cookieParser());
 
-  // SEC-002: CORS — restrict to known origins when CORS_ORIGIN is set,
-  // otherwise allow all origins so the app works without env var config.
-  const corsOrigin = process.env.CORS_ORIGIN;
-  const allowedOrigins = corsOrigin
-    ? corsOrigin.split(',').map((s) => s.trim()).filter(Boolean)
-    : [];
-  const isDev = process.env.NODE_ENV !== 'production';
-  if (!isDev && allowedOrigins.length === 0) {
+  // SEC-002 / NFR-009: CORS is decided by buildCorsPolicy() so the production
+  // rule ("only configured origins, never a wildcard") is testable without booting Nest.
+  const cors = buildCorsPolicy(process.env);
+  if (cors.refusesToStart) {
     console.error('[main] CORS_ORIGIN must be set in production. Refusing to start with permissive CORS.');
     process.exit(1);
   }
-  app.enableCors({
-    origin: isDev || allowedOrigins.length === 0
-      ? true
-      : (origin: string) => allowedOrigins.includes(origin),
-    credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    maxAge: 86400,
-  });
+  app.enableCors(cors.policy);
   const rawPort = process.env.PORT;
   const port = parsePort(rawPort);
   if (rawPort !== undefined && port !== Number(rawPort)) {

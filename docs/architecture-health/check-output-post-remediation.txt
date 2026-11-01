@@ -1,0 +1,85 @@
+Architecture health checks — post-remediation
+=============================================
+Generated: 2026-10-30
+Command: node scripts/check-architecture-health.js --strict
+
+[PASS] models.count — 22 Prisma models match the document
+[PASS] modules.coverage — 18 NestJS modules are represented in the overview
+[PASS] sources.inventory — 11 web sources + 3 Telegram channels
+[PASS] dedup.fingerprint — cross-source fingerprint grouping is documented as not implemented
+[PASS] dedup.sameSource — ingestion refreshes an existing row when (sourceId, fingerprint) matches
+[PASS] matching.neutral — empty-skill neutral value is aligned
+[PASS] matching.eligibility — eligibility contract is documented
+[PASS] matching.inputs — ProfileInput fields are documented
+[PASS] matching.schedule — matching schedule is aligned
+[PASS] matching.role — role-matching semantics are aligned
+[PASS] traceability.specs — 28 spec files are referenced
+[PASS] traceability.total — test declaration count matches (325)
+[PASS] traceability.proseCounts — no hand-written declaration counts contradict the specs
+[PASS] traceability.counts — per-file test counts are aligned
+[PASS] plan.status — plan status is aligned
+[PASS] deployment.db — SQLite is the documented and configured production database
+[PASS] deployment.migrations — entrypoint, Dockerfile, and runbook use the guarded migration script
+[PASS] deployment.devlauncher — dev.sh respects the schema provider, applies committed migrations, and probes real health paths
+[PASS] db.migrations — 2 migration(s) available to deploy
+[PASS] model.source — no diagram source, but docs/architecture-facts.json provides a generated machine-readable inventory
+[PASS] docs.freshness — architecture docs are at least as new as the inspected code
+[PASS] routes.count — 19 frontend page routes
+[PASS] facts.current — generated facts match the source tree
+[PASS] traceability.matrix — requirement→test matrix matches the SRS and the spec tree
+[PASS] traceability.proseCoverage — no hand-typed coverage percentages outside the generated blocks
+
+
+Summary: 25 passed, 0 failed, 0 warnings.
+
+Backend suite: node scripts/run-tests.js --ci
+Test Suites: 28 passed, 28 total
+Tests:       377 passed, 377 total
+
+Traceability: node scripts/generate-traceability.js --check
+Traceability is up to date (76/81 requirements = 94%, 1 partial).
+Exit: 0
+
+Gate 6 rehearsal (production build + disposable seeded database):
+npx playwright test e2e/runtime-verification.spec.ts e2e/onboarding.spec.ts --project=desktop
+6 passed (2.0m) — health 200, anonymous 401, sign-in reaches dashboard,
+authenticated matches scored with unique jobIds, no duplicate rows rendered,
+onboarding wizard completes/persists/resumes/skips.
+
+NFR harness — the measurement traceability cites for NFR-001 — against a VACUUM snapshot of
+dev.db on a second instance with the auth throttle raised (2026-10-31):
+npm run nfr:check
+TOTAL: 21 passed, 0 failed, 6 warnings
+  Dashboard p95 64ms · Jobs list 115ms · Matches 105ms · Tag counts 18ms · Profile 45ms · Sources 41ms
+  Login (slowest of 3): 895ms (slow)
+  Dashboard while 5 logins run: p95 306ms, max 306ms (5 logins took 3045ms)
+  Recalculation (single user): 4765ms
+Before the native-bcrypt swap the same stack measured 2.06-3.57s for a warm login and
+10.2-10.4s for concurrent or first-call logins. The harness was fixed before it could be
+trusted: it requested the bare port paths while main.ts serves everything under /api, so
+every request answered 404 and the suite exited at login without measuring anything. Its
+data-quality panel compared raw SQLite counts (BigInt) with === 0, so clean data reported
+as three failures.
+
+Gate 6 re-run against the live dev stack after the bcrypt change (2026-10-31): 6 passed (1.2m).
+All 13 stored hashes in dev.db were then the $2a$ form written by the previous pure-JS library and
+still authenticate; a freshly seeded disposable database writes $2b$ and its demo account
+signs in. Backend suite after the swap: 28 suites / 377 tests, 95s (was 127s).
+
+Cost 11 (2026-11-01) — PASSWORD_COST moved to backend/src/common/security/password-policy.ts and
+login now re-hashes an account whose stored cost differs. NFR harness against a VACUUM snapshot of
+dev.db on a second instance, throttle raised, second (warm) run:
+npm run nfr:check
+TOTAL: 23 passed, 0 failed, 4 warnings
+  Dashboard p95 54ms · Jobs list 83ms · Matches 211ms · Tag counts 15ms · Profile 39ms · Sources 33ms
+  Login (slowest of 3): 316ms
+  Dashboard while 5 logins run: p95 170ms, max 170ms (5 logins took 668ms)
+  Recalculation (single user): 2339ms
+  The four warnings are: no applications to exercise stage transitions, 421 matches pointing at
+  non-ACTIVE jobs, 26 case-duplicate skill groups, and the throttle not tripping at the raised
+  limits the suite needs. A first run after boot can add a fifth, on the dashboard-during-burst
+  sample, which is the worst of 20 reads and so the one that shows cold-start noise.
+Login was 653ms for the first call on a snapshot (verifies the legacy cost-12 hash, writes the cost-11
+one) and 197-321ms afterwards. Backend suite: 28 suites / 382 tests, 58s. Gate 6 against the live dev
+stack: 6 passed (20.3s), and that run converted admin@jobhunter.et from $2a$12$ to $2b$11$ in the real
+database — the re-hash path proven in a browser, not only over HTTP.

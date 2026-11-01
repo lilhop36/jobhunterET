@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, ConflictException, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { SourcesService } from './sources.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -27,16 +27,23 @@ export class SourcesController {
     return this.sources.update(id, body);
   }
 
-  /** Enqueue collection for a single source (non-blocking, returns immediately). */
+  /**
+   * FR-010: admin trigger for a single source, processed asynchronously.
+   * HTTP 409 when that source already has a collection run in progress.
+   */
   @Post(':id/collect')
   collect(@Param('id') id: string) {
-    return this.sources.enqueueCollect(id);
+    const result = this.sources.enqueueCollect(id);
+    if (result.conflict) throw new ConflictException(result.message);
+    return result;
   }
 
   /** Enqueue deep collection for a single source (non-blocking). */
   @Post(':id/collect-deep')
   collectDeep(@Param('id') id: string) {
-    return this.sources.enqueueCollect(id);
+    const result = this.sources.enqueueCollect(id);
+    if (result.conflict) throw new ConflictException(result.message);
+    return result;
   }
 
   /** Enqueue deep collection for ALL active sources. */

@@ -39,6 +39,8 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
   private readonly adapters: Record<string, JobSourceAdapter>;
   private readonly queue: CollectionQueue;
   private readonly sourceConfigMap: Record<string, SourceDefinition> = {};
+  /** FR-010: sources with a manual (admin-triggered) collection in flight. */
+  private readonly manualRuns = new Set<string>();
   private bootTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
@@ -308,6 +310,9 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
     for (const j of valid) {
       seenIds.add(j.sourceJobId);
       const persistResult = await this.persist(source.id, j, source.baseUrl);
+      // A regional variant can match an existing row under a different
+      // sourceJobId; keep that row out of ghost reconciliation this run.
+      if (persistResult.matchedSourceJobId) seenIds.add(persistResult.matchedSourceJobId);
       if (persistResult.status === 'CREATED') created++;
       else duplicates++;
       if (persistResult.descQuality !== null) totalDescQuality += persistResult.descQuality;
@@ -397,14 +402,9 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
     descQuality: number | null;
     linkChecked: boolean;
     urlStatus: string;
+    /** Existing row matched by fingerprint when `sourceJobId` changed (regional feed variants). */
+    matchedSourceJobId?: string;
   }> {
-    const skills = [...new Set(j.skills.map(normalizeSkill))].filter(Boolean);
-    const skillIds: string[] = [];
-    for (const name of skills) {
-      const s = await this.prisma.skill.upsert({ where: { name }, create: { name }, update: {} });
-      skillIds.push(s.id);
-    }
-
     const existing = await this.prisma.job.findUnique({
       where: { sourceId_sourceJobId: { sourceId, sourceJobId: j.sourceJobId } },
       select: { id: true, status: true },
@@ -438,6 +438,50 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
       // FidelityInput takes `Date | undefined`; RawJob allows null.
       postedDate: j.postedDate ?? undefined,
     });
+
+    /*
+     * FR-014: the same posting can appear under several `sourceJobId` values
+     * inside one source (Arbeitnow serves the same job from regional domains
+     * with different numeric suffixes). Match on the normalized fingerprint so
+     * the duplicate refreshes the existing row instead of creating a second one.
+     * Scoped to `sourceId`: cross-source grouping is deliberately still absent.
+     * An empty description is not distinctive enough to serve as a dedup key,
+     * so those postings keep the sourceJobId-only behavior.
+     */
+    const hasDescriptiveFingerprint = Boolean(fidelity.description && fidelity.description.trim());
+    const sameFingerprint = hasDescriptiveFingerprint
+      ? await this.prisma.job.findFirst({
+          where: { sourceId, fingerprint: fidelity.fingerprint },
+          select: { id: true, status: true, sourceJobId: true },
+        })
+      : null;
+
+    if (sameFingerprint) {
+      const wasRemoved = sameFingerprint.status === 'REMOVED';
+      await this.prisma.job.update({
+        where: { id: sameFingerprint.id },
+        data: {
+          lastSeenAt: new Date(),
+          missedCycles: 0,
+          status: wasRemoved ? 'ACTIVE' : sameFingerprint.status,
+          statusChangedAt: wasRemoved ? null : undefined,
+        },
+      });
+      return {
+        status: 'DUPLICATE',
+        descQuality: null,
+        linkChecked: false,
+        urlStatus: 'OK',
+        matchedSourceJobId: sameFingerprint.sourceJobId ?? undefined,
+      };
+    }
+
+    const skills = [...new Set(j.skills.map(normalizeSkill))].filter(Boolean);
+    const skillIds: string[] = [];
+    for (const name of skills) {
+      const s = await this.prisma.skill.upsert({ where: { name }, create: { name }, update: {} });
+      skillIds.push(s.id);
+    }
 
     await this.prisma.job.create({
       data: {
@@ -728,13 +772,25 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
     return this.sourceConfigMap[sourceId];
   }
 
-  /** Enqueue collection for a single source (non-blocking). */
-  enqueueCollect(sourceId: string): { enqueued: boolean; message: string } {
+  /**
+   * Enqueue collection for a single source (non-blocking).
+   *
+   * FR-010: a manual trigger for a source that already has a run in flight is
+   * refused (`conflict: true` → the controller answers HTTP 409) instead of
+   * starting a second concurrent collection against the same endpoint.
+   */
+  enqueueCollect(sourceId: string): { enqueued: boolean; conflict?: boolean; message: string } {
     const source = this.adapters[sourceId];
     if (!source) {
       return { enqueued: false, message: `No adapter registered for ${sourceId}` };
     }
-    this.queue.enqueue(sourceId, () => this.collectWithFallback(sourceId));
+    if (this.manualRuns.has(sourceId)) {
+      return { enqueued: false, conflict: true, message: `${sourceId} collection is already running` };
+    }
+    this.manualRuns.add(sourceId);
+    this.queue.enqueue(sourceId, () =>
+      this.collectWithFallback(sourceId).finally(() => this.manualRuns.delete(sourceId)),
+    );
     return { enqueued: true, message: `${sourceId} queued for collection` };
   }
 

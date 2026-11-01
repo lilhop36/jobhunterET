@@ -11,7 +11,7 @@ async function main() {
   }
 
   // Check if demo1234 matches
-  const bcrypt = require('bcryptjs');
+  const bcrypt = require('bcrypt');
   for (const u of users) {
     const match = bcrypt.compareSync('demo1234', u.passwordHash);
     console.log(`${u.email} matches demo1234: ${match}`);

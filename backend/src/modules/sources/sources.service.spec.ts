@@ -23,7 +23,7 @@ function rawJob(overrides: Partial<RawJob> = {}): RawJob {
 function createService() {
   const prisma: any = {
     jobSource: { findUnique: jest.fn(), update: jest.fn() },
-    job: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+    job: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     skill: { upsert: jest.fn().mockResolvedValue({ id: 'skill-1' }) },
     sourceRun: { create: jest.fn().mockResolvedValue({}) },
     user: { findMany: jest.fn().mockResolvedValue([]) },
@@ -157,6 +157,44 @@ describe('SourcesService.persist — upsert, dedup, reactivation (FR-014 / FR-01
     expect(update.data.status).toBe('ACTIVE');
     expect(update.data.statusChangedAt).toBeNull();
   });
+
+  it('matches a new sourceJobId by fingerprint within the same source', async () => {
+    const { service, prisma } = createService();
+    prisma.job.findUnique.mockResolvedValue(null);
+    prisma.job.findFirst.mockResolvedValue({ id: 'j-fp', status: 'ACTIVE', sourceJobId: 'rw-original' });
+
+    const result = await (service as any).persist(
+      'reliefweb',
+      rawJob({ sourceJobId: 'rw-regional', description: 'Same posting served from a regional domain.' }),
+    );
+
+    expect(result.status).toBe('DUPLICATE');
+    expect(result.matchedSourceJobId).toBe('rw-original');
+    expect(prisma.job.create).not.toHaveBeenCalled();
+    expect(prisma.job.findFirst).toHaveBeenCalledWith({
+      where: { sourceId: 'reliefweb', fingerprint: expect.any(String) },
+      select: { id: true, status: true, sourceJobId: true },
+    });
+    expect(prisma.job.update).toHaveBeenCalledWith({
+      where: { id: 'j-fp' },
+      data: expect.objectContaining({ missedCycles: 0, status: 'ACTIVE', statusChangedAt: undefined }),
+    });
+  });
+
+  it('reactivates a REMOVED fingerprint match', async () => {
+    const { service, prisma } = createService();
+    prisma.job.findUnique.mockResolvedValue(null);
+    prisma.job.findFirst.mockResolvedValue({ id: 'j-fp', status: 'REMOVED', sourceJobId: 'rw-original' });
+
+    await (service as any).persist(
+      'reliefweb',
+      rawJob({ sourceJobId: 'rw-regional', description: 'Same posting served from a regional domain.' }),
+    );
+
+    const update = prisma.job.update.mock.calls[0][0];
+    expect(update.data.status).toBe('ACTIVE');
+    expect(update.data.statusChangedAt).toBeNull();
+  });
 });
 
 describe('SourcesService.collect — validation, dedup counting, isolation (FR-013/014/036)', () => {
@@ -188,6 +226,29 @@ describe('SourcesService.collect — validation, dedup counting, isolation (FR-0
     const run = prisma.sourceRun.create.mock.calls[0][0].data;
     expect(run.status).toBe('OK');
     expect(run.jobsCreated).toBe(1);
+  });
+
+  it('keeps a fingerprint-matched row out of ghost reconciliation', async () => {
+    const { service, prisma, reliefweb } = createService();
+    prisma.jobSource.findUnique.mockResolvedValue({ id: 'reliefweb', name: 'ReliefWeb', status: 'ACTIVE' });
+    // The feed now reports the same posting under a regional sourceJobId.
+    reliefweb.fetchJobs.mockResolvedValue([
+      rawJob({ sourceJobId: 'rw-regional', description: 'Same posting served from a regional domain.' }),
+    ]);
+    prisma.job.findUnique.mockResolvedValue(null);
+    prisma.job.findFirst.mockResolvedValue({ id: 'j-original', status: 'ACTIVE', sourceJobId: 'rw-original' });
+    prisma.job.findMany.mockResolvedValue([
+      { id: 'j-original', sourceJobId: 'rw-original', missedCycles: 2 },
+    ]);
+
+    await service.collect('reliefweb');
+
+    // The matched row was refreshed, not treated as unseen.
+    const increment = prisma.job.updateMany.mock.calls.find(
+      (c: any[]) => c[0]?.data?.missedCycles?.increment === 1,
+    );
+    expect(increment).toBeUndefined();
+    expect(prisma.job.create).not.toHaveBeenCalled();
   });
 
   it('records a transient failure but keeps the source ACTIVE for retry (SEC-006)', async () => {
@@ -427,5 +488,85 @@ describe('SourcesService.collectWithFallback', () => {
 
     // Primary failed and fallbacks exhausted
     expect(result.status).toBe('FAIL');
+  });
+});
+
+/**
+ * FR-010 (SRS §13): `POST /api/sources/:id/collect` is the admin trigger and is
+ * processed asynchronously. A second trigger while a run is in flight is refused
+ * (the controller answers HTTP 409) rather than double-collecting the same endpoint.
+ */
+describe('SourcesService.enqueueCollect — FR-010 manual collection lock', () => {
+  /**
+   * The real CollectionQueue retries with backoff timers, which would outlive the
+   * test. Capture the enqueued job instead and run it by hand.
+   */
+  function withCapturedQueue() {
+    const { service } = createService();
+    const jobs: { sourceId: string; execute: () => Promise<any> }[] = [];
+    (service as any).queue = {
+      enqueue: (sourceId: string, execute: () => Promise<any>) => jobs.push({ sourceId, execute }),
+    };
+    return { service, jobs };
+  }
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('queues the first trigger and reports a conflict for a second one in flight', async () => {
+    const { service, jobs } = withCapturedQueue();
+    const run = jest
+      .spyOn(service, 'collectWithFallback')
+      .mockResolvedValue({ status: 'OK', jobsFetched: 12 } as any);
+
+    expect(service.enqueueCollect('reliefweb')).toEqual({
+      enqueued: true,
+      message: 'reliefweb queued for collection',
+    });
+    expect(jobs).toHaveLength(1);
+
+    // A second admin click while the first run is still queued/running is refused.
+    expect(service.enqueueCollect('reliefweb')).toMatchObject({
+      enqueued: false,
+      conflict: true,
+      message: 'reliefweb collection is already running',
+    });
+    expect(jobs).toHaveLength(1);
+    expect(run).not.toHaveBeenCalled();
+
+    await jobs[0].execute();
+    expect(run).toHaveBeenCalledWith('reliefweb');
+
+    // The lock is released when the run settles, so the admin can trigger again.
+    expect(service.enqueueCollect('reliefweb')).toMatchObject({ enqueued: true });
+    expect(jobs).toHaveLength(2);
+  });
+
+  it('releases the lock when a collection ends in a FAIL result', async () => {
+    const { service, jobs } = withCapturedQueue();
+    jest
+      .spyOn(service, 'collectWithFallback')
+      .mockResolvedValue({ status: 'FAIL', message: 'source unreachable' } as any);
+
+    expect(service.enqueueCollect('ethiojobs').enqueued).toBe(true);
+    await jobs[0].execute();
+    expect(service.enqueueCollect('ethiojobs').enqueued).toBe(true);
+    expect(jobs).toHaveLength(2);
+  });
+
+  it('releases the lock when the run throws', async () => {
+    const { service, jobs } = withCapturedQueue();
+    jest.spyOn(service, 'collectWithFallback').mockRejectedValue(new Error('socket hang up') as any);
+
+    service.enqueueCollect('jobicy');
+    await expect(jobs[0].execute()).rejects.toThrow('socket hang up');
+    expect(service.enqueueCollect('jobicy')).toMatchObject({ enqueued: true });
+  });
+
+  it('says "no adapter" — not conflict — for an unregistered source', () => {
+    const { service } = createService();
+    expect(service.enqueueCollect('telegram:unlinked')).toEqual({
+      enqueued: false,
+      message: 'No adapter registered for telegram:unlinked',
+    });
   });
 });

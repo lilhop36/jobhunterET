@@ -32,11 +32,15 @@ POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 
 # ── Watchdog config ──────────────────────────────────────────
 HEALTH_INTERVAL=5        # seconds between watchdog checks
-HEALTH_TIMEOUT=3         # seconds to wait for a port probe
+HEALTH_TIMEOUT=10        # seconds to wait for a probe (first hit on a Next route compiles)
+STRIKE_LIMIT=3           # consecutive failed probes before a service is restarted
 MAX_RESTARTS=5           # max restarts per service before giving up
 RESTART_COOLDOWN=30      # seconds to wait after last restart before allowing another
-BACKEND_HEALTH_URL="http://localhost:${BACKEND_PORT}"
-FRONTEND_HEALTH_URL="http://localhost:${FRONTEND_PORT}"
+BOOT_GRACE=120           # seconds a service may take to compile and bind its port
+# Probe a path that actually answers: the Nest API returns 404 at "/" and Next
+# is still bundling on first request, so probing "/" restarts healthy services.
+BACKEND_HEALTH_URL="http://localhost:${BACKEND_PORT}/api/health"
+FRONTEND_HEALTH_URL="http://localhost:${FRONTEND_PORT}/login"
 
 # ── Colors ────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -59,29 +63,51 @@ declare -A SVC_RESTARTS      # restart count per service
 declare -A SVC_LAST_RESTART  # epoch of last restart per service
 declare -A SVC_RUNNING       # 1 if process should be alive
 declare -A SVC_LOG           # log file path per service
+declare -A SVC_LAST_START    # epoch of the most recent (re)start, for boot grace
+declare -A SVC_STRIKES       # consecutive failed health probes per service
 RUNNING=1                    # global flag — set to 0 on shutdown
 
 mkdir -p "$LOG_DIR"
 SVC_LOG[backend]="$LOG_DIR/backend.log"
 SVC_LOG[frontend]="$LOG_DIR/frontend.log"
 
+# ── Process helpers ───────────────────────────────────────────
+# Services start as `bash -c "cd dir && npm run …"`, so the tracked PID is a
+# wrapper: a plain `kill` leaves the real node process (and its port) behind.
+# On Windows, taskkill /T takes the whole tree; elsewhere fall back to the
+# process group, then the bare PID.
+kill_tree() {
+  local pid="$1"
+  [ -z "$pid" ] && return 0
+  if command -v taskkill &>/dev/null; then
+    taskkill //PID "$pid" //T //F >/dev/null 2>&1 || true
+  fi
+  kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+}
+
+# PIDs bound to a TCP listen port — the ground truth when the wrapper is gone.
+pids_on_port() {
+  local port="$1"
+  command -v netstat &>/dev/null || return 0
+  netstat -ano 2>/dev/null | grep -i LISTENING | grep -E "[:.]${port}([^0-9]|$)" | awk '{print $NF}' | sort -u
+}
+
 # ── Cleanup on exit ───────────────────────────────────────────
 cleanup() {
   RUNNING=0
   info "Shutting down…"
-  # kill all tracked children
-  for svc in "${!SVC_PID[@]}"; do
-    local pid="${SVC_PID[$svc]}"
-    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-      kill "$pid" 2>/dev/null || true
-      # give it a moment to exit gracefully
-      for i in $(seq 1 10); do
-        kill -0 "$pid" 2>/dev/null || break
-        sleep 0.1
-      done
-      # force-kill if still alive
-      kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null || true
-    fi
+  for svc in backend frontend; do
+    local pid="${SVC_PID[$svc]:-}"
+    local port
+    case "$svc" in
+      backend) port="$BACKEND_PORT" ;;
+      *) port="$FRONTEND_PORT" ;;
+    esac
+    kill_tree "$pid"
+    # Sweep anything still holding the port (children of a dead wrapper).
+    for orphan in $(pids_on_port "$port"); do
+      kill_tree "$orphan"
+    done
   done
   wait 2>/dev/null
   ok "All services stopped."
@@ -89,11 +115,16 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # ── Port check ────────────────────────────────────────────────
+# A service counts as serving when it answers at all: the Nest API replies 404
+# to "/" and 200 to "/api/health", and both prove the port is bound. Only a
+# connection that times out or is refused means the service is not up.
 port_responding() {
   local port="$1"
-  # Try a TCP connect with timeout (works without curl)
+  local url="$2"
   if command -v curl &>/dev/null; then
-    curl -sf -o /dev/null --max-time "$HEALTH_TIMEOUT" "http://localhost:${port}/" 2>/dev/null
+    local code
+    code="$(curl -s -o /dev/null --max-time "$HEALTH_TIMEOUT" -w '%{http_code}' "$url" 2>/dev/null)"
+    [ -n "$code" ] && [ "$code" != "000" ]
   elif command -v nc &>/dev/null; then
     nc -z -w "$HEALTH_TIMEOUT" localhost "$port" 2>/dev/null
   elif command -v powershell &>/dev/null; then
@@ -114,6 +145,8 @@ start_service() {
   (cd "$dir" && eval "$cmd") > "${SVC_LOG[$name]}" 2>&1 &
   SVC_PID[$name]=$!
   SVC_RUNNING[$name]=1
+  SVC_LAST_START[$name]=$(date +%s)
+  SVC_STRIKES[$name]=0
 
   # Brief wait to catch immediate crashes (exit within 2s = bad)
   sleep 2
@@ -153,10 +186,9 @@ restart_service() {
 
   # Kill old process if still lingering
   local old_pid="${SVC_PID[$name]:-}"
-  if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
-    kill "$old_pid" 2>/dev/null || true
+  if [ -n "$old_pid" ]; then
+    kill_tree "$old_pid"
     sleep 1
-    kill -0 "$old_pid" 2>/dev/null && kill -9 "$old_pid" 2>/dev/null || true
   fi
 
   restarts=$(( restarts + 1 ))
@@ -167,12 +199,21 @@ restart_service() {
   start_service "$name" "$dir" "$cmd"
 }
 
-# ── Ensure Postgres is reachable ─────────────────────────────
-info "Checking PostgreSQL…"
-if command -v pg_isready &>/dev/null && pg_isready -p "$POSTGRES_PORT" &>/dev/null; then
-  ok "PostgreSQL is running (native)."
+# ── Ensure the configured database is reachable ───────────────
+# SQLite is the authoritative database (see docs/ops-runbook.md).
+# Only fall back to PostgreSQL when the schema actually asks for it,
+# so a fresh checkout does not require Docker.
+DB_PROVIDER="$(sed -n 's/^[[:space:]]*provider[[:space:]]*=[[:space:]]*"\([a-z0-9]*\)".*/\1/p' "$BACKEND_DIR/prisma/schema.prisma" | head -1)"
+DB_PROVIDER="${DB_PROVIDER:-sqlite}"
+DB_LABEL="SQLite (${DATABASE_URL:-file:./dev.db})"
+
+if [ "$DB_PROVIDER" = "sqlite" ]; then
+  ok "Database: SQLite — no server to start."
+elif command -v pg_isready &>/dev/null && pg_isready -p "$POSTGRES_PORT" &>/dev/null; then
+  ok "Database: PostgreSQL is running (native)."
+  DB_LABEL="PostgreSQL localhost:${POSTGRES_PORT}"
 elif command -v docker &>/dev/null; then
-  info "Starting PostgreSQL container…"
+  info "Database: PostgreSQL — starting container…"
   POSTGRES_PORT="$POSTGRES_PORT" docker compose -f "$BACKEND_DIR/docker-compose.yml" up -d --wait 2>/dev/null || \
     POSTGRES_PORT="$POSTGRES_PORT" docker compose -f "$BACKEND_DIR/docker-compose.yml" up -d
   RETRIES=0
@@ -181,16 +222,22 @@ elif command -v docker &>/dev/null; then
     [ "$RETRIES" -ge 30 ] && fail "Postgres did not become ready after 30s."
     sleep 1
   done
-  ok "PostgreSQL is running (Docker)."
+  ok "Database: PostgreSQL is running (Docker)."
+  DB_LABEL="PostgreSQL localhost:${POSTGRES_PORT}"
 else
-  fail "PostgreSQL not found. Install PostgreSQL or Docker."
+  fail "Schema wants PostgreSQL but neither PostgreSQL nor Docker is available."
 fi
 
-# ── Prisma generate + migrate ─────────────────────────────────
+# ── Prisma generate + apply committed migrations ──────────────
+# `migrate deploy` applies only committed migrations and never rewrites
+# schema history; `migrate dev --name _ensure` used to leave a trailing
+# "_ensure" migration behind on every start.
 info "Running Prisma generate…"
 (cd "$BACKEND_DIR" && npx prisma generate --quiet 2>/dev/null) || true
-info "Running Prisma migrate (dev)…"
-(cd "$BACKEND_DIR" && npx prisma migrate dev --name _ensure 2>/dev/null) || true
+info "Applying committed migrations…"
+if ! (cd "$BACKEND_DIR" && npx prisma migrate deploy 2>&1 | tail -3); then
+  warn "prisma migrate deploy failed — see docs/ops-runbook.md (one-time baseline may be required)."
+fi
 
 # ── Start services ────────────────────────────────────────────
 start_service "backend"  "$BACKEND_DIR"  "npm run start:dev"
@@ -203,9 +250,9 @@ echo -e "${GREEN}║       JobHunter Dev Servers + Watchdog       ║${NC}"
 echo -e "${GREEN}╠══════════════════════════════════════════════╣${NC}"
 echo -e "${GREEN}║${NC}  Frontend  : ${CYAN}http://localhost:${FRONTEND_PORT}${NC}              ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC}  Backend   : ${CYAN}http://localhost:${BACKEND_PORT}${NC}              ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}  Postgres  : ${CYAN}localhost:5432${NC}                  ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  Database  : ${CYAN}${DB_LABEL}${NC}"
 echo -e "${GREEN}╠══════════════════════════════════════════════╣${NC}"
-echo -e "${GREEN}║${NC}  Watchdog  : ${DIM}every ${HEALTH_INTERVAL}s · max ${MAX_RESTARTS} restarts · ${RESTART_COOLDOWN}s cooldown${NC}  ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  Watchdog  : ${DIM}every ${HEALTH_INTERVAL}s · max ${MAX_RESTARTS} restarts · ${RESTART_COOLDOWN}s cooldown · ${BOOT_GRACE}s boot grace${NC}  ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC}  Logs      : ${DIM}${LOG_DIR}/${NC}  ${GREEN}║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════╝${NC}"
 echo ""
@@ -213,41 +260,57 @@ echo -e "  Press ${RED}Ctrl+C${NC} to stop all services."
 echo ""
 
 # ── Watchdog loop ─────────────────────────────────────────────
+svc_cmd()  { case "$1" in backend) echo "npm run start:dev";; frontend) echo "npm run dev";; esac; }
+svc_dir()  { case "$1" in backend) echo "$BACKEND_DIR";; frontend) echo "$FRONTEND_DIR";; esac; }
+svc_port() { case "$1" in backend) echo "$BACKEND_PORT";; frontend) echo "$FRONTEND_PORT";; esac; }
+svc_url()  { case "$1" in backend) echo "$BACKEND_HEALTH_URL";; frontend) echo "$FRONTEND_HEALTH_URL";; esac; }
+
 while [ "$RUNNING" -eq 1 ]; do
   sleep "$HEALTH_INTERVAL"
   [ "$RUNNING" -eq 0 ] && break
 
   for svc in backend frontend; do
-    pid="${SVC_PID[$svc]:-}"
-    should_be_running="${SVC_RUNNING[$svc]:-0}"
-
     # Skip if we already gave up on this service
-    [ "$should_be_running" -eq 0 ] && continue
+    [ "${SVC_RUNNING[$svc]:-0}" -eq 0 ] && continue
+    pid="${SVC_PID[$svc]:-}"
+    url="$(svc_url "$svc")"
+    port="$(svc_port "$svc")"
 
-    # Check 1: is the process alive?
-    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-      # Process alive — also verify the port is responding
-      if [ "$svc" = "backend" ]; then
-        if ! port_responding "$BACKEND_PORT"; then
-          log "${DIM}  ${svc} process alive but port ${BACKEND_PORT} not responding — restarting${NC}"
-          if [ "$svc" = "backend" ]; then
-            restart_service "backend" "$BACKEND_DIR" "npm run start:dev"
-          fi
-        fi
-      elif [ "$svc" = "frontend" ]; then
-        if ! port_responding "$FRONTEND_PORT"; then
-          log "${DIM}  ${svc} process alive but port ${FRONTEND_PORT} not responding — restarting${NC}"
-          restart_service "frontend" "$FRONTEND_DIR" "npm run dev"
-        fi
-      fi
-    else
-      # Process is dead — restart it
-      warn "${BOLD}${svc}${NC} process died (pid ${pid:-unknown})"
-      if [ "$svc" = "backend" ]; then
-        restart_service "backend" "$BACKEND_DIR" "npm run start:dev"
-      elif [ "$svc" = "frontend" ]; then
-        restart_service "frontend" "$FRONTEND_DIR" "npm run dev"
-      fi
+    # Answering on its health path — healthy, whatever the status code.
+    if port_responding "$port" "$url"; then
+      SVC_STRIKES[$svc]=0
+      continue
     fi
+
+    now=$(date +%s)
+    since_boot=$(( now - ${SVC_LAST_START[$svc]:-0} ))
+
+    # Wrapper gone and the port not answering, past the first 15s of boot: the
+    # service is really down. (The port probe above protects against the common
+    # case where only the wrapper exited and the server is still bound.)
+    if [ -z "$pid" ] || { ! kill -0 "$pid" 2>/dev/null && [ "$since_boot" -gt 15 ]; }; then
+      warn "${BOLD}${svc}${NC} process died (pid ${pid:-unknown})"
+      restart_service "$svc" "$(svc_dir "$svc")" "$(svc_cmd "$svc")"
+      continue
+    fi
+
+    # Still inside the boot grace — `nest start --watch` and `next dev` compile
+    # for tens of seconds before binding. Restarting during that window used to
+    # kill healthy services in a loop.
+    if [ "$since_boot" -lt "$BOOT_GRACE" ]; then
+      continue
+    fi
+
+    # Grace is over and the probe failed; require a few consecutive misses
+    # before acting, because one slow request can time out on its own.
+    strikes=$(( ${SVC_STRIKES[$svc]:-0} + 1 ))
+    SVC_STRIKES[$svc]=$strikes
+    if [ "$strikes" -lt "$STRIKE_LIMIT" ]; then
+      log "${DIM}  ${svc} probe ${strikes}/${STRIKE_LIMIT} failed; waiting${NC}"
+      continue
+    fi
+
+    log "${DIM}  ${svc} has not answered ${url} — restarting${NC}"
+    restart_service "$svc" "$(svc_dir "$svc")" "$(svc_cmd "$svc")"
   done
 done

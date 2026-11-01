@@ -6,7 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import * as bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcrypt';
+import { PASSWORD_COST } from '../../common/security/password-policy';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -176,7 +177,7 @@ export class AdminService {
     if (!user) throw new NotFoundException('User not found');
 
     const tempPassword = crypto.randomBytes(12).toString('base64url');
-    const hash = await bcrypt.hash(tempPassword, 10);
+    const hash = await bcrypt.hash(tempPassword, PASSWORD_COST);
 
     await this.prisma.user.update({
       where: { id: userId },

@@ -7,8 +7,9 @@ export BACKEND_PORT FRONTEND_PORT
 
 cd /app/backend
 mkdir -p /app/data/uploads/cv
-echo "[entrypoint] Syncing database schema..."
-DATABASE_URL="${DATABASE_URL:-file:/app/data/prod.db}" npx prisma db push --skip-generate --accept-data-loss >/dev/null 2>&1 || true
+echo "[entrypoint] Applying database migrations (backup + copy verification)..."
+# Fails closed: a refused migration stops the container instead of risking data.
+DATABASE_URL="${DATABASE_URL:-file:/app/data/prod.db}" node scripts/db-migrate-safe.js
 
 echo "[entrypoint] Starting backend on ${BACKEND_PORT}..."
 PORT="${BACKEND_PORT}" npm run start:prod &

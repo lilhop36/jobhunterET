@@ -1,0 +1,23 @@
+Architecture health checks
+=========================
+[FAIL] models.count — architecture-overview.md says 16 models; schema.prisma defines 22: User, CandidateProfile, CvFile, TelegramLink, Skill, CandidateSkill, TargetRole, LocationPreference, JobSource, SourceRun, SourceRunCategory, Job, JobSkill, JobMatch, Application, ApplicationTransition, Notification, SearchProfile, Digest, MatchCycle, SystemLog, BotState
+[FAIL] modules.coverage — modules missing from the overview map: matches
+[FAIL] sources.inventory — overview lists adapters that do not exist: Himalayas, WorkingNomads, JobsFitty, LinkedIn, FindWork, WeWorkRemotely, HaHuJobs, RelieWeb. Actual: 11 web sources + 3 Telegram channels = 14 endpoints, 12 adapter classes.
+[FAIL] sources.count — overview claims 15 adapters; actual is 11 web sources + 3 Telegram channels (12 adapter classes).
+[FAIL] dedup.fingerprint — overview claims cross-source fingerprint deduplication, but sources.service.ts stores the fingerprint without querying it; dedupeWithinRun only groups sourceJobId within one run.
+[FAIL] matching.neutral — matching reference says empty skills score 0.65; engine uses 0.4
+[FAIL] matching.eligibility — engine has hard eligibility filters (score 0) and returns eligible/ineligibleReasons; the reference does not document them
+[FAIL] matching.inputs — ProfileInput.excludeEntryLevel is implemented but missing from the reference
+[FAIL] matching.schedule — overview says matching runs every 30m; MATCH_CYCLE_INTERVAL defaults to 10m
+[FAIL] matching.role — reference says role matching is exact substring; engine uses token-aware phrase matching
+[FAIL] traceability.specs — spec files missing from traceability.md: backend/src/common/utils/url-safety.spec.ts, backend/src/modules/jobs/jobs.service.spec.ts, backend/src/modules/lifecycle/lifecycle.service.spec.ts, backend/src/modules/sources/categories/category-mapper.spec.ts
+[FAIL] traceability.total — traceability.md says ~227 tests; 23 spec files contain 252 it/test declarations (parameterized cases expand further, so use CI output for the executed count).
+[FAIL] traceability.counts — per-file test counts are stale: auth.service.spec.ts claims 15, has 1; auth.controller.spec.ts claims 8, has 4; applications.service.spec.ts claims 10, has 2; matching-engine.spec.ts claims 22, has 34; sources.service.spec.ts claims 8, has 20; adapters.spec.ts claims 41, has 51; telegram.service.spec.ts claims 10, has 12; notifications.service.spec.ts claims 6, has 7; job-fidelity.spec.ts claims 28, has 31; integration.spec.ts claims 21, has 10; security.spec.ts claims 12, has 3
+[FAIL] plan.status — category-aware-collection.md says "not yet implemented", but category-mapper.ts, category-taxonomy.json, SourceRunCategory, FAST/DEEP modes and related tests exist.
+[WARN] deployment.db — README says PostgreSQL is the production database, while docker-compose.yml configures a SQLite file. Declare which production topology is authoritative.
+[WARN] deployment.migrations — runbook uses prisma migrate deploy, while the Docker entrypoint uses prisma db push --accept-data-loss.
+[WARN] model.source — no .dot/.dsl/.mmd/.puml architecture source exists; the diagrams are ASCII inside Markdown and cannot be diffed mechanically.
+[WARN] docs.freshness — latest code commit (2026-10-22) is newer than the latest architecture-doc commit (2026-08-28).
+[WARN] routes.count — README says 20+ routes; frontend/app contains 19 page.tsx routes
+
+Summary: 0 passed, 14 failed, 5 warnings.

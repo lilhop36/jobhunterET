@@ -89,21 +89,29 @@ describe('data integrity', () => {
     expect(orphans).toHaveLength(0);
   });
 
-  it('no new matches created after expiry sweep reference expired jobs', async () => {
-    const lastExpiry = await prisma.job.findFirst({
-      where: { status: 'EXPIRED' },
-      orderBy: { statusChangedAt: 'desc' },
-      select: { statusChangedAt: true },
-    });
-    if (!lastExpiry?.statusChangedAt) return;
-
-    const stale = await prisma.jobMatch.count({
-      where: {
-        createdAt: { gt: lastExpiry.statusChangedAt },
-        job: { status: { in: ['EXPIRED', 'REMOVED'] } },
+  it('no match is created for a job that was already expired or removed', async () => {
+    // The invariant is per row: a match may only reference a job that was still
+    // live when the match was written. Comparing against the newest EXPIRED
+    // timestamp across the whole table is not the same thing — it hides matches
+    // written after an earlier sweep and flags the legitimate ones written
+    // before a job's own removal, so the job's own statusChangedAt is the bound.
+    const rows = await prisma.jobMatch.findMany({
+      where: { job: { status: { in: ['EXPIRED', 'REMOVED'] } } },
+      select: {
+        id: true,
+        createdAt: true,
+        job: { select: { id: true, status: true, statusChangedAt: true } },
       },
+      take: 100_000,
     });
-    expect(stale).toBe(0);
+
+    const violations = rows.filter(
+      (row) =>
+        row.job.statusChangedAt &&
+        new Date(row.job.statusChangedAt).getTime() < new Date(row.createdAt).getTime(),
+    );
+
+    expect(violations.map((v) => v.id)).toEqual([]);
   });
 
   it('database has active jobs and matches', async () => {

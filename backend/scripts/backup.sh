@@ -7,6 +7,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$BACKEND_DIR"
+
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 CV_DIR="${CV_UPLOAD_DIR:-./uploads/cv}"
 RETENTION_DAYS=7
@@ -17,14 +21,23 @@ echo "$LOG_PREFIX Starting backup at $(date)"
 
 # ── Parse DATABASE_URL ──
 if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
+  set -a
+  # shellcheck disable=SC1091
+  . ./.env
+  set +a
+fi
+
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "$LOG_PREFIX ERROR: DATABASE_URL is not set" >&2
+  exit 1
 fi
 
 # Detect provider from DATABASE_URL
 if echo "$DATABASE_URL" | grep -qiE '^file:'; then
   DB_PROVIDER="sqlite"
-  DB_PATH=$(echo "$DATABASE_URL" | sed 's|file:||')
+  DB_PATH=$(echo "$DATABASE_URL" | sed 's|file:||' | sed 's|?.*||')
   echo "$LOG_PREFIX SQLite mode — DB file: $DB_PATH"
+  echo "$LOG_PREFIX Database: SQLite file $DB_PATH"
 else
   DB_PROVIDER="postgresql"
   DB_HOST=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:]*\).*|\1|p')
@@ -33,8 +46,6 @@ else
   DB_USER=$(echo "$DATABASE_URL" | sed -n 's|://\([^:]*\):.*|\1|p')
   echo "$LOG_PREFIX PostgreSQL mode — Database: $DB_NAME @ $DB_HOST:$DB_PORT (user: $DB_USER)"
 fi
-
-echo "$LOG_PREFIX Database: $DB_NAME @ $DB_HOST:$DB_PORT (user: $DB_USER)"
 
 # ── Create backup directory ──
 mkdir -p "$BACKUP_DIR"
@@ -45,15 +56,14 @@ mkdir -p "$BACKUP_DIR/uploads"
 if [ "$DB_PROVIDER" = "sqlite" ]; then
   SQLITE_BACKUP_DIR="$BACKUP_DIR/sqlite"
   mkdir -p "$SQLITE_BACKUP_DIR"
-  DUMP_FILE="$SQLITE_BACKUP_DIR/jobhunter_${TIMESTAMP}.db.gz"
-  echo "$LOG_PREFIX Copying SQLite database to $DUMP_FILE"
-  if [ -f "$DB_PATH" ]; then
-    gzip -c "$DB_PATH" > "$DUMP_FILE"
-    DUMP_SIZE=$(du -h "$DUMP_FILE" | cut -f1)
-    echo "$LOG_PREFIX SQLite backup complete: $DUMP_SIZE"
-  else
-    echo "$LOG_PREFIX Warning: SQLite file not found at $DB_PATH"
+  echo "$LOG_PREFIX Creating consistent SQLite snapshot (VACUUM INTO)..."
+  DUMP_FILE=$(node "$SCRIPT_DIR/db-migrate-safe.js" --backup-only --backup-dir "$SQLITE_BACKUP_DIR")
+  if [ -z "$DUMP_FILE" ] || [ ! -f "$DUMP_FILE" ]; then
+    echo "$LOG_PREFIX ERROR: SQLite backup was not created" >&2
+    exit 1
   fi
+  DUMP_SIZE=$(du -h "$DUMP_FILE" | cut -f1)
+  echo "$LOG_PREFIX SQLite backup complete: $DUMP_FILE ($DUMP_SIZE)"
 else
   mkdir -p "$BACKUP_DIR/pg"
   DUMP_FILE="$BACKUP_DIR/pg/jobhunter_${TIMESTAMP}.sql.gz"
@@ -90,6 +100,6 @@ find "$BACKUP_DIR/uploads" -name "cv_*.tar.gz" -mtime +$RETENTION_DAYS -delete -
 
 # ── Summary ──
 TOTAL_SIZE=$(du -sh "$BACKUP_DIR" | cut -f1)
-BACKUP_COUNT=$(find "$BACKUP_DIR/pg" -name "jobhunter_*.sql.gz" | wc -l)
+BACKUP_COUNT=$(find "$BACKUP_DIR/pg" "$BACKUP_DIR/sqlite" -type f \( -name "jobhunter_*.sql.gz" -o -name "jobhunter_*.db.gz" \) | wc -l | tr -d ' ')
 echo "$LOG_PREFIX Backup complete. Total: $TOTAL_SIZE ($BACKUP_COUNT database dumps retained)"
 echo "$LOG_PREFIX Finished at $(date)"

@@ -17,7 +17,20 @@
     "prisma:studio": "npm run prisma:studio --prefix backend",
     "db:sqlite": "npm run db:sqlite --prefix backend",
     "db:pg": "npm run db:pg --prefix backend",
-    "db:switch": "npm run db:switch --prefix backend"
+    "db:switch": "npm run db:switch --prefix backend",
+    "db:migrate": "npm run db:migrate:safe --prefix backend",
+    "db:baseline": "npm run db:baseline --prefix backend",
+    "db:backup": "npm run db:backup --prefix backend",
+    "duplicates:report": "npm run duplicates:report --prefix backend",
+    "smoke": "bash backend/scripts/smoke-test.sh",
+    "nfr:check": "npm run nfr:check --prefix backend",
+    "live:verify": "npm run smoke && npm run nfr:check",
+    "facts:generate": "node scripts/generate-architecture-facts.js",
+    "facts:check": "node scripts/generate-architecture-facts.js --check",
+    "traceability:generate": "node scripts/generate-traceability.js",
+    "traceability:check": "node scripts/generate-traceability.js --check",
+    "arch:check": "node scripts/check-architecture-health.js --strict",
+    "arch:verify": "npm run facts:check && npm run traceability:check && npm run arch:check"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

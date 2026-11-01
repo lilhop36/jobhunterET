@@ -1,0 +1,340 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/generate-architecture-facts.js",
+  "stack": {
+    "next": "15.5",
+    "react": "19.2",
+    "nestjs": "10.4",
+    "prisma": "5.20",
+    "typescript": "5.5"
+  },
+  "database": {
+    "authoritative": "sqlite",
+    "prismaProvider": "sqlite",
+    "dockerDatabaseUrl": "file:/app/data/prod.db",
+    "postgresql": "optional / not the current production target"
+  },
+  "prisma": {
+    "modelCount": 22,
+    "models": [
+      "User",
+      "CandidateProfile",
+      "CvFile",
+      "TelegramLink",
+      "Skill",
+      "CandidateSkill",
+      "TargetRole",
+      "LocationPreference",
+      "JobSource",
+      "SourceRun",
+      "SourceRunCategory",
+      "Job",
+      "JobSkill",
+      "JobMatch",
+      "Application",
+      "ApplicationTransition",
+      "Notification",
+      "SearchProfile",
+      "Digest",
+      "MatchCycle",
+      "SystemLog",
+      "BotState"
+    ]
+  },
+  "backend": {
+    "featureModuleCount": 18,
+    "featureModules": [
+      "account",
+      "admin",
+      "applications",
+      "auth",
+      "dashboard",
+      "digest",
+      "events",
+      "jobs",
+      "lifecycle",
+      "matches",
+      "matching",
+      "notifications",
+      "profile",
+      "salary",
+      "saved-jobs",
+      "searches",
+      "sources",
+      "telegram"
+    ],
+    "moduleFileCount": 20,
+    "specFileCount": 28,
+    "testDeclarations": 330,
+    "tests": [
+      {
+        "file": "account.service.spec.ts",
+        "declarations": 7
+      },
+      {
+        "file": "adapters.spec.ts",
+        "declarations": 55
+      },
+      {
+        "file": "admin.service.spec.ts",
+        "declarations": 8
+      },
+      {
+        "file": "applications.service.spec.ts",
+        "declarations": 6
+      },
+      {
+        "file": "auth.controller.spec.ts",
+        "declarations": 4
+      },
+      {
+        "file": "auth.service.spec.ts",
+        "declarations": 9
+      },
+      {
+        "file": "backup.service.spec.ts",
+        "declarations": 5
+      },
+      {
+        "file": "category-mapper.spec.ts",
+        "declarations": 9
+      },
+      {
+        "file": "digest.service.spec.ts",
+        "declarations": 8
+      },
+      {
+        "file": "exclusive.spec.ts",
+        "declarations": 4
+      },
+      {
+        "file": "integration.spec.ts",
+        "declarations": 10
+      },
+      {
+        "file": "job-fidelity.spec.ts",
+        "declarations": 31
+      },
+      {
+        "file": "jobs.service.spec.ts",
+        "declarations": 4
+      },
+      {
+        "file": "keyset.spec.ts",
+        "declarations": 10
+      },
+      {
+        "file": "lifecycle.service.spec.ts",
+        "declarations": 13
+      },
+      {
+        "file": "lifecycle.tasks.spec.ts",
+        "declarations": 9
+      },
+      {
+        "file": "matching-engine.spec.ts",
+        "declarations": 34
+      },
+      {
+        "file": "matching.service.spec.ts",
+        "declarations": 4
+      },
+      {
+        "file": "notifications.service.spec.ts",
+        "declarations": 7
+      },
+      {
+        "file": "parse-port.spec.ts",
+        "declarations": 3
+      },
+      {
+        "file": "profile.service.spec.ts",
+        "declarations": 4
+      },
+      {
+        "file": "rate-limiter.spec.ts",
+        "declarations": 5
+      },
+      {
+        "file": "security.spec.ts",
+        "declarations": 14
+      },
+      {
+        "file": "sources.controller.spec.ts",
+        "declarations": 4
+      },
+      {
+        "file": "sources.service.spec.ts",
+        "declarations": 27
+      },
+      {
+        "file": "telegram-channel.spec.ts",
+        "declarations": 10
+      },
+      {
+        "file": "telegram.service.spec.ts",
+        "declarations": 15
+      },
+      {
+        "file": "url-safety.spec.ts",
+        "declarations": 11
+      }
+    ]
+  },
+  "frontend": {
+    "routeCount": 19,
+    "routes": [
+      "/",
+      "/admin/dashboard",
+      "/admin/users",
+      "/applications",
+      "/dashboard",
+      "/error",
+      "/forbidden",
+      "/inbox",
+      "/jobs",
+      "/jobs/[id]",
+      "/login",
+      "/matches",
+      "/onboarding",
+      "/profile",
+      "/register",
+      "/saved",
+      "/searches",
+      "/settings",
+      "/sources"
+    ]
+  },
+  "sources": {
+    "webCount": 11,
+    "webSources": [
+      {
+        "id": "reliefweb",
+        "name": "ReliefWeb (Ethiopia)",
+        "adapter": "reliefweb",
+        "frequencyMinutes": 30
+      },
+      {
+        "id": "remotive",
+        "name": "Remotive",
+        "adapter": "remotive",
+        "frequencyMinutes": 60
+      },
+      {
+        "id": "arbeitnow",
+        "name": "Arbeitnow",
+        "adapter": "arbeitnow",
+        "frequencyMinutes": 60
+      },
+      {
+        "id": "ethiojobs",
+        "name": "EthioJobs",
+        "adapter": "ethiojobs",
+        "frequencyMinutes": 30
+      },
+      {
+        "id": "ethiongojobs",
+        "name": "Ethio NGO Jobs",
+        "adapter": "ethiongojobs",
+        "frequencyMinutes": 30
+      },
+      {
+        "id": "geez",
+        "name": "GeezJobs",
+        "adapter": "geezjobs",
+        "frequencyMinutes": 60
+      },
+      {
+        "id": "etcareers",
+        "name": "ET Careers",
+        "adapter": "etcareers",
+        "frequencyMinutes": 30
+      },
+      {
+        "id": "jobicy",
+        "name": "Jobicy",
+        "adapter": "jobicy",
+        "frequencyMinutes": 120
+      },
+      {
+        "id": "remoteok",
+        "name": "RemoteOK",
+        "adapter": "remoteok",
+        "frequencyMinutes": 120
+      },
+      {
+        "id": "landingjobs",
+        "name": "Landing.jobs",
+        "adapter": "landingjobs",
+        "frequencyMinutes": 120
+      },
+      {
+        "id": "hagerejobs",
+        "name": "Hagere Jobs",
+        "adapter": "hagerejobs",
+        "frequencyMinutes": 60
+      }
+    ],
+    "telegramCount": 3,
+    "telegramChannels": [
+      {
+        "sourceId": "tg-elelanajobs",
+        "name": "ElelanaJobs (Telegram)"
+      },
+      {
+        "sourceId": "tg-shegarjob",
+        "name": "ShegerJobs (Telegram)"
+      },
+      {
+        "sourceId": "tg-ethiojobvacancy1",
+        "name": "EthioJobVacancy (Telegram)"
+      }
+    ],
+    "adapterClassCount": 12,
+    "adapterClasses": [
+      "arbeitnow.adapter.ts",
+      "etcareers.adapter.ts",
+      "ethiojobs.adapter.ts",
+      "ethiongojobs.adapter.ts",
+      "geezjobs.adapter.ts",
+      "hagerejobs.adapter.ts",
+      "jobicy.adapter.ts",
+      "landingjobs.adapter.ts",
+      "reliefweb.adapter.ts",
+      "remoteok.adapter.ts",
+      "remotive.adapter.ts",
+      "telegram-channel.adapter.ts"
+    ],
+    "endpointCount": 14
+  },
+  "knowledgeBase": {
+    "skills": 153,
+    "aliases": 146,
+    "roleProfiles": 17,
+    "roleSynonyms": 31,
+    "relationships": 34
+  },
+  "matching": {
+    "weights": {
+      "Role": 25,
+      "Skills": 30,
+      "Experience": 15,
+      "Location": 15,
+      "Employment": 5,
+      "Freshness": 5,
+      "Salary": 5
+    },
+    "matchCycleDefault": "10m"
+  },
+  "ci": {
+    "jobCount": 6,
+    "jobs": [
+      "lint-and-typecheck",
+      "test-backend",
+      "build-frontend",
+      "security",
+      "architecture",
+      "runtime-verification"
+    ]
+  }
+}

@@ -31,3 +31,13 @@ coverage/
 backend/coverage/
 backend/prisma/*.db
 backend/prisma/*.db-journal
+backend/prisma/*.db-wal
+backend/prisma/*.db-shm
+
+# Database backups and migration work files
+backups/
+backend/backups/
+backend/.migration-work/
+
+# dev.sh service logs (watchdog output; regenerated on every launch)
+.dev-logs/

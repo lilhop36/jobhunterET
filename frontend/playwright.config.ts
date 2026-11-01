@@ -3,9 +3,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // ── Read ports from root .env (single source of truth) ──
+// This package is CommonJS (Next.js), so `import.meta` is unavailable here.
 function loadPort(key: string, fallback: number): number {
   try {
-    const raw = readFileSync(resolve(import.meta.dirname, '..', '.env'), 'utf8');
+    const raw = readFileSync(resolve(__dirname, '..', '.env'), 'utf8');
     const m = raw.match(new RegExp(`^${key}=(.+)$`, 'm'));
     return m ? Number(m[1].trim()) : fallback;
   } catch {
@@ -17,7 +18,7 @@ const FRONTEND_PORT = loadPort('FRONTEND_PORT', 3211);
 
 /**
  * Shell smoke tests run against the ALREADY-RUNNING stack (no webServer here):
- * frontend dev server on the configured port, NestJS backend, Postgres.
+ * frontend dev server on the configured port, NestJS backend, SQLite.
  * Start them first (see dev.sh or npm run dev), then: npx playwright test
  */
 export default defineConfig({

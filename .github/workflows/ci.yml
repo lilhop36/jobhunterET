@@ -4,6 +4,9 @@
 # Gate 1: Static analysis (lint + typecheck) — <2 min
 # Gate 2: Unit tests with coverage gates — <5 min
 # Gate 3: Frontend build verification — <3 min
+# Gate 4: Dependency audit
+# Gate 5: Architecture drift (generated facts + docs vs code)
+# Gate 6: Runtime verification — real backend + frontend + Chromium
 # ──────────────────────────────────────────────────────────────
 name: CI
 
@@ -166,3 +169,148 @@ jobs:
       - name: Audit frontend dependencies (high+)
         working-directory: frontend
         run: npm audit --audit-level=critical
+
+  # ═══════════════════════════════════════════════════════════
+  # Gate 5: Architecture drift — generated facts + docs vs code
+  # ═══════════════════════════════════════════════════════════
+  architecture:
+    name: "Gate 5: Architecture Drift"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # git history is used for the docs-freshness check
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Both scripts are dependency-free; no npm install is required.
+      - name: Generated facts are current
+        run: node scripts/generate-architecture-facts.js --check
+
+      - name: Architecture claims match code
+        run: node scripts/check-architecture-health.js --strict
+
+  # ═══════════════════════════════════════════════════════════
+  # Gate 6: Runtime verification — boot the real stack, drive it in a browser
+  #
+  # Everything above proves the code compiles and its units behave. This gate
+  # proves the assembled system answers: SQLite provisioned + seeded, Nest
+  # serving /api, Next serving the shell, Chromium clicking through login,
+  # matches and the onboarding wizard. A missing browser binary is a hard error,
+  # never a skip — a green run with no browser would be a lie.
+  # ═══════════════════════════════════════════════════════════
+  runtime-verification:
+    name: "Gate 6: Runtime Verification"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [test-backend, build-frontend]
+    env:
+      # Disposable database; provision-test-db.js refuses anything but a file: URL.
+      DATABASE_URL: "file:./ci-e2e.db"
+      # The auth throttle is unit-tested; the browser suite would otherwise burn
+      # its 10-calls/15-min IP budget signing in.
+      AUTH_RATE_MAX: "500"
+      AUTH_EMAIL_RATE_MAX: "500"
+      NODE_ENV: development
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install dependencies (backend + frontend)
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+
+      - name: Generate Prisma client (SQLite)
+        working-directory: backend
+        run: npx prisma generate
+
+      # A throwaway secret: this stack exists for the length of the job.
+      - name: Mint an ephemeral JWT secret
+        run: echo "JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))")" >> "$GITHUB_ENV"
+
+      - name: Provision and seed the disposable database
+        working-directory: backend
+        run: node scripts/provision-test-db.js
+
+      - name: Build backend and frontend
+        run: |
+          npm run build --prefix backend
+          npm run build --prefix frontend
+
+      - name: Start the backend
+        working-directory: backend
+        run: |
+          nohup node dist/main.js > /tmp/backend.log 2>&1 &
+          echo "$!" > /tmp/backend.pid
+
+      - name: Start the frontend
+        working-directory: frontend
+        env:
+          PORT: "3211"
+        run: |
+          nohup npm run start > /tmp/frontend.log 2>&1 &
+          echo "$!" > /tmp/frontend.pid
+
+      - name: Wait until both services answer
+        run: |
+          probe() { curl -sf -o /dev/null "$1"; }
+          for target in "http://localhost:3210/api/health" "http://localhost:3211/login"; do
+            for i in $(seq 1 60); do
+              if probe "$target"; then echo "ready: $target"; break; fi
+              if [ "$i" = 60 ]; then
+                echo "::error::$target never became healthy"
+                echo "--- backend log ---"; tail -40 /tmp/backend.log
+                echo "--- frontend log ---"; tail -40 /tmp/frontend.log
+                exit 1
+              fi
+              sleep 2
+            done
+          done
+
+      - name: Install Chromium for Playwright
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # Loud failure, not a silent skip: without a browser nothing was verified.
+      - name: Verify the Chromium binary is installed
+        working-directory: frontend
+        run: |
+          BIN=$(node -e "console.log(require('@playwright/test').chromium.executablePath())")
+          if [ ! -f "$BIN" ]; then
+            echo "::error::Playwright Chromium missing at $BIN — run npx playwright install chromium"
+            exit 1
+          fi
+          echo "Chromium binary: $BIN"
+
+      - name: Run the browser runtime checks
+        working-directory: frontend
+        run: npx playwright test e2e/runtime-verification.spec.ts e2e/onboarding.spec.ts --project=desktop --reporter=list
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-verification
+          path: |
+            frontend/e2e-artifacts
+            frontend/test-results
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Show service logs on failure
+        if: failure()
+        run: |
+          echo "--- backend ---"; tail -60 /tmp/backend.log
+          echo "--- frontend ---"; tail -60 /tmp/frontend.log

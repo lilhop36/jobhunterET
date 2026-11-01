@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Interval } from '@nestjs/schedule';
+import { Cron, Interval } from '@nestjs/schedule';
 import { LifecycleService } from './lifecycle.service';
 import { SourcesService } from '../sources/sources.service';
 import { DigestService } from '../digest/digest.service';
 import { createExclusive } from '../../common/utils/exclusive';
 
 /** FR-034a: sweep interval in ms — reads EXPIRATION_SWEEP_INTERVAL (default 6h). */
-function sweepIntervalMs(): number {
+export function sweepIntervalMs(): number {
   const raw = process.env.EXPIRATION_SWEEP_INTERVAL;
   if (!raw) return 6 * 60 * 60 * 1000;
   const n = Number(raw);
@@ -15,18 +15,20 @@ function sweepIntervalMs(): number {
   return h ? Number(h[1]) * 60 * 60 * 1000 : 6 * 60 * 60 * 1000; // "6h"
 }
 
-/** FR-028: digest interval in ms — reads DIGEST_INTERVAL (default 24h). */
-function digestIntervalMs(): number {
-  const raw = process.env.DIGEST_INTERVAL;
-  if (!raw) return 24 * 60 * 60 * 1000;
-  const n = Number(raw);
-  if (!Number.isNaN(n)) return n; // plain milliseconds
-  const h = raw.trim().match(/^(\d+)\s*h$/);
-  return h ? Number(h[1]) * 60 * 60 * 1000 : 24 * 60 * 60 * 1000; // "24h"
+/**
+ * FR-028: the SRS fixes the default digest send time at 08:00 Africa/Addis_Ababa,
+ * so the schedule is a cron in that zone rather than a rolling 24-hour interval
+ * measured from process start. `DIGEST_CRON` / `DIGEST_TIMEZONE` override it.
+ */
+export function digestSchedule(): { cron: string; timeZone: string } {
+  return {
+    cron: process.env.DIGEST_CRON?.trim() || '0 0 8 * * *',
+    timeZone: process.env.DIGEST_TIMEZONE?.trim() || 'Africa/Addis_Ababa',
+  };
 }
 
 /** FR-018/037a: match-cycle interval in ms — reads MATCH_CYCLE_INTERVAL (default 10m). */
-function matchCycleIntervalMs(): number {
+export function matchCycleIntervalMs(): number {
   const raw = process.env.MATCH_CYCLE_INTERVAL;
   if (!raw) return 10 * 60 * 1000;
   const n = Number(raw);
@@ -38,7 +40,7 @@ function matchCycleIntervalMs(): number {
 }
 
 /** FR-037b: retention interval in ms — reads RETENTION_INTERVAL (default 24h = nightly). */
-function retentionIntervalMs(): number {
+export function retentionIntervalMs(): number {
   const raw = process.env.RETENTION_INTERVAL;
   if (!raw) return 24 * 60 * 60 * 1000;
   const n = Number(raw);
@@ -46,7 +48,7 @@ function retentionIntervalMs(): number {
   const h = raw.trim().match(/^(\d+)\s*h$/);
   return h ? Number(h[1]) * 60 * 60 * 1000 : 24 * 60 * 60 * 1000; // "24h"
 }
-function backupIntervalMs(): number {
+export function backupIntervalMs(): number {
   const raw = process.env.BACKUP_INTERVAL;
   if (!raw) return 24 * 60 * 60 * 1000;
   const n = Number(raw);
@@ -56,7 +58,7 @@ function backupIntervalMs(): number {
 }
 
 /** FR-035: collection interval in ms — reads JOB_COLLECTION_INTERVAL (default 30m). */
-function collectIntervalMs(): number {
+export function collectIntervalMs(): number {
   const raw = process.env.JOB_COLLECTION_INTERVAL;
   if (!raw) return 30 * 60 * 1000;
   const n = Number(raw);
@@ -68,7 +70,7 @@ function collectIntervalMs(): number {
 }
 
 /** FR-035b: deep collection interval in ms — reads DEEP_COLLECTION_INTERVAL (default 60m). */
-function deepCollectIntervalMs(): number {
+export function deepCollectIntervalMs(): number {
   const raw = process.env.DEEP_COLLECTION_INTERVAL;
   if (!raw) return 60 * 60 * 1000;
   const n = Number(raw);
@@ -155,7 +157,10 @@ export class LifecycleTasks {
     });
   }
 
-  @Interval(digestIntervalMs()) // FR-028: daily digest (configurable via DIGEST_INTERVAL, default 24h)
+  @Cron(digestSchedule().cron, {
+    name: 'daily-digest',
+    timeZone: digestSchedule().timeZone,
+  }) // FR-028: 08:00 Africa/Addis_Ababa by default
   async digest() {
     await this.runExclusive('digest', async () => {
       try {

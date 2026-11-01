@@ -946,6 +946,184 @@ describe('EtcareersAdapter', () => {
 });
 
 // ══════════════════════════════════════════════════════════════
+// 11. HAGEREJOBS — WordPress/Elementor listing-page scraping
+// ══════════════════════════════════════════════════════════════
+describe('HagereJobsAdapter', () => {
+  // Elementor job card: the anchor wraps the title, and the field lines follow
+  // it inside the same card. Cards are ~400 characters apart, which is closer
+  // than any fixed-size window that tries to capture "the rest of the card".
+  const card = ({
+    id,
+    title,
+    company,
+    location,
+    deadline,
+    experience,
+    type,
+    apply,
+  }: {
+    id: string;
+    title: string;
+    company?: string;
+    location?: string;
+    deadline?: string;
+    experience?: string;
+    type?: string;
+    apply?: string;
+  }) => `
+  <article class="elementor-repeater-item job-card">
+    <a href="https://hagerejobs.com/ethiopia-job/?job_detail=${id}">
+      <h3 class="job-card-title">${title}</h3>
+    </a>
+    ${company ? `<p><strong>Company:</strong> ${company}</p>` : ''}
+    ${location ? `<p><strong>Location:</strong> ${location}</p>` : ''}
+    ${experience ? `<p><strong>Experience:</strong> ${experience}</p>` : ''}
+    <p><strong>Education:</strong> BA Degree</p>
+    ${deadline ? `<p><strong>Deadline:</strong> ${deadline}</p>` : ''}
+    ${type ? `<span>${type}</span>` : ''}
+    ${apply ? `<a href="${apply}">Apply now</a>` : ''}
+  </article>`;
+
+  const listing = (cards: string) => `<html><body><div class="jobs">${cards}</div></body></html>`;
+
+  it('parses each card without borrowing a neighbour\'s fields', async () => {
+    const { HagereJobsAdapter } = require('./hagerejobs.adapter');
+    const adapter = new HagereJobsAdapter();
+
+    mockFetchHtml(
+      listing(
+        card({
+          id: '101',
+          title: 'Senior Accountant',
+          company: 'Ethio Telecom',
+          location: 'Addis Ababa',
+          experience: '5 years',
+          deadline: '15/11/2026',
+          type: 'Full Time',
+          apply: 'https://docs.google.com/forms/d/e/1FAIpQLSenior/viewform',
+        }) +
+          card({
+            id: '102',
+            title: 'Finance Officer',
+            company: 'DHL Ethiopia',
+            location: 'Addis Ababa',
+            experience: '3 years',
+            deadline: '01/12/2026',
+            type: 'Contract',
+          }),
+      ),
+    );
+    mockFetchHtml(listing('')); // international page: nothing listed
+
+    const jobs = await adapter.fetchJobs();
+    expect(jobs.map((j: RawJob) => j.sourceJobId)).toEqual(['hagerejobs-101', 'hagerejobs-102']);
+
+    const [first, second] = jobs;
+    expect(first.title).toBe('Senior Accountant');
+    expect(first.company).toBe('Ethio Telecom');
+    expect(first.location).toBe('Addis Ababa');
+    expect(first.employmentType).toBe('FULL_TIME');
+    expect(first.deadline).toEqual(new Date(2026, 10, 15));
+    // An apply link on the card wins over the listing detail URL.
+    expect(first.url).toContain('docs.google.com/forms');
+
+    // The regression this fixture exists for: the second card used to be read
+    // through a window that still contained the first card, so the job below
+    // came out named after the job above it.
+    expect(second.title).toBe('Finance Officer');
+    expect(second.company).toBe('DHL Ethiopia');
+    expect(second.employmentType).toBe('CONTRACT');
+    expect(second.deadline).toEqual(new Date(2026, 11, 1));
+    expect(second.url).toBe('https://hagerejobs.com/ethiopia-job/?job_detail=102');
+
+    // Seniority comes from the title even when the card also states years.
+    expect(first.experienceLevel).toBe('SENIOR');
+    expect(second.experienceLevel).toBe('UNKNOWN');
+
+    for (const job of jobs) {
+      expect(job.locationClass).toBe('ETHIOPIA_LOCAL');
+      expect(job.country).toBe('Ethiopia');
+      expect(job.currency).toBe('ETB');
+      expect(job.parseConfidence).toBe(80);
+      expect(job.description).toContain('<h2>');
+    }
+  });
+
+  it('defaults the fields a sparse card omits', async () => {
+    const { HagereJobsAdapter } = require('./hagerejobs.adapter');
+    const adapter = new HagereJobsAdapter();
+
+    mockFetchHtml(listing(''));
+    mockFetchHtml(
+      listing(
+        card({
+          id: '207',
+          title: 'Programme Manager',
+          experience: '7 years',
+        }),
+      ),
+    );
+
+    const jobs = await adapter.fetchJobs();
+    expect(jobs.length).toBe(1);
+    const job = jobs[0];
+    // International listings have no country to name, so location falls back.
+    expect(job.location).toBe('International');
+    expect(job.locationClass).toBe('INTERNATIONAL_ONSITE');
+    expect(job.company).toBe('Unknown');
+    expect(job.country).toBeUndefined();
+    expect(job.deadline).toBeUndefined();
+    expect(job.employmentType).toBe('FULL_TIME');
+    // deriveExperience reads seniority words, not years, so "7 years" on a
+    // title with no level indicator stays UNKNOWN rather than guessing MID.
+    expect(job.experienceLevel).toBe('UNKNOWN');
+  });
+
+  it('reads a card whose fields sit before the apply link', async () => {
+    const { HagereJobsAdapter } = require('./hagerejobs.adapter');
+    const adapter = new HagereJobsAdapter();
+
+    // Variant markup: the title and field lines precede the job_detail anchor,
+    // so the card's own text is the slice *ending* at its marker.
+    const backwardCard = (id: string, title: string, company: string) => `
+  <article class="job-card">
+    <h3 class="job-card-title">${title}</h3>
+    <p><strong>Company:</strong> ${company}</p>
+    <p><strong>Location:</strong> Adama</p>
+    <a href="https://hagerejobs.com/ethiopia-job/?job_detail=${id}">Read more</a>
+  </article>`;
+
+    mockFetchHtml(
+      listing(
+        backwardCard('301', 'Warehouse Supervisor', 'Ethio Freight') +
+          backwardCard('302', 'Fleet Mechanic', 'Addis Haulage'),
+      ),
+    );
+    mockFetchHtml(listing(''));
+
+    const jobs = await adapter.fetchJobs();
+    expect(jobs.map((j: RawJob) => [j.sourceJobId, j.title, j.company])).toEqual([
+      ['hagerejobs-301', 'Warehouse Supervisor', 'Ethio Freight'],
+      ['hagerejobs-302', 'Fleet Mechanic', 'Addis Haulage'],
+    ]);
+    for (const job of jobs) {
+      expect(job.location).toBe('Adama');
+      expect(job.url).toBe('https://hagerejobs.com/ethiopia-job/?job_detail=' + job.sourceJobId.replace('hagerejobs-', ''));
+    }
+  });
+
+  it('throws when no listing page yields a card', async () => {
+    const { HagereJobsAdapter } = require('./hagerejobs.adapter');
+    const adapter = new HagereJobsAdapter();
+
+    mockFetchHtml('<html><body><div class="jobs">No postings right now.</div></body></html>');
+    mockFetchHtml('<html><body><div class="jobs">No postings right now.</div></body></html>');
+
+    await expect(adapter.fetchJobs()).rejects.toThrow('HagereJobs returned no parseable jobs');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
 // SHARED UTILITY TESTS (from job-source.adapter.ts)
 // ══════════════════════════════════════════════════════════════
 describe('Shared adapter utilities', () => {

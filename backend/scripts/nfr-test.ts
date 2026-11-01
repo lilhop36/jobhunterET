@@ -1,16 +1,35 @@
 /**
  * Non-Functional Requirements (NFR) Test Suite
- * Tests: Performance, Reliability, Data Quality, Security
+ * Tests: Performance (NFR-001), Reliability (NFR-004), Data Quality, Security (NFR-005)
  *
- * Run: cd backend && npx ts-node --transpile-only scripts/nfr-test.ts
+ * This suite measures the running system, so it needs a live backend and real
+ * credentials — it is deliberately not a jest test (a unit test cannot prove a
+ * latency budget). Run it from `backend/` against a started stack:
+ *
+ *   npm run nfr:check                    # defaults to the local dev ports
+ *   QA_ADMIN_EMAIL=… QA_ADMIN_PASSWORD=… npm run nfr:check
+ *
+ * `BACKEND_URL` / `DATABASE_URL` override the target; credentials come from the
+ * environment only — a personal account is never committed here.
+ *
+ * Defaults match the e2e specs: the account the demo seed creates. A long-used
+ * `dev.db` has no demo seed, so point it at an account that exists there.
+ *
+ * It makes roughly twenty-five auth calls, far more than the production per-email budget (5 per
+ * 15 min, SEC-005) allows. Run the backend with `AUTH_EMAIL_RATE_MAX=50 AUTH_RATE_MAX=200`
+ * so the throttle measures nothing; a 429 is reported as such rather than as a slow
+ * endpoint.
  */
 
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-const BASE = 'http://localhost:3210';
-const ADMIN_EMAIL = 'abdigaboma@gmail.com';
-const ADMIN_PASS = 'demo1234';
+const BASE = (process.env.BACKEND_URL || 'http://localhost:3210').replace(/\/$/, '');
+// main.ts puts every route behind app.setGlobalPrefix('api'); probing the bare port answers
+// 404 for all of them, which would make this whole suite report on nothing.
+const API = `${BASE}/api`;
+const ADMIN_EMAIL = process.env.QA_ADMIN_EMAIL || 'amara@jobhunter.et';
+const ADMIN_PASS = process.env.QA_ADMIN_PASSWORD || 'demo1234';
 
 let token = '';
 let pass = 0;
@@ -37,7 +56,7 @@ function warn_test(cat: string, test: string, value: string) {
 }
 
 async function login() {
-  const res = await fetch(`${BASE}/auth/login`, {
+  const res = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASS }),
@@ -48,7 +67,7 @@ async function login() {
 }
 
 async function authed(path: string, method = 'GET', body?: any) {
-  return fetch(`${BASE}${path}`, {
+  return fetch(`${API}${path}`, {
     method,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
@@ -89,6 +108,64 @@ async function testPerformance() {
     console.log(`    ${ep.name}: avg=${avg.toFixed(0)}ms p50=${p50.toFixed(0)}ms p95=${p95.toFixed(0)}ms p99=${p99.toFixed(0)}ms`);
   }
 
+  // Login is the one endpoint whose latency is a deliberate security choice: bcrypt cost 12
+  // is the policy (SEC-005), so this reports where that lands instead of pretending every
+  // request can be sub-500ms. Three samples, because the per-email auth budget is 5 per
+  // 15 minutes and the rest of this suite spends some of it.
+  const loginTimes: number[] = [];
+  let throttled = false;
+  for (let i = 0; i < 3; i++) {
+    const start = performance.now();
+    const res = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASS }),
+    });
+    loginTimes.push(performance.now() - start);
+    await res.json().catch(() => null);
+    if (res.status === 429) throttled = true;
+  }
+  const slowestLogin = Math.max(...loginTimes);
+  if (throttled) {
+    warn_test('Performance', 'Login (slowest of 3)', '429 — run the backend with AUTH_EMAIL_RATE_MAX=50 AUTH_RATE_MAX=200 for this suite');
+  } else if (slowestLogin < 500) {
+    ok('Performance', 'Login (slowest of 3)', `${slowestLogin.toFixed(0)}ms`);
+  } else if (slowestLogin < 1000) {
+    warn_test('Performance', 'Login (slowest of 3)', `${slowestLogin.toFixed(0)}ms (slow)`);
+  } else {
+    fail_test('Performance', 'Login (slowest of 3)', `${slowestLogin.toFixed(0)}ms (too slow)`);
+  }
+
+  // NFR-001's other half: heavy work must not block the API. Five logins at once is the
+  // worst ordinary case, so a normal authenticated read runs alongside them and is timed.
+  const during: number[] = [];
+  const poller = (async () => {
+    for (let i = 0; i < 20; i++) {
+      const start = performance.now();
+      await authed('/dashboard').catch(() => null);
+      during.push(performance.now() - start);
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  })();
+  const burstStart = performance.now();
+  await Promise.all(
+    Array.from({ length: 5 }, () =>
+      fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASS }),
+      }).then((r) => r.json().catch(() => null)),
+    ),
+  );
+  const burstWall = performance.now() - burstStart;
+  await poller;
+  during.sort((a, b) => a - b);
+  const worstDuring = during[during.length - 1];
+  const burstLabel = 'Dashboard while 5 logins run';
+  if (worstDuring < 500) ok('Performance', burstLabel, `p95 ${during[Math.floor(during.length * 0.95)].toFixed(0)}ms, max ${worstDuring.toFixed(0)}ms (5 logins took ${burstWall.toFixed(0)}ms)`);
+  else if (worstDuring < 1000) warn_test('Performance', burstLabel, `max ${worstDuring.toFixed(0)}ms (slow)`);
+  else fail_test('Performance', burstLabel, `max ${worstDuring.toFixed(0)}ms — the API is blocked by auth work`);
+
   // Matching engine recalculation time
   console.log('\n  Matching engine benchmark...');
   const start = performance.now();
@@ -107,12 +184,12 @@ async function testReliability() {
   console.log('\n=== RELIABILITY ===');
 
   // 1. Invalid auth token
-  const noAuth = await fetch(`${BASE}/dashboard`);
+  const noAuth = await fetch(`${API}/dashboard`);
   if (noAuth.status === 401) ok('Reliability', 'Rejects unauthenticated requests', '401');
   else fail_test('Reliability', 'Rejects unauthenticated requests', `${noAuth.status}`);
 
   // 2. Invalid credentials
-  const badLogin = await fetch(`${BASE}/auth/login`, {
+  const badLogin = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: 'admin@jobhunter.et', password: 'wrong' }),
@@ -137,7 +214,7 @@ async function testReliability() {
   else fail_test('Reliability', '5 concurrent dashboard requests', `${concurrentTime.toFixed(0)}ms, statuses: ${concurrentResults.map((r) => r.status).join(',')}`);
 
   // 5. Duplicate login (token still valid)
-  const secondLogin = await fetch(`${BASE}/auth/login`, {
+  const secondLogin = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASS }),
@@ -171,6 +248,11 @@ async function testReliability() {
 async function testDataQuality() {
   console.log('\n=== DATA QUALITY ===');
 
+  // Prisma hands raw SQLite integers back as BigInt, so `count === 0` is never true and
+  // every clean check falls into its failure branch — a panel that cries wolf on healthy
+  // data gets ignored. Coerce before comparing.
+  const n = (v: any) => Number(v ?? 0);
+
   // 1. Match score range
   const matchStats = await prisma.$queryRaw`
     SELECT
@@ -183,8 +265,8 @@ async function testDataQuality() {
   ` as any[];
   const ms = matchStats[0];
 
-  if (ms.out_of_range === 0) ok('Data Quality', 'All match scores in 0-100', `${ms.total} matches, avg=${Number(ms.avg_score).toFixed(1)}`);
-  else fail_test('Data Quality', 'Match scores out of range', `${ms.out_of_range} invalid`);
+  if (n(ms.out_of_range) === 0) ok('Data Quality', 'All match scores in 0-100', `${n(ms.total)} matches, avg=${Number(ms.avg_score).toFixed(1)}`);
+  else fail_test('Data Quality', 'Match scores out of range', `${n(ms.out_of_range)} invalid`);
 
   // 2. User thresholds consistency
   const thresholdStats = await prisma.$queryRaw`
@@ -198,8 +280,8 @@ async function testDataQuality() {
   ` as any[];
   const ts = thresholdStats[0];
 
-  if (ts.bad_t === 0) ok('Data Quality', 'User thresholds in valid range (30-100)', `min=${ts.min_t}, max=${ts.max_t}`);
-  else fail_test('Data Quality', 'User thresholds out of range', `${ts.bad_t} users with invalid threshold`);
+  if (n(ts.bad_t) === 0) ok('Data Quality', 'User thresholds in valid range (30-100)', `min=${ts.min_t}, max=${ts.max_t}`);
+  else fail_test('Data Quality', 'User thresholds out of range', `${n(ts.bad_t)} users with invalid threshold`);
 
   // 3. No orphaned JobMatches (job must exist and be ACTIVE)
   const orphanMatches = await prisma.$queryRaw`
@@ -209,8 +291,8 @@ async function testDataQuality() {
     WHERE j.id IS NULL OR j.status != 'ACTIVE'
   ` as any[];
 
-  if (orphanMatches[0].cnt === 0) ok('Data Quality', 'No orphaned matches (all match jobs are ACTIVE)', '0 orphans');
-  else warn_test('Data Quality', 'Orphaned matches found', `${orphanMatches[0].cnt} matches reference non-ACTIVE jobs`);
+  if (n(orphanMatches[0].cnt) === 0) ok('Data Quality', 'No orphaned matches (all match jobs are ACTIVE)', '0 orphans');
+  else warn_test('Data Quality', 'Orphaned matches found', `${n(orphanMatches[0].cnt)} matches reference non-ACTIVE jobs`);
 
   // 4. No duplicate notifications per (user, job)
   const dupeNotifs = await prisma.$queryRaw`
@@ -222,8 +304,8 @@ async function testDataQuality() {
     )
   ` as any[];
 
-  if (dupeNotifs[0].cnt === 0) ok('Data Quality', 'No duplicate notifications', '0 duplicates');
-  else fail_test('Data Quality', 'Duplicate notifications found', `${dupeNotifs[0].cnt} user:job pairs`);
+  if (n(dupeNotifs[0].cnt) === 0) ok('Data Quality', 'No duplicate notifications', '0 duplicates');
+  else fail_test('Data Quality', 'Duplicate notifications found', `${n(dupeNotifs[0].cnt)} user:job pairs`);
 
   // 5. Jobs have required fields
   const incompleteJobs = await prisma.$queryRaw`
@@ -233,8 +315,8 @@ async function testDataQuality() {
        OR "employmentType" IS NULL OR "employmentType" = ''
   ` as any[];
 
-  if (incompleteJobs[0].cnt === 0) ok('Data Quality', 'All jobs have required fields', '0 incomplete');
-  else warn_test('Data Quality', 'Jobs missing required fields', `${incompleteJobs[0].cnt} jobs`);
+  if (n(incompleteJobs[0].cnt) === 0) ok('Data Quality', 'All jobs have required fields', '0 incomplete');
+  else warn_test('Data Quality', 'Jobs missing required fields', `${n(incompleteJobs[0].cnt)} jobs`);
 
   // 6. Skill normalization consistency
   const skillDuplicates = await prisma.$queryRaw`
@@ -287,7 +369,7 @@ async function testSecurity() {
   // 3. Rate limiting (rapid auth attempts)
   const rapidAttempts = [];
   for (let i = 0; i < 15; i++) {
-    const r = await fetch(`${BASE}/auth/login`, {
+    const r = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'test@test.com', password: 'wrong' }),
@@ -305,7 +387,7 @@ async function testSecurity() {
   else warn_test('Security', 'Admin stats response', `${adminStats.status}`);
 
   // 5. Password not in error messages
-  const badLogin = await fetch(`${BASE}/auth/login`, {
+  const badLogin = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: 'admin@jobhunter.et', password: 'wrongpassword' }),
@@ -351,7 +433,12 @@ async function main() {
 
   const loggedIn = await login();
   if (!loggedIn) {
-    console.error('Failed to login — is the backend running on port 3210?');
+    console.error(
+      `Failed to login as ${ADMIN_EMAIL} against ${BASE}. Three causes, in the order worth checking: ` +
+        'the backend is not up; the account does not exist (a long-used dev.db has no demo seed — ' +
+        'set QA_ADMIN_EMAIL / QA_ADMIN_PASSWORD to an account that does); or the SEC-005 throttle has ' +
+        'filled (start the backend with AUTH_EMAIL_RATE_MAX=50 AUTH_RATE_MAX=200).',
+    );
     process.exit(1);
   }
   console.log(`Logged in as ${ADMIN_EMAIL}`);

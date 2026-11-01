@@ -7,7 +7,8 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
-import * as bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcrypt';
+import { PASSWORD_COST } from '../../common/security/password-policy';
 import { RegisterDto, LoginDto, ChangePasswordDto } from './dto/auth.dto';
 import { MatchingService } from '../matching/matching.service';
 
@@ -21,8 +22,9 @@ export class AuthService {
     private readonly matching: MatchingService,
   ) {}
 
+  /** SEC-005: the cost comes from the shared policy, not a number local to this call site. */
   private async hash(pw: string): Promise<string> {
-    return bcrypt.hash(pw, 12);
+    return bcrypt.hash(pw, PASSWORD_COST);
   }
 
   async register(dto: RegisterDto) {
@@ -114,11 +116,23 @@ export class AuthService {
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('Invalid credentials');
 
+    // bcrypt keeps its cost inside the hash, so an account created under an earlier policy keeps
+    // verifying — and paying that cost's latency — until something re-hashes it. This path already
+    // writes below, so refreshing the hash costs no extra round trip.
+    const refreshed =
+      bcrypt.getRounds(user.passwordHash) === PASSWORD_COST
+        ? undefined
+        : await this.hash(dto.password);
+
     // FR-003e2: dormant user reactivation — set ACTIVE, update lastActiveAt, enqueue recalc.
     if (user.status === 'DORMANT') {
       await this.prisma.user.update({
         where: { id: user.id },
-        data: { status: 'ACTIVE', lastActiveAt: new Date() },
+        data: {
+          status: 'ACTIVE',
+          lastActiveAt: new Date(),
+          ...(refreshed ? { passwordHash: refreshed } : {}),
+        },
       });
       this.logger.log(`[AUTH] Dormant user reactivated: userId=${user.id}`);
       this.matching.recalculate(user.id).catch((err) => {
@@ -127,7 +141,10 @@ export class AuthService {
     } else {
       await this.prisma.user.update({
         where: { id: user.id },
-        data: { lastActiveAt: new Date() },
+        data: {
+          lastActiveAt: new Date(),
+          ...(refreshed ? { passwordHash: refreshed } : {}),
+        },
       });
     }
 

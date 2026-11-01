@@ -216,3 +216,55 @@ describe('TelegramService.poll — BUG-002 offset persistence + reentrancy', () 
     expect(upsert).not.toHaveBeenCalled();
   });
 });
+/**
+ * FR-030 (SRS §22) from the Telegram side: the [Reject] button on a match alert
+ * records the rejection for the user who owns that chat — nobody else's.
+ */
+describe('TelegramService.handleCallback — FR-030 reject button', () => {
+  const linkFor = (userId: string) => ({ userId, user: { id: userId, matchThreshold: 65 } });
+
+  const makeService = (link: any) => {
+    const prisma: any = {
+      telegramLink: { findUnique: jest.fn().mockResolvedValue(link) },
+      job: { findUnique: jest.fn().mockResolvedValue({ url: 'https://example.test/job/9' }) },
+      matchCycle: { update: jest.fn(), findFirst: jest.fn().mockResolvedValue(null) },
+    };
+    const apps: any = { save: jest.fn(), apply: jest.fn(), setStage: jest.fn().mockResolvedValue({ stage: 'REJECTED' }) };
+    const service = new TelegramService(prisma, apps);
+    const answer = jest.spyOn(service as any, 'answerCallback').mockResolvedValue(undefined);
+    return { service, apps, answer, prisma };
+  };
+
+  it('records REJECTED for the linked user and confirms in the chat', async () => {
+    const { service, apps, answer } = makeService(linkFor('u-owner'));
+
+    await (service as any).handleCallback(555, 'reject:job-9', 'cb-1');
+
+    expect(apps.setStage).toHaveBeenCalledWith('u-owner', 'job-9', 'REJECTED');
+    expect(answer).toHaveBeenCalledWith('cb-1', 'Noted as rejected');
+  });
+
+  it('rejects nothing for an unlinked chat', async () => {
+    const { service, apps, answer } = makeService(null);
+
+    await (service as any).handleCallback(999, 'reject:job-9', 'cb-2');
+
+    expect(apps.setStage).not.toHaveBeenCalled();
+    expect(answer).toHaveBeenCalledWith('cb-2', expect.stringContaining('Link your account first'));
+  });
+
+  it('counts the action on the current match cycle so the funnel sees it', async () => {
+    const { service, prisma } = makeService(linkFor('u-owner'));
+    prisma.matchCycle.findFirst = jest
+      .fn()
+      .mockResolvedValue({ id: 'cycle-1', actionsTaken: 4 });
+
+    await (service as any).handleCallback(555, 'reject:job-9', 'cb-3');
+
+    expect(prisma.matchCycle.update).toHaveBeenCalledWith({
+      where: { id: 'cycle-1' },
+      data: { actionsTaken: { increment: 1 } },
+    });
+  });
+});
+

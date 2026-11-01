@@ -1,9 +1,23 @@
 # Category-Aware Collection + Deeper Pagination + Category→Tag Mapping
 
-Status: plan (not yet implemented)
+Status: implemented (October 2026)
 Scope: backend collection engineering only. **No category browsing frontend.**
 
+## Implementation status (October 2026)
+
+Shipped:
+
+- `categories/category-taxonomy.json`, `categories/source-categories.json`, and `category-mapper.ts` with `category-mapper.spec.ts`.
+- Per-source `collection` blocks in `source-configs.json` (FAST/DEEP freshness windows, page/request budgets, verified category ids).
+- `SourceRun` mode/coverage counters and the `SourceRunCategory` model.
+- Mode-aware `SourcesService.collect()`, `dedupeWithinRun()`, canonical categories on `Job`, coverage-aware ghost reconciliation, `collectDeepDue()`, and `getCoverageReport()`.
+- Admin endpoints `POST /sources/:id/collect-deep`, `POST /sources/collect-deep-all`, and `GET /sources/coverage`.
+- `scripts/collection-coverage-report.ts` (`npm run collect:report`).
+
+Not part of this phase: category browsing routes, matching changes, Telegram formatting changes, and any new third-party source. SQLite remains the authoritative production database; the PostgreSQL schema is maintained in parallel for optional future use.
+
 ---
+
 
 ## 1. Goal
 

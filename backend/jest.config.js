@@ -7,5 +7,8 @@ module.exports = {
     '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
   testEnvironment: 'node',
+  // Adapter tests exercise the fidelity pipeline's URL checks; the default 5s
+  // is too tight on slower networks. Keep local runs aligned with CI.
+  testTimeout: 30000,
   collectCoverageFrom: ['src/**/*.ts', '!src/**/*.module.ts', '!src/main.ts'],
 };

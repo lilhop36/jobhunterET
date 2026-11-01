@@ -1,0 +1,748 @@
+{
+  "metadata": {
+    "artifact": "JobHunter current-state traceability index",
+    "generated": "2026-10-27",
+    "scope": "Architecture claims in docs and README, checked against backend, frontend, Prisma, Docker, and CI sources.",
+    "sourceRefPolicy": "resolvable",
+    "controllingEvidence": [
+      "backend/prisma/schema.prisma",
+      "backend/src/app.module.ts",
+      "backend/src/modules/**",
+      "frontend/app/**/page.tsx",
+      "frontend/package.json",
+      "backend/package.json",
+      ".github/workflows/ci.yml",
+      "docker-compose.yml",
+      "Dockerfile",
+      "docker-entrypoint.sh"
+    ],
+    "trust": "medium for high-level topology; low for counts, matching behaviour, traceability, and deployment"
+  },
+  "counts": {
+    "prismaModels": 22,
+    "nestModulesWithModuleFile": 18,
+    "nestModuleDirectories": 20,
+    "frontendPageRoutes": 19,
+    "configuredWebSources": 11,
+    "telegramChannels": 3,
+    "collectionEndpoints": 14,
+    "adapterClasses": 12,
+    "knowledgeBaseSkills": 153,
+    "knowledgeBaseAliases": 146,
+    "roleProfiles": 17,
+    "roleSynonyms": 31,
+    "testSpecFiles": 28,
+    "testDeclarations": 325,
+    "ciJobs": 6
+  },
+  "nodes": [
+    {
+      "id": "actor.user",
+      "label": "Job seeker / admin",
+      "type": "actor",
+      "state": "current",
+      "description": "Uses the web app, receives Telegram alerts, and manages matches and applications.",
+      "sourceRefs": ["frontend/app/login/page.tsx", "frontend/app/register/page.tsx"],
+      "confidence": "high"
+    },
+    {
+      "id": "service.frontend",
+      "label": "Next.js frontend",
+      "type": "service",
+      "state": "current",
+      "description": "Next.js 15 / React 19 application on port 3211.",
+      "sourceRefs": ["frontend/package.json:7", "frontend/app/layout.tsx", "frontend/app/**/page.tsx"],
+      "confidence": "high"
+    },
+    {
+      "id": "service.backend-api",
+      "label": "NestJS API",
+      "type": "service",
+      "state": "current",
+      "description": "NestJS 10 REST API and background process on port 3210.",
+      "sourceRefs": ["backend/src/main.ts:56-65", "backend/src/app.module.ts:26-47"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.auth",
+      "label": "auth",
+      "type": "module",
+      "state": "current",
+      "description": "Registration, login, JWT, roles, throttling, token revocation.",
+      "sourceRefs": ["backend/src/modules/auth/auth.module.ts", "backend/src/app.module.ts:29"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.profile",
+      "label": "profile",
+      "type": "module",
+      "state": "current",
+      "description": "Candidate profile CRUD and CV upload.",
+      "sourceRefs": ["backend/src/modules/profile/profile.module.ts", "backend/src/modules/profile/profile.controller.ts:27"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.matching",
+      "label": "matching",
+      "type": "module",
+      "state": "current",
+      "description": "Deterministic scoring engine and batch match cycles.",
+      "sourceRefs": ["backend/src/modules/matching/matching.module.ts", "backend/src/modules/matching/matching-engine.ts", "backend/src/modules/matching/matching.service.ts"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.sources",
+      "label": "sources",
+      "type": "module",
+      "state": "current",
+      "description": "Job source adapters, collection queue, health scoring, and ghost reconciliation.",
+      "sourceRefs": ["backend/src/modules/sources/sources.module.ts", "backend/src/modules/sources/sources.service.ts"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.notifications",
+      "label": "notifications",
+      "type": "module",
+      "state": "current",
+      "description": "Per-match delivery: Telegram first, web inbox fallback, SSE emission.",
+      "sourceRefs": ["backend/src/modules/notifications/notifications.module.ts", "backend/src/modules/notifications/notifications.service.ts:29-165"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.telegram",
+      "label": "telegram",
+      "type": "module",
+      "state": "current",
+      "description": "Bot polling, account linking, commands, inline buttons, and rate limiting.",
+      "sourceRefs": ["backend/src/modules/telegram/telegram.module.ts", "backend/src/modules/telegram/telegram.service.ts:241-278"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.lifecycle",
+      "label": "lifecycle",
+      "type": "module",
+      "state": "current",
+      "description": "Scheduled collection, match cycle, expiry, link-rot, retention, digest, and backup tasks.",
+      "sourceRefs": ["backend/src/modules/lifecycle/lifecycle.module.ts", "backend/src/modules/lifecycle/lifecycle.tasks.ts:95-206"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.applications",
+      "label": "applications",
+      "type": "module",
+      "state": "current",
+      "description": "Application stage transition graph and history.",
+      "sourceRefs": ["backend/src/modules/applications/applications.module.ts", "backend/src/modules/applications/applications.service.ts:8-29,105-147"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.events",
+      "label": "events",
+      "type": "module",
+      "state": "current",
+      "description": "Per-user SSE streams backed by RxJS Subjects.",
+      "sourceRefs": ["backend/src/modules/events/events.module.ts", "backend/src/modules/events/events.service.ts:51-84"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.matches",
+      "label": "matches",
+      "type": "module",
+      "state": "current",
+      "description": "Match read/query endpoints. Omitted from the architecture-overview module map.",
+      "sourceRefs": ["backend/src/modules/matches/matches.module.ts", "backend/src/app.module.ts:32"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.jobs",
+      "label": "jobs",
+      "type": "module",
+      "state": "current",
+      "description": "Job fidelity pipeline, URL liveness, and description quality.",
+      "sourceRefs": ["backend/src/modules/jobs/jobs.module.ts", "backend/src/modules/jobs/job-fidelity.ts"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.admin",
+      "label": "admin",
+      "type": "module",
+      "state": "current",
+      "description": "Stats, source health, user management, and admin actions.",
+      "sourceRefs": ["backend/src/modules/admin/admin.module.ts", "frontend/app/admin/dashboard/page.tsx", "frontend/app/admin/users/page.tsx"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.dashboard",
+      "label": "dashboard",
+      "type": "module",
+      "state": "current",
+      "description": "Aggregated stats for the frontend dashboard.",
+      "sourceRefs": ["backend/src/modules/dashboard/dashboard.module.ts", "frontend/app/dashboard/page.tsx"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.account",
+      "label": "account",
+      "type": "module",
+      "state": "current",
+      "description": "Deactivation and deletion with pseudonymization.",
+      "sourceRefs": ["backend/src/modules/account/account.module.ts", "backend/src/modules/account/account.service.ts:42-97"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.digest",
+      "label": "digest",
+      "type": "module",
+      "state": "current",
+      "description": "Daily digest generation.",
+      "sourceRefs": ["backend/src/modules/digest/digest.module.ts", "backend/src/modules/lifecycle/lifecycle.tasks.ts:158"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.salary",
+      "label": "salary",
+      "type": "module",
+      "state": "current",
+      "description": "Salary benchmarking data.",
+      "sourceRefs": ["backend/src/modules/salary/salary.module.ts"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.saved-jobs",
+      "label": "saved-jobs",
+      "type": "module",
+      "state": "current",
+      "description": "Save/unsave jobs per user.",
+      "sourceRefs": ["backend/src/modules/saved-jobs/saved-jobs.module.ts", "frontend/app/saved/page.tsx"],
+      "confidence": "high"
+    },
+    {
+      "id": "module.searches",
+      "label": "searches",
+      "type": "module",
+      "state": "current",
+      "description": "Saved search profiles and manual runs.",
+      "sourceRefs": ["backend/src/modules/searches/searches.module.ts", "frontend/app/searches/page.tsx"],
+      "confidence": "high"
+    },
+    {
+      "id": "controller.health",
+      "label": "health controller",
+      "type": "module",
+      "state": "current",
+      "description": "Health endpoint used by the Docker entrypoint and deployment checks.",
+      "sourceRefs": ["backend/src/modules/health/health.controller.ts", "backend/src/app.module.ts:18,47", "docker-entrypoint.sh:20"],
+      "confidence": "high"
+    },
+    {
+      "id": "database.sqlite",
+      "label": "SQLite database",
+      "type": "database",
+      "state": "current",
+      "description": "Prisma SQLite datasource used by tests and the single-container Docker path.",
+      "sourceRefs": ["backend/prisma/schema.prisma:5-8", "docker-compose.yml:9", "docker-entrypoint.sh:10-11"],
+      "confidence": "high"
+    },
+    {
+      "id": "database.postgresql",
+      "label": "PostgreSQL database",
+      "type": "database",
+      "state": "target",
+      "description": "Supported Prisma PostgreSQL schema and runbook target; actual production use is unresolved.",
+      "sourceRefs": ["backend/prisma/schema.postgresql.prisma", "docs/ops-runbook.md:8-34", "README.md:94"],
+      "confidence": "medium"
+    },
+    {
+      "id": "store.cv-uploads",
+      "label": "CV file storage",
+      "type": "database",
+      "state": "current",
+      "description": "Local upload directory for CV files.",
+      "sourceRefs": ["backend/src/modules/profile/profile.controller.ts:27", "Dockerfile:43"],
+      "confidence": "high"
+    },
+    {
+      "id": "external.job-boards",
+      "label": "External job boards and feeds",
+      "type": "external-system",
+      "state": "current",
+      "description": "Eleven configured web sources plus three Telegram channels.",
+      "sourceRefs": ["backend/src/modules/sources/source-configs.json", "backend/src/modules/sources/adapters/telegram-channels.config.ts:13-29"],
+      "confidence": "high"
+    },
+    {
+      "id": "external.telegram-bot",
+      "label": "Telegram Bot API",
+      "type": "external-system",
+      "state": "current",
+      "description": "Bot API for outbound alerts and inbound polling.",
+      "sourceRefs": ["backend/src/modules/telegram/telegram.service.ts:241-278", "backend/src/modules/notifications/notifications.service.ts:107"],
+      "confidence": "high"
+    },
+    {
+      "id": "worker.lifecycle-crons",
+      "label": "Lifecycle cron workers",
+      "type": "service",
+      "state": "current",
+      "description": "In-process @nestjs/schedule intervals for collection, matching, sweeps, digest, and backup.",
+      "sourceRefs": ["backend/src/modules/lifecycle/lifecycle.tasks.ts:95-206"],
+      "confidence": "high"
+    },
+    {
+      "id": "ci.pipeline",
+      "label": "GitHub Actions CI",
+      "type": "service",
+      "state": "current",
+      "description": "Four jobs: lint/typecheck, backend tests, frontend build, dependency audit.",
+      "sourceRefs": [".github/workflows/ci.yml:23-168"],
+      "confidence": "high"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge.user-to-frontend",
+      "from": "actor.user",
+      "to": "service.frontend",
+      "type": "calls",
+      "sync": "sync",
+      "protocol": "HTTP",
+      "description": "User opens the web application.",
+      "sourceRefs": ["frontend/app/login/page.tsx", "frontend/app/layout.tsx"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.frontend-to-api",
+      "from": "service.frontend",
+      "to": "service.backend-api",
+      "type": "calls",
+      "sync": "sync",
+      "protocol": "HTTP",
+      "description": "REST API calls plus an SSE subscription for live updates.",
+      "sourceRefs": ["frontend/lib/api-store.ts", "frontend/lib/use-match-stream.ts", "backend/src/modules/events/events.controller.ts"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.api-to-sqlite",
+      "from": "service.backend-api",
+      "to": "database.sqlite",
+      "type": "reads",
+      "sync": "sync",
+      "protocol": "SQL",
+      "description": "Prisma CRUD against the SQLite datasource.",
+      "sourceRefs": ["backend/src/prisma/prisma.service.ts", "backend/prisma/schema.prisma"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.api-to-postgresql",
+      "from": "service.backend-api",
+      "to": "database.postgresql",
+      "type": "reads",
+      "sync": "sync",
+      "protocol": "SQL",
+      "description": "Supported PostgreSQL schema, selected by the database switch script. Production usage is unresolved.",
+      "sourceRefs": ["backend/prisma/schema.postgresql.prisma", "backend/scripts/switch-db.sh", "docs/ops-runbook.md:8-34"],
+      "confidence": "medium"
+    },
+    {
+      "id": "edge.sources-to-job-boards",
+      "from": "module.sources",
+      "to": "external.job-boards",
+      "type": "calls",
+      "sync": "sync",
+      "protocol": "HTTP",
+      "description": "Adapters fetch JSON, RSS, HTML, and Telegram channel pages.",
+      "sourceRefs": ["backend/src/modules/sources/adapters", "backend/src/modules/sources/sources.service.ts:213-387"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.sources-to-sqlite",
+      "from": "module.sources",
+      "to": "database.sqlite",
+      "type": "writes",
+      "sync": "sync",
+      "protocol": "SQL",
+      "description": "Persists jobs and source runs through Prisma.",
+      "sourceRefs": ["backend/src/modules/sources/sources.service.ts:339-357,442-485"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.sources-to-matching",
+      "from": "module.sources",
+      "to": "module.matching",
+      "type": "calls",
+      "sync": "sync",
+      "protocol": "in-process",
+      "description": "Collection invokes incremental matching after a run.",
+      "sourceRefs": ["backend/src/modules/sources/sources.service.ts:384"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.matching-to-sqlite",
+      "from": "module.matching",
+      "to": "database.sqlite",
+      "type": "writes",
+      "sync": "sync",
+      "protocol": "SQL",
+      "description": "Persists JobMatch rows and match-cycle records.",
+      "sourceRefs": ["backend/src/modules/matching/matching.service.ts", "backend/prisma/schema.prisma:259-286,363-376"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.matching-to-notifications",
+      "from": "module.matching",
+      "to": "module.notifications",
+      "type": "calls",
+      "sync": "sync",
+      "protocol": "in-process",
+      "description": "Qualifying matches are handed to the notification router.",
+      "sourceRefs": ["backend/src/modules/matching/matching.service.ts:197"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.notifications-to-telegram",
+      "from": "module.notifications",
+      "to": "module.telegram",
+      "type": "calls",
+      "sync": "sync",
+      "protocol": "in-process",
+      "description": "Telegram-first delivery when the user has a reachable link.",
+      "sourceRefs": ["backend/src/modules/notifications/notifications.service.ts:77-107"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.notifications-to-sqlite",
+      "from": "module.notifications",
+      "to": "database.sqlite",
+      "type": "writes",
+      "sync": "sync",
+      "protocol": "SQL",
+      "description": "Creates Notification rows, including the web-inbox fallback.",
+      "sourceRefs": ["backend/src/modules/notifications/notifications.service.ts", "backend/prisma/schema.prisma:316-331"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.notifications-to-events",
+      "from": "module.notifications",
+      "to": "module.events",
+      "type": "publishes",
+      "sync": "async",
+      "protocol": "in-process",
+      "description": "Emits match events to the user's SSE stream.",
+      "sourceRefs": ["backend/src/modules/notifications/notifications.service.ts:119,135,164-165", "backend/src/modules/events/events.service.ts:75-84"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.telegram-to-bot-api",
+      "from": "module.telegram",
+      "to": "external.telegram-bot",
+      "type": "calls",
+      "sync": "sync",
+      "protocol": "HTTP",
+      "description": "Long-polls getUpdates and sends messages.",
+      "sourceRefs": ["backend/src/modules/telegram/telegram.service.ts:241-278"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.lifecycle-to-sources",
+      "from": "worker.lifecycle-crons",
+      "to": "module.sources",
+      "type": "calls",
+      "sync": "batch",
+      "protocol": "in-process",
+      "description": "Scheduled FAST/DEEP collection.",
+      "sourceRefs": ["backend/src/modules/lifecycle/lifecycle.tasks.ts:129-144"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.lifecycle-to-matching",
+      "from": "worker.lifecycle-crons",
+      "to": "module.matching",
+      "type": "calls",
+      "sync": "batch",
+      "protocol": "in-process",
+      "description": "Ten-minute match cycle and ghost detection.",
+      "sourceRefs": ["backend/src/modules/lifecycle/lifecycle.tasks.ts:28-30,117-125"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.lifecycle-to-digest",
+      "from": "worker.lifecycle-crons",
+      "to": "module.digest",
+      "type": "calls",
+      "sync": "batch",
+      "protocol": "in-process",
+      "description": "Daily digest generation.",
+      "sourceRefs": ["backend/src/modules/lifecycle/lifecycle.tasks.ts:158-166"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.profile-to-cv-store",
+      "from": "module.profile",
+      "to": "store.cv-uploads",
+      "type": "writes",
+      "sync": "sync",
+      "protocol": "file",
+      "description": "Stores uploaded CV files on local disk.",
+      "sourceRefs": ["backend/src/modules/profile/profile.controller.ts:27"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.applications-to-sqlite",
+      "from": "module.applications",
+      "to": "database.sqlite",
+      "type": "writes",
+      "sync": "sync",
+      "protocol": "SQL",
+      "description": "Persists application stages and transition history.",
+      "sourceRefs": ["backend/src/modules/applications/applications.service.ts:105-147", "backend/prisma/schema.prisma:288-314"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.ci-to-backend",
+      "from": "ci.pipeline",
+      "to": "service.backend-api",
+      "type": "validates",
+      "sync": "batch",
+      "protocol": "in-process",
+      "description": "Typecheck, tests, and dependency audit.",
+      "sourceRefs": [".github/workflows/ci.yml:27-111,141-168"],
+      "confidence": "high"
+    },
+    {
+      "id": "edge.ci-to-frontend",
+      "from": "ci.pipeline",
+      "to": "service.frontend",
+      "type": "validates",
+      "sync": "batch",
+      "protocol": "in-process",
+      "description": "TypeScript check and production build.",
+      "sourceRefs": [".github/workflows/ci.yml:61-67,116-136"],
+      "confidence": "high"
+    }
+  ],
+  "claims": [
+    {
+      "id": "C01",
+      "artifact": "docs/architecture-overview.md",
+      "claim": "Next.js frontend on 3211, NestJS backend on 3210, Prisma over SQLite/PostgreSQL.",
+      "verdict": "confirmed",
+      "evidence": ["frontend/package.json:7", "dev.sh:29-30", "backend/src/main.ts:56-65", "backend/prisma/schema.prisma:5-8"],
+      "confidence": "high"
+    },
+    {
+      "id": "C02",
+      "artifact": "docs/architecture-overview.md:46,134-150",
+      "claim": "16 Prisma models.",
+      "verdict": "stale",
+      "evidence": ["backend/prisma/schema.prisma:18-391"],
+      "confidence": "high",
+      "observed": "22 models; six are absent from the document and 'Source' should be 'JobSource'."
+    },
+    {
+      "id": "C03",
+      "artifact": "docs/architecture-overview.md:7,29,69-73,117",
+      "claim": "15 source adapters with the listed adapter names.",
+      "verdict": "stale",
+      "evidence": ["backend/src/modules/sources/source-configs.json", "backend/src/modules/sources/adapters/telegram-channels.config.ts:13-29", "backend/src/modules/sources/sources.module.ts:8-19,41-47"],
+      "confidence": "high",
+      "observed": "11 web sources + 3 Telegram channels = 14 endpoints; 12 adapter classes; seven listed adapters do not exist."
+    },
+    {
+      "id": "C04",
+      "artifact": "docs/architecture-overview.md:88-90",
+      "claim": "Cross-source fingerprint deduplication prevents duplicates from different sources.",
+      "verdict": "stale",
+      "evidence": ["backend/src/modules/sources/sources.service.ts:297-312,477-478,530-544", "backend/prisma/schema.prisma:240"],
+      "confidence": "high",
+      "observed": "Fingerprint is stored only; dedupeWithinRun groups sourceJobId within one run; no fingerprint query exists."
+    },
+    {
+      "id": "C05",
+      "artifact": "docs/matching-engine-reference.md:78",
+      "claim": "Jobs without extractable skills receive 0.65 skill credit.",
+      "verdict": "stale",
+      "evidence": ["backend/src/modules/matching/matching-engine.ts:323-330"],
+      "confidence": "high",
+      "observed": "Neutral value is 0.4."
+    },
+    {
+      "id": "C06",
+      "artifact": "docs/matching-engine-reference.md:154-173,230-244",
+      "claim": "Matching uses penalties but no hard eligibility result.",
+      "verdict": "stale",
+      "evidence": ["backend/src/modules/matching/matching-engine.ts:469-515,642-645"],
+      "confidence": "high",
+      "observed": "Hard-ineligible jobs get score 0 and eligible=false; MatchResult exposes eligible and ineligibleReasons."
+    },
+    {
+      "id": "C07",
+      "artifact": "docs/matching-engine-reference.md:199-210",
+      "claim": "ProfileInput has skills, targetRoles, locationTiers, remote, employmentTypes, years, minSalary, excludeOnsite.",
+      "verdict": "missing",
+      "evidence": ["backend/src/modules/matching/matching-engine.ts:366-377"],
+      "confidence": "high",
+      "observed": "ProfileInput also requires excludeEntryLevel."
+    },
+    {
+      "id": "C08",
+      "artifact": "docs/architecture-overview.md:96",
+      "claim": "Incremental matching runs every 30 minutes.",
+      "verdict": "stale",
+      "evidence": ["backend/src/modules/lifecycle/lifecycle.tasks.ts:28-30,117"],
+      "confidence": "high",
+      "observed": "MATCH_CYCLE_INTERVAL defaults to 10 minutes; collection is 30 minutes."
+    },
+    {
+      "id": "C09",
+      "artifact": "docs/matching-engine-reference.md:57,156-161",
+      "claim": "Role similarity uses exact substring matching; seniority also fires via synonym match.",
+      "verdict": "stale",
+      "evidence": ["backend/src/modules/matching/matching-engine.ts:172-234,416,620-630"],
+      "confidence": "high",
+      "observed": "Token-aware phrase matching; seniority uses only the title regex and a <4-year check."
+    },
+    {
+      "id": "C10",
+      "artifact": "docs/traceability.md:114-136",
+      "claim": "~227 tests across the indexed files; per-file counts as listed.",
+      "verdict": "stale",
+      "evidence": ["backend/src/**/*.spec.ts"],
+      "confidence": "high",
+      "observed": "23 spec files, 252 it/test declarations; many per-file counts differ; four spec files are absent from the index."
+    },
+    {
+      "id": "C11",
+      "artifact": "docs/traceability.md:47",
+      "claim": "Each of the 11 adapters parses fixtures in adapters.spec.ts.",
+      "verdict": "stale",
+      "evidence": ["backend/src/modules/sources/adapters/adapters.spec.ts", "backend/src/modules/sources/sources.service.spec.ts:60-62"],
+      "confidence": "high",
+      "observed": "Ten web adapters are parser-tested; HagereJobs is only mocked in the service test."
+    },
+    {
+      "id": "C12",
+      "artifact": "docs/architecture-overview.md:73",
+      "claim": "Sources failing 3+ consecutive cycles are auto-disabled.",
+      "verdict": "stale",
+      "evidence": ["backend/src/modules/sources/sources.service.ts:32-34,580-589"],
+      "confidence": "high",
+      "observed": "Auto-disable requires a full 10-run window with zero successes; HEALTH_AUTO_DISABLE_THRESHOLD=50 is unused."
+    },
+    {
+      "id": "C13",
+      "artifact": "README.md:94; docs/ops-runbook.md:8-86; docker-compose.yml:9",
+      "claim": "PostgreSQL is the production database and Prisma migrations are the deployment path.",
+      "verdict": "conflicting",
+      "evidence": ["README.md:94", "docs/ops-runbook.md:8-34,50-86", "docker-compose.yml:9", "docker-entrypoint.sh:10-11"],
+      "confidence": "high",
+      "observed": "Docker production path uses a SQLite file and prisma db push --accept-data-loss; the runbook uses PostgreSQL and prisma migrate deploy."
+    },
+    {
+      "id": "C14",
+      "artifact": "docs/plans/category-aware-collection.md:4",
+      "claim": "Category-aware collection is a plan, not yet implemented.",
+      "verdict": "stale",
+      "evidence": ["backend/src/modules/sources/categories/category-mapper.ts", "backend/src/modules/sources/categories/category-taxonomy.json", "backend/prisma/schema.prisma:172-188", "backend/src/modules/sources/sources.service.ts:214-260"],
+      "confidence": "high",
+      "observed": "The mapper, taxonomy, SourceRunCategory model, and FAST/DEEP collection modes exist."
+    },
+    {
+      "id": "C15",
+      "artifact": "docs/architecture-overview.md:112-130",
+      "claim": "The module map is complete.",
+      "verdict": "missing",
+      "evidence": ["backend/src/modules/matches/matches.module.ts", "backend/src/app.module.ts:18,32,47"],
+      "confidence": "high",
+      "observed": "matches is omitted; health is a controller-only module and integration is a test-only directory."
+    },
+    {
+      "id": "C16",
+      "artifact": "README.md:200; docs/architecture-overview.md:155-173",
+      "claim": "20+ frontend routes; 17+ feature routes.",
+      "verdict": "stale",
+      "evidence": ["frontend/app/**/page.tsx"],
+      "confidence": "high",
+      "observed": "19 page routes; the overview lists 16 feature routes and omits /, /error, /forbidden."
+    },
+    {
+      "id": "C17",
+      "artifact": "all architecture docs",
+      "claim": "Updated August 2026.",
+      "verdict": "stale",
+      "evidence": ["docs/architecture-overview.md", "backend/src"],
+      "confidence": "high",
+      "observed": "Docs last changed 2026-08-28; code last changed 2026-10-22."
+    },
+    {
+      "id": "C18",
+      "artifact": "architecture artifact set",
+      "claim": "Architecture diagrams are maintained sources.",
+      "verdict": "missing",
+      "evidence": ["docs/architecture-overview.md:13-51", "README.md:51-84", "docs/ops-runbook.md:12-25"],
+      "confidence": "high",
+      "observed": "Only ASCII diagrams inside Markdown; no .dot/.dsl/.mmd/.puml source."
+    },
+    {
+      "id": "C19",
+      "artifact": "docs/architecture-overview.md:208",
+      "claim": "JWT_SECRET is required.",
+      "verdict": "inferred",
+      "evidence": ["backend/src/main.ts:20-22", "backend/src/modules/auth/auth.module.ts:15-34"],
+      "confidence": "high",
+      "observed": "The service auto-generates a random secret when missing; persistent sessions require the env var."
+    },
+    {
+      "id": "C20",
+      "artifact": "docs/architecture-overview.md:177-188",
+      "claim": "Key design decisions are recorded.",
+      "verdict": "missing",
+      "evidence": ["docs/"],
+      "confidence": "high",
+      "observed": "Five prose decisions; no ADR files or decision records with source links."
+    }
+  ],
+  "unknowns": [
+    {
+      "id": "U01",
+      "question": "Which production database and migration path is authoritative?",
+      "whyItMatters": "The README, runbook, and Docker path disagree; backup and migration procedures differ.",
+      "nextCheck": "Confirm the actual deployment target and run a restore drill against it.",
+      "status": "resolved 2026-10-27: SQLite authoritative, db-migrate-safe.js the only migration path"
+    },
+    {
+      "id": "U02",
+      "question": "Do the services start and serve the documented ports and health endpoint?",
+      "whyItMatters": "No runtime evidence was collected; both local ports refused connections.",
+      "nextCheck": "Start the stack and run a smoke test against /api/health and the frontend routes.",
+      "status": "resolved 2026-10-30: live stack verified in Chromium by frontend/e2e/runtime-verification.spec.ts"
+    },
+    {
+      "id": "U03",
+      "question": "What is the executed test count and pass/fail status?",
+      "whyItMatters": "The traceability matrix and README disagree with the static declaration count.",
+      "nextCheck": "Run the backend test suite in CI and publish the jest summary next to the matrix.",
+      "status": "resolved 2026-10-30: 377 tests pass across 28 spec files (325 declarations)"
+    },
+    {
+      "id": "U04",
+      "question": "Are 41/53 requirements actually covered?",
+      "whyItMatters": "The per-file counts and file index are stale, so the 77% figure is not reproducible.",
+      "nextCheck": "Regenerate requirement-to-test mappings from test names and requirement IDs.",
+      "status": "resolved 2026-10-30: docs/traceability.md is now generated from JobHunter_SRS_v2.3.md and the spec tree (85 requirements, 76 tested, 4 deferred = 94%, 0 unexplained gaps); the hand-typed 41/53 figure is gone and two CI checks (traceability.matrix, traceability.proseCoverage) fail on drift"
+    },
+    {
+      "id": "U05",
+      "question": "Should cross-source fingerprint deduplication be implemented or removed from the architecture?",
+      "whyItMatters": "It is a product/data-integrity decision, not only a documentation fix.",
+      "nextCheck": "Decide with the product owner; add a test either way.",
+      "status": "resolved 2026-10-27: same-source fingerprint guard implemented and tested; cross-source grouping intentionally unimplemented (no measured group spans sources)"
+    },
+    {
+      "id": "U06",
+      "question": "Is HagereJobs parser output verified against a fixture?",
+      "whyItMatters": "The adapter exists but no parser-level test was found.",
+      "nextCheck": "Add a fixture parser test or document the coverage gap.",
+      "status": "resolved 2026-10-30: 4 fixture tests in adapters.spec.ts cover both card layouts, sparse cards, and the empty-listing failure; they exposed and fixed a card-scoping defect in hagerejobs.adapter.ts"
+    }
+  ]
+}

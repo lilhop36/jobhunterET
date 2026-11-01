@@ -1,10 +1,33 @@
 # System Architecture — Overview
 
-> SRS v2.3 | Updated August 2026
+> Current state | Updated October 2026
+
+This document describes the system **as implemented**. Counts and inventories in the generated block below come from the source tree; run `npm run facts:check` to verify them. Detailed inventories are in [Architecture Facts](./architecture-facts.md).
 
 ## What Is JobHunter?
 
-JobHunter is an automated job-matching agent for the Ethiopian tech market. It collects jobs from 15+ sources, matches them against user profiles using a knowledge-graph-powered scoring engine, and delivers personalized alerts via Telegram or a web inbox.
+JobHunter is an automated job-matching agent for the Ethiopian tech market. It collects jobs from 11 configured web sources plus 3 Telegram channels, matches them against user profiles using a knowledge-graph-powered scoring engine, and delivers personalized alerts via Telegram or a web inbox.
+
+---
+
+<!-- BEGIN GENERATED OVERVIEW FACTS -->
+<!-- Generated from source by scripts/generate-architecture-facts.js. Do not edit by hand. -->
+
+| Fact | Current value |
+|---|---|
+| Stack | Next.js 15.5, React 19.2, NestJS 10.4, Prisma 5.20, TypeScript 5.5 |
+| Production database | SQLite (Prisma provider: sqlite; Docker URL: `file:/app/data/prod.db`) |
+| Prisma models | 22 — User, CandidateProfile, CvFile, TelegramLink, Skill, CandidateSkill, TargetRole, LocationPreference, JobSource, SourceRun, SourceRunCategory, Job, JobSkill, JobMatch, Application, ApplicationTransition, Notification, SearchProfile, Digest, MatchCycle, SystemLog, BotState |
+| NestJS feature modules | 18 — account, admin, applications, auth, dashboard, digest, events, jobs, lifecycle, matches, matching, notifications, profile, salary, saved-jobs, searches, sources, telegram |
+| Frontend page routes | 19 |
+| Web job sources | 11 — ReliefWeb (Ethiopia), Remotive, Arbeitnow, EthioJobs, Ethio NGO Jobs, GeezJobs, ET Careers, Jobicy, RemoteOK, Landing.jobs, Hagere Jobs |
+| Telegram channels | 3 — ElelanaJobs (Telegram), ShegerJobs (Telegram), EthioJobVacancy (Telegram) |
+| Adapter classes | 12 (11 web + 1 parameterized Telegram) |
+| Collection endpoints | 14 (11 web + 3 Telegram) |
+| Test spec files | 28 (330 `it`/`test` declarations; parameterized cases expand at runtime) |
+| CI jobs | 6 — lint-and-typecheck, test-backend, build-frontend, security, architecture, runtime-verification |
+
+<!-- END GENERATED OVERVIEW FACTS -->
 
 ---
 
@@ -26,7 +49,7 @@ JobHunter is an automated job-matching agent for the Ethiopian tech market. It c
 │                                                                 │
 │  ┌─────────┐  ┌─────────┐  ┌──────────┐  ┌──────────────────┐ │
 │  │  Auth   │  │ Profile │  │ Matching │  │    Sources       │ │
-│  │  JWT    │  │  CV     │  │  Engine  │  │  15 Adapters     │ │
+│  │  JWT    │  │  CV     │  │  Engine  │  │  11 web + 3 TG   │ │
 │  └─────────┘  └─────────┘  └──────────┘  └──────────────────┘ │
 │                                                                 │
 │  ┌─────────────┐ ┌────────────┐ ┌───────────┐ ┌────────────┐  │
@@ -40,15 +63,19 @@ JobHunter is an automated job-matching agent for the Ethiopian tech market. It c
 │  │  Daily   │ │  SSE     │ │  Bench   │ │  User Lists      │  │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘  │
 └──────────────────────────┬──────────────────────────────────────┘
-                           │
+                           │ Prisma
 ┌──────────────────────────▼──────────────────────────────────────┐
-│                     SQLite / PostgreSQL                         │
-│                     16 Prisma Models                            │
-│  User · Job · JobMatch · Skill · CandidateProfile · TargetRole │
-│  LocationPreference · Application · SavedJob · Notification    │
-│  SourceRun · SearchProfile · SystemLog · TelegramLink · etc.   │
+│                          SQLite                                 │
+│                 22 Prisma models (single node)                  │
+│  User · CandidateProfile · CvFile · TelegramLink · Skill        │
+│  CandidateSkill · TargetRole · LocationPreference · JobSource   │
+│  SourceRun · SourceRunCategory · Job · JobSkill · JobMatch      │
+│  Application · ApplicationTransition · Notification             │
+│  SearchProfile · Digest · MatchCycle · SystemLog · BotState     │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+PostgreSQL remains supported by a parallel Prisma schema and is the path to multiple application instances, but it is **not** the current production database. See [Operations Runbook](./ops-runbook.md).
 
 ---
 
@@ -59,18 +86,21 @@ The system operates as a continuous pipeline:
 ```
  Collection → Normalization → Validation → Dedup → Matching → Notification
      │              │              │          │         │            │
-  15 sources    Fidelity      Schema     Fingerprint  Score     Telegram /
-  (adapters)    Pipeline      Check      + Ghost     0-100     Web Inbox
-               + Skills                    Detection  + Alert
+ 11 web + 3 TG   Fidelity      Schema     (sourceId,  Score     Telegram /
+   adapters      Pipeline      Check      sourceJobId) 0-100    Web Inbox
+               + Skills                   + Ghost                + Alert
 ```
 
 ### Stage 1: Collection
 
-15 source adapters fetch job listings on a configurable interval (default: 30 minutes). Each adapter implements `JobSourceAdapter` and returns normalized `RawJob` objects.
+Eleven web adapters and three Telegram channel adapters fetch job listings. Collection uses a queue with per-source frequency and health scoring.
 
-**Adapters:** EthioJobs, RemoteOK, RelieWeb, HaHuJobs, EthioNgoJobs, GeezJob, HagerJobs, Jobicy, Remotive, Himalayas, WorkingNomads, JobsFitty, LinkedIn, FindWork, WeWorkRemotely.
+**Web adapters:** EthioJobs, Ethio NGO Jobs, GeezJobs, ET Careers, ReliefWeb, Remotive, Arbeitnow, Jobicy, RemoteOK, Landing.jobs, Hagere Jobs.
+**Telegram channels:** ElelanaJobs, ShegerJobs, EthioJobVacancy.
 
-Collection runs through a **concurrency-limited queue** with health scoring per source. Sources that fail 3+ consecutive cycles are auto-disabled.
+FAST collection runs on a 30-minute tick (`JOB_COLLECTION_INTERVAL`) and only collects sources whose own frequency has elapsed. DEEP category sweeps run on a 60-minute tick (`DEEP_COLLECTION_INTERVAL`); each source declares its own deep cadence (typically 12 hours). See [Category-Aware Collection](./plans/category-aware-collection.md).
+
+Health scoring uses the last 10 runs (`HEALTH_WINDOW = 10`). A source is auto-disabled only when the window is full and **zero** runs succeeded; a single success keeps it eligible. Failed collection attempts use the configured fallback chains.
 
 ### Stage 2: Fidelity Pipeline
 
@@ -84,26 +114,41 @@ Raw jobs pass through the fidelity pipeline (`job-fidelity.spec.ts` tested):
 
 ### Stage 3: Deduplication
 
-Two layers:
-1. **Source-level**: `sourceJobId` uniqueness per adapter
-2. **Cross-source**: Fingerprint-based (URL + title hash) — prevents duplicate jobs from different sources
+Deduplication is **per source**, not cross-source:
+
+1. **Database level**: a unique constraint on `(sourceId, sourceJobId)` prevents the same posting from being stored twice with the same source ID.
+2. **Fingerprint level**: after the fidelity pipeline computes `fingerprint`, `persist()` looks for an existing job with the same `(sourceId, fingerprint)`. A match refreshes `lastSeenAt`, resets `missedCycles`, reactivates a REMOVED row, and keeps that row out of ghost reconciliation instead of creating a second copy. This covers the same posting served under different `sourceJobId` values, such as Arbeitnow's regional domains. The lookup is skipped when the description is empty, because an empty description is not distinctive enough to serve as a dedup key.
+3. **Within a run**: `dedupeWithinRun()` groups by `sourceJobId` and merges `sourceCategories` and `discoveredVia` when a job is found through several category pages.
+
+Cross-source fingerprint grouping is **not implemented**; it is a backlog item for when duplicate postings across boards become a user-visible problem. Historical same-source groups can be inventoried read-only with `npm run duplicates:report`; `--apply` merges safe groups after a verified backup.
+
+A related case the fingerprint key cannot reach is **content twins**: some sources publish one page per
+city for the same opening, so each variant has its own `sourceJobId`, its own URL, and a description that
+differs only in the location sentence — which means a different fingerprint by construction. 98 such
+groups exist in the local dataset (worst case: 7 rows for one posting), and none of them are detectable
+by `(sourceId, fingerprint)`. They are inventoried with `npm run duplicates:report -- --content` and are
+deliberately **not merged**, because the same fields cannot tell "republished per city" apart from two
+genuine openings in two cities; collapsing them in the match list is an open product decision.
 
 ### Stage 4: Matching
 
-The matching engine (`docs/matching-engine-reference.md`) scores each job against every user's profile using a v2 knowledge base with 130+ skills, transferability graphs, and role profiles.
+The matching engine (`docs/matching-engine-reference.md`) scores each job against each user profile using a knowledge base with 153 skills, transferability graphs, and 17 role profiles.
 
 **Trigger points:**
-- Incremental: new unmatched jobs are scored against all users (cron, every 30m)
-- Full recalculation: on profile update or manual trigger
-- Batch-optimized: profiles loaded in 4 parallel queries, yields to event loop every 50 users
+- Incremental: new unmatched jobs are scored against all users. The default cycle is **10 minutes** (`MATCH_CYCLE_INTERVAL`); the sample `.env.example` sets 35 minutes for development.
+- Full recalculation: on profile update or manual trigger.
+- Batch-optimized: profiles are loaded in 4 parallel queries, and the loop yields to the event loop every 50 users.
+
+Matching applies **hard eligibility filters** before scoring: remote-only users do not receive on-site jobs, `excludeOnsite` removes international on-site roles, `excludeEntryLevel` removes ENTRY/INTERN postings, and a relevance gate rejects jobs with neither role alignment nor at least two skill signals. Ineligible jobs are returned with `score = 0`, `eligible = false`, and an `ineligibleReasons` list.
 
 ### Stage 5: Notification
 
 Above-threshold matches trigger notifications:
+
 1. **Telegram** (primary): formatted message with [Save] [Reject] [Apply] [Open] inline buttons
 2. **Web Inbox** (fallback): when Telegram is unavailable or rate-limited
 
-Notifications are deduplicated per (user, match) pair and rate-limited per chat.
+Notifications are deduplicated per `(user, job)` pair and rate-limited per chat.
 
 ---
 
@@ -114,7 +159,7 @@ Notifications are deduplicated per (user, match) pair and rate-limited per chat.
 | `auth` | Registration, login, JWT, roles, rate limiting | `auth.service.ts`, `auth.controller.ts` |
 | `profile` | User profiles, CV upload (magic-byte validation, versioning) | `profile.service.ts` |
 | `matching` | Scoring engine + knowledge base | `matching-engine.ts`, `matching.service.ts` |
-| `sources` | 15 adapters, collection queue, health scoring | `adapters/`, `source-classifier.ts` |
+| `sources` | 12 adapter classes, collection queue, health scoring | `adapters/`, `source-classifier.ts` |
 | `telegram` | Bot polling, linking, commands, inline buttons, rate limiting | `telegram.service.ts` |
 | `notifications` | Channel routing, dedup, Web Inbox, keyset pagination, SSE | `notifications.service.ts` |
 | `lifecycle` | Expiration sweep, ghost detection, dormancy, backup, retention | `lifecycle.tasks.ts` |
@@ -128,34 +173,43 @@ Notifications are deduplicated per (user, match) pair and rate-limited per chat.
 | `events` | SSE real-time push per user | `events.service.ts` |
 | `salary` | Benchmarking data | `salary.service.ts` |
 | `jobs` | Fidelity pipeline, URL liveness, description quality | `jobs.service.ts` |
+| `matches` | Match listing, filtering, and recalculate endpoint | `matches.service.ts`, `matches.controller.ts` |
+
+`PrismaModule` is infrastructure, and `health` is a controller-only module; neither is a feature module.
 
 ---
 
-## Data Model (16 Prisma Models)
+## Data Model (22 Prisma Models)
 
 ```
 User ──┬── CandidateProfile
+       ├── CvFile
        ├── TargetRole
        ├── LocationPreference
        ├── CandidateSkill ── Skill
        ├── JobMatch ── Job ── JobSkill ── Skill
-       ├── Application
-       ├── SavedJob ── Job
+       ├── Application ── ApplicationTransition
        ├── Notification
        ├── SearchProfile
+       ├── Digest
        └── TelegramLink
 
-Job ─── SourceRun ── Source
+Job ─── JobSource ── SourceRun ── SourceRunCategory
 
+MatchCycle (per-cycle metrics)
 SystemLog (audit trail)
+BotState (Telegram polling state)
 ```
+
+Saved jobs are not a separate table: saving is represented by an `Application` row in the `SAVED` stage.
 
 ---
 
-## Frontend Pages (17+)
+## Frontend Pages (19)
 
 | Route | Purpose |
 |-------|---------|
+| `/` | Landing / redirect to the signed-in experience |
 | `/login`, `/register` | Auth forms with invite code support |
 | `/onboarding` | 3-step wizard (roles → skills → locations), resumable |
 | `/dashboard` | Stats, match carousel, daily digest, SSE live updates |
@@ -171,14 +225,15 @@ SystemLog (audit trail)
 | `/sources` | Source health monitoring (admin) |
 | `/admin/dashboard` | System stats, collection metrics |
 | `/admin/users` | User management, role changes |
+| `/error`, `/forbidden` | Error and access-denied states |
 
 ---
 
 ## Key Design Decisions
 
-1. **Knowledge graph over keyword matching**: The v2 knowledge base models skill relationships, transferability, and prerequisites — enabling nuanced matching (e.g., "React developer" matches a "Next.js" job at 0.70 transferability).
+1. **Knowledge graph over keyword matching**: The knowledge base models skill relationships, transferability, and prerequisites — enabling nuanced matching (e.g., React → Next.js at 0.90 transferability).
 
-2. **Graceful degradation**: When Telegram is unavailable, notifications route to the Web Inbox. When a source fails, other sources continue. When skills are missing from a job, the engine defaults to neutral (0.65) instead of penalizing.
+2. **Graceful degradation with hard constraints**: When Telegram is unavailable, notifications route to the Web Inbox. When a source fails, other sources continue. When a job has no extractable skills, the skill factor uses a conservative neutral of **0.4**, not a bonus; hard eligibility filters still prevent unrelated jobs from ranking. See the [matching reference](./matching-engine-reference.md).
 
 3. **Batch-optimized matching**: Profile loading uses 4 parallel Prisma queries instead of N+1. The scoring loop yields to the event loop every 50 users to prevent blocking SSE streams.
 
@@ -186,17 +241,24 @@ SystemLog (audit trail)
 
 5. **Pseudonymization on deletion**: Account deletion preserves data integrity by pseudonymizing rather than hard-deleting, so match history and application records remain queryable.
 
+6. **SQLite first**: The production topology is a single Node process with a SQLite file on a persistent volume. This is deliberate for a zero-budget, single-node deployment. Multi-instance or managed hosting requires PostgreSQL first.
+
 ---
 
 ## Infrastructure
 
-| Component | Current | Production Target |
-|-----------|---------|-------------------|
-| Database | SQLite | PostgreSQL |
-| Process manager | Direct `node` | PM2 / systemd |
-| Rate limiter | In-memory | Redis-backed (Phase 2) |
-| Job queue | Cron-based | BullMQ (Phase 2) |
-| Deployment | Manual | CI/CD pipeline |
+| Component | Current (authoritative) | Optional / future |
+|-----------|-------------------------|-------------------|
+| Database | SQLite file (`/app/data/prod.db` in Docker) | PostgreSQL via `schema.postgresql.prisma` |
+| Migrations | `node scripts/db-migrate-safe.js` → verified backup, copy test, row-count check, `prisma migrate deploy` | Same |
+| Process manager | Docker entrypoint / direct `node` | PM2 / systemd |
+| Rate limiter | In-memory | Redis-backed (multi-instance) |
+| Job queue | Cron-based | BullMQ |
+| Deployment | Docker Compose or manual | CI/CD pipeline |
+
+Schema changes are applied only through `backend/scripts/db-migrate-safe.js`; `prisma db push` is not used against a live database. The entrypoint fails closed if a migration cannot be verified, and an existing `db push` database must be baselined once (see the runbook).
+
+SQLite is a single-writer database. Do not run multiple backend replicas against the same file. See [Operations Runbook](./ops-runbook.md) for the baseline, backup, and restore procedure.
 
 ---
 
@@ -204,24 +266,28 @@ SystemLog (audit trail)
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DATABASE_URL` | ✅ | — | Database connection string |
-| `JWT_SECRET` | ✅ | — | JWT signing secret (48+ bytes) |
+| `DATABASE_URL` | ✅ | `file:./dev.db` | SQLite file in development; `file:/app/data/prod.db` in Docker |
+| `JWT_SECRET` | Recommended | auto-generated | Signing secret (32+ chars). If unset, a random secret is generated and sessions do not survive restarts. Set it in production. |
 | `TELEGRAM_BOT_TOKEN` | ⚠️ | — | From @BotFather |
 | `MATCH_THRESHOLD` | ❌ | **65** | Default notification threshold |
 | `ADMIN_EMAILS` | ❌ | — | Comma-separated admin emails |
-| `JOB_COLLECTION_INTERVAL` | ❌ | 30m | Collection cycle interval |
+| `JOB_COLLECTION_INTERVAL` | ❌ | 30m | FAST collection tick |
+| `DEEP_COLLECTION_INTERVAL` | ❌ | 60m | DEEP collection tick |
+| `MATCH_CYCLE_INTERVAL` | ❌ | 10m | Matching cycle (sample `.env` uses 35m) |
 | `INCREMENTAL_MATCH_LIMIT` | ❌ | 250 | Max jobs per incremental match pass |
-| `RECALC_JOB_LIMIT` | ❌ | 1000 | Max jobs for full recalculation |
+| `RECALC_JOB_LIMIT` | ❌ | 1000 | Max jobs for a full recalculation |
 
 ---
 
 ## Further Reading
 
-- [Matching Engine Reference](./matching-engine-reference.md) — Scoring algorithm details
-- [Operations Runbook](./ops-runbook.md) — Deployment, monitoring, troubleshooting
-- [Traceability Matrix](./traceability.md) — Requirement → test coverage
-- [SRS v2.3](../JobHunter_SRS_v2.3.md) — Full requirements specification
+- [Architecture Facts](./architecture-facts.md) — generated inventories (models, modules, sources, routes, tests)
+- [Matching Engine Reference](./matching-engine-reference.md) — scoring algorithm details
+- [Operations Runbook](./ops-runbook.md) — deployment, backup/restore, monitoring, troubleshooting
+- [Traceability Matrix](./traceability.md) — requirement → test mapping
+- [Category-Aware Collection](./plans/category-aware-collection.md) — implemented FAST/DEEP collection design
+- [SRS v2.3](../JobHunter_SRS_v2.3.md) — full requirements specification
 
 ---
 
-*Last updated: August 2026*
+*Last updated: October 2026*

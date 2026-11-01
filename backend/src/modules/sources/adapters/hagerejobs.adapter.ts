@@ -46,34 +46,62 @@ export class HagereJobsAdapter implements JobSourceAdapter {
     const jobs: RawJob[] = [];
     const isInternational = sourceUrl.includes('international');
 
-    // Extract job IDs from job_detail=NNN links
-    const jobIdSet = new Set<string>();
+    // Every job_detail=NNN occurrence, in document order. The id is what makes a
+    // card addressable; the markup around it is not stable enough to slice by a
+    // fixed character window.
+    const markers: { id: string; index: number; length: number }[] = [];
     const idRegex = /job_detail=(\d+)/g;
     let m: RegExpExecArray | null;
     while ((m = idRegex.exec(html)) !== null) {
-      jobIdSet.add(m[1]);
+      markers.push({ id: m[1], index: m.index, length: m[0].length });
     }
 
-    // For each job, extract surrounding HTML block and parse fields
-    for (const jobId of jobIdSet) {
-      const job = this.extractJobFromListing(html, jobId, isInternational);
-      if (job) jobs.push(job);
+    const seen = new Set<string>();
+    for (let i = 0; i < markers.length; i++) {
+      const marker = markers[i];
+      if (seen.has(marker.id)) continue;
+      const job = this.extractJobFromListing(this.cardBlock(markers, i, html), marker.id, isInternational);
+      if (job) {
+        jobs.push(job);
+        seen.add(marker.id);
+      }
     }
 
     return jobs;
   }
 
-  private extractJobFromListing(html: string, jobId: string, isInternational: boolean): RawJob | null {
-    // Find the block around this job_detail link
-    const marker = `job_detail=${jobId}`;
-    const idx = html.indexOf(marker);
-    if (idx === -1) return null;
+  /**
+   * The slice of the page belonging to one card: from its own link to the next
+   * card element (or the next card's link, whichever comes first), because
+   * Elementor puts the title and field lines after the anchor. Cards that place
+   * their fields before the apply link fall back to the slice that ends at
+   * their own marker.
+   *
+   * A fixed ±1500-character window around the link bleeds into whichever
+   * neighbour happens to be closer, and the field regexes then read the
+   * neighbour's title — so a job can be stored named after the card above it.
+   */
+  private cardBlock(
+    markers: { id: string; index: number; length: number }[],
+    position: number,
+    html: string,
+  ): string {
+    const marker = markers[position];
+    const markerEnd = marker.index + marker.length;
+    const nextMarker = markers[position + 1]?.index ?? html.length;
+    // A card ends where the next card element opens, so the slice never reaches
+    // a neighbour's title even when the neighbour's link comes later.
+    const nextCard = html.slice(markerEnd, nextMarker).search(/<(article|li)\b/i);
+    const forwardEnd = nextCard === -1 ? nextMarker : markerEnd + nextCard;
+    const forward = html.slice(marker.index, forwardEnd);
+    if (/<h3[^>]*class="job-card-title"/i.test(forward)) return forward;
 
-    // Expand the window to capture the full card (typically ~2000 chars)
-    const start = Math.max(0, idx - 1500);
-    const end = Math.min(html.length, idx + 1500);
-    const block = html.substring(start, end);
+    const previous = markers[position - 1];
+    const from = previous ? previous.index + previous.length : Math.max(0, marker.index - 1500);
+    return html.slice(from, markerEnd);
+  }
 
+  private extractJobFromListing(block: string, jobId: string, isInternational: boolean): RawJob | null {
     // Extract title from <h3 class="job-card-title">
     const titleMatch = /<h3[^>]*class="job-card-title"[^>]*>([^<]+)<\/h3>/i.exec(block);
     const title = titleMatch?.[1]?.trim();
@@ -124,7 +152,9 @@ export class HagereJobsAdapter implements JobSourceAdapter {
       location,
       locationClass: (isInternational ? 'INTERNATIONAL_ONSITE' : 'ETHIOPIA_LOCAL') as LocationClass,
       employmentType: this.mapEmploymentType(empType) as EmploymentType,
-      experienceLevel: deriveExperience(expText || title),
+      // Both strings carry seniority words ("Senior Accountant", "5 years" does
+      // not), so feed the helper the whole card signal rather than choosing one.
+      experienceLevel: deriveExperience([title, expText].filter(Boolean).join(' ')),
       workPlace: 'ONSITE',
       salary: undefined,
       currency: 'ETB',
