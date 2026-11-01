@@ -58,8 +58,9 @@ function createService() {
   const landingjobs: any = { sourceId: 'landingjobs', fetchJobs: jest.fn() };
   const etcareers: any = { sourceId: 'etcareers', fetchJobs: jest.fn() };
   const hagerejobs: any = { sourceId: 'hagerejobs', fetchJobs: jest.fn() };
+  const elelana: any = { sourceId: 'elelana', fetchJobs: jest.fn() };
   const events: any = { pushToUser: jest.fn() };
-  const service = new SourcesService(prisma, matching, events, reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs, jobicy, remoteok, landingjobs, etcareers, hagerejobs, []);
+  const service = new SourcesService(prisma, matching, events, reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs, jobicy, remoteok, landingjobs, etcareers, hagerejobs, elelana, []);
   return { service, prisma, matching, reliefweb, remotive };
 }
 

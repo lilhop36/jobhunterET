@@ -84,3 +84,26 @@ one) and 197-321ms afterwards. Backend suite: 28 suites / 382 tests (58-83s depe
 load). Gate 6 against the live dev
 stack: 6 passed (20.3s), and that run converted admin@jobhunter.et from $2a$12$ to $2b$11$ in the real
 database — the re-hash path proven in a browser, not only over HTTP.
+
+SEC-007/010/011 evidence closed (2026-11-01). The generated SECURITY table had three
+`**none**` rows; each control now has a spec exercising its behaviour:
+  modules/sources/adapters/fetch-timeout.spec.ts  (SEC-007)
+  prisma/prisma.service.spec.ts                   (SEC-010)
+  modules/events/events.controller.spec.ts        (SEC-011)
+The SEC-007 spec asserts the invariant across the production tree — every fetch(...) call site
+must carry a signal, arguments matched by balanced parentheses — and it failed on its first run:
+TelegramService.pollOnce() long-polled the Bot API with no signal while holding
+runExclusive('telegram-poll'), so a silent Bot API would have dropped every later poll tick.
+Fixed with AbortSignal.timeout(20_000) in pollOnce, plus a test pinning the signal.
+
+node scripts/run-tests.js --ci
+Test Suites: 32 passed, 32 total
+Tests:       421 passed, 421 total
+Time:        43.7s
+
+node scripts/generate-traceability.js
+Up to date: 85 requirements, 76 tested (1 partial), 0 unexplained and 5 explained gaps,
+4 deferred -> 94% coverage.
+
+npm run arch:verify
+Summary: 25 passed, 0 failed, 0 warnings.

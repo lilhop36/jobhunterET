@@ -25,12 +25,12 @@
 | Prisma models | 22 |
 | NestJS feature modules | 18 |
 | Frontend page routes | 19 |
-| Web job sources | 11 |
+| Web job sources | 12 |
 | Telegram channels | 3 |
-| Collection endpoints | 14 |
-| Adapter classes | 12 |
-| Test spec files | 32 |
-| Test declarations | 369 |
+| Collection endpoints | 15 |
+| Adapter classes | 13 |
+| Test spec files | 33 |
+| Test declarations | 376 |
 | CI jobs | 6 |
 
 ## Prisma models
@@ -73,10 +73,11 @@
 | RemoteOK (`remoteok`) | `remoteok` | 120 |
 | Landing.jobs (`landingjobs`) | `landingjobs` | 120 |
 | Hagere Jobs (`hagerejobs`) | `hagerejobs` | 60 |
+| ElelanaJobs (`elelana`) | `elelana` | 60 |
 
 Telegram channels: `tg-elelanajobs` (ElelanaJobs (Telegram)), `tg-shegarjob` (ShegerJobs (Telegram)), `tg-ethiojobvacancy1` (EthioJobVacancy (Telegram)).
 
-Adapter classes (12): `arbeitnow.adapter.ts`, `etcareers.adapter.ts`, `ethiojobs.adapter.ts`, `ethiongojobs.adapter.ts`, `geezjobs.adapter.ts`, `hagerejobs.adapter.ts`, `jobicy.adapter.ts`, `landingjobs.adapter.ts`, `reliefweb.adapter.ts`, `remoteok.adapter.ts`, `remotive.adapter.ts`, `telegram-channel.adapter.ts`.
+Adapter classes (13): `arbeitnow.adapter.ts`, `elelanajobs.adapter.ts`, `etcareers.adapter.ts`, `ethiojobs.adapter.ts`, `ethiongojobs.adapter.ts`, `geezjobs.adapter.ts`, `hagerejobs.adapter.ts`, `jobicy.adapter.ts`, `landingjobs.adapter.ts`, `reliefweb.adapter.ts`, `remoteok.adapter.ts`, `remotive.adapter.ts`, `telegram-channel.adapter.ts`.
 
 ## Backend feature modules
 
@@ -148,6 +149,7 @@ Match cycle default: `10m` (override with `MATCH_CYCLE_INTERVAL`).
 | `backup.service.spec.ts` | 5 |
 | `category-mapper.spec.ts` | 9 |
 | `digest.service.spec.ts` | 8 |
+| `elelanajobs.adapter.spec.ts` | 7 |
 | `ethiopia-eligibility.spec.ts` | 13 |
 | `events.controller.spec.ts` | 6 |
 | `exclusive.spec.ts` | 4 |
@@ -171,4 +173,4 @@ Match cycle default: `10m` (override with `MATCH_CYCLE_INTERVAL`).
 | `telegram-channel.spec.ts` | 11 |
 | `telegram.service.spec.ts` | 16 |
 | `url-safety.spec.ts` | 11 |
-| **Total** | **369** |
+| **Total** | **376** |

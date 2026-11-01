@@ -61,8 +61,11 @@ collection, fallback and `collectAll`.
 
 | Scope | Sources |
 | --- | --- |
-| Enabled (Ethiopia) | EthioJobs, Ethio NGO Jobs, GeezJobs, ET Careers, Hagere Jobs, ReliefWeb (Ethiopia feed), configured Telegram channels |
+| Enabled (Ethiopia) | EthioJobs, Ethio NGO Jobs, GeezJobs, ET Careers, Hagere Jobs, ElelanaJobs, ReliefWeb (Ethiopia feed), configured Telegram channels |
 | Disabled (`enabled: false`) | Remotive, Arbeitnow, Jobicy, RemoteOK, Landing.jobs |
+
+Source-by-source audit, including what was rejected and why:
+[source-audit.md](source-audit.md).
 
 The international adapters are **disabled, not deleted**, so they can be restored
 by flipping the flag. Re-enabling one only widens collection; the eligibility

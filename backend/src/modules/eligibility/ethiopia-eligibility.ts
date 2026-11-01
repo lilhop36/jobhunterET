@@ -41,6 +41,10 @@ const ETHIOPIA_PLACES = [
   'semera', 'axum', 'aksum', 'lalibela', 'woldiya', 'kombolcha', 'ambo',
   'adigrat', 'asella', 'dilla', 'hosaena', 'hoseana', 'mizan teferi', 'nekemte',
   'nekempte', 'welkite', 'butajira', 'jijiga', 'sodo', 'wolaita',
+  // towns that appear by name on Ethiopian job boards (ElelanaJobs, EthioJobs)
+  'delomena', 'yebbu', 'ginir', 'woliso', 'mettu', 'dembi dollo', 'kellem wollega',
+  'kellam wollega', 'sheger', 'shegger', 'holeta', 'sebeta', 'burayu', 'negele',
+  'goba', 'teppi', 'shire', 'adwa',
   // regions / administrations
   'oromia', 'amhara', 'tigray', 'sidama', 'afar', 'somali region', 'benishangul',
   'south west ethiopia', 'central ethiopia', 'harari', 'snnpr',

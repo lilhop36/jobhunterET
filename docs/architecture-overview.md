@@ -20,11 +20,11 @@ JobHunter is an automated job-matching agent for the Ethiopian tech market. It c
 | Prisma models | 22 — User, CandidateProfile, CvFile, TelegramLink, Skill, CandidateSkill, TargetRole, LocationPreference, JobSource, SourceRun, SourceRunCategory, Job, JobSkill, JobMatch, Application, ApplicationTransition, Notification, SearchProfile, Digest, MatchCycle, SystemLog, BotState |
 | NestJS feature modules | 18 — account, admin, applications, auth, dashboard, digest, events, jobs, lifecycle, matches, matching, notifications, profile, salary, saved-jobs, searches, sources, telegram |
 | Frontend page routes | 19 |
-| Web job sources | 11 — ReliefWeb (Ethiopia), Remotive, Arbeitnow, EthioJobs, Ethio NGO Jobs, GeezJobs, ET Careers, Jobicy, RemoteOK, Landing.jobs, Hagere Jobs |
+| Web job sources | 12 — ReliefWeb (Ethiopia), Remotive, Arbeitnow, EthioJobs, Ethio NGO Jobs, GeezJobs, ET Careers, Jobicy, RemoteOK, Landing.jobs, Hagere Jobs, ElelanaJobs |
 | Telegram channels | 3 — ElelanaJobs (Telegram), ShegerJobs (Telegram), EthioJobVacancy (Telegram) |
-| Adapter classes | 12 (11 web + 1 parameterized Telegram) |
-| Collection endpoints | 14 (11 web + 3 Telegram) |
-| Test spec files | 32 (369 `it`/`test` declarations; parameterized cases expand at runtime) |
+| Adapter classes | 13 (12 web + 1 parameterized Telegram) |
+| Collection endpoints | 15 (12 web + 3 Telegram) |
+| Test spec files | 33 (376 `it`/`test` declarations; parameterized cases expand at runtime) |
 | CI jobs | 6 — lint-and-typecheck, test-backend, build-frontend, security, architecture, runtime-verification |
 
 <!-- END GENERATED OVERVIEW FACTS -->

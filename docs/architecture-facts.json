@@ -64,8 +64,8 @@
       "telegram"
     ],
     "moduleFileCount": 20,
-    "specFileCount": 32,
-    "testDeclarations": 369,
+    "specFileCount": 33,
+    "testDeclarations": 376,
     "tests": [
       {
         "file": "account.service.spec.ts",
@@ -102,6 +102,10 @@
       {
         "file": "digest.service.spec.ts",
         "declarations": 8
+      },
+      {
+        "file": "elelanajobs.adapter.spec.ts",
+        "declarations": 7
       },
       {
         "file": "ethiopia-eligibility.spec.ts",
@@ -222,7 +226,7 @@
     ]
   },
   "sources": {
-    "webCount": 11,
+    "webCount": 12,
     "webSources": [
       {
         "id": "reliefweb",
@@ -289,6 +293,12 @@
         "name": "Hagere Jobs",
         "adapter": "hagerejobs",
         "frequencyMinutes": 60
+      },
+      {
+        "id": "elelana",
+        "name": "ElelanaJobs",
+        "adapter": "elelana",
+        "frequencyMinutes": 60
       }
     ],
     "telegramCount": 3,
@@ -306,9 +316,10 @@
         "name": "EthioJobVacancy (Telegram)"
       }
     ],
-    "adapterClassCount": 12,
+    "adapterClassCount": 13,
     "adapterClasses": [
       "arbeitnow.adapter.ts",
+      "elelanajobs.adapter.ts",
       "etcareers.adapter.ts",
       "ethiojobs.adapter.ts",
       "ethiongojobs.adapter.ts",
@@ -321,7 +332,7 @@
       "remotive.adapter.ts",
       "telegram-channel.adapter.ts"
     ],
-    "endpointCount": 14
+    "endpointCount": 15
   },
   "knowledgeBase": {
     "skills": 153,

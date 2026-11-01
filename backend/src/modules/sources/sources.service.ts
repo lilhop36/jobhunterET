@@ -16,6 +16,7 @@ import { RemoteOKAdapter } from './adapters/remoteok.adapter';
 import { LandingJobsAdapter } from './adapters/landingjobs.adapter';
 import { EtcareersAdapter } from './adapters/etcareers.adapter';
 import { HagereJobsAdapter } from './adapters/hagerejobs.adapter';
+import { ElelanaJobsAdapter } from './adapters/elelanajobs.adapter';
 import { TELEGRAM_ADAPTERS } from './adapters/telegram-tokens';
 import { EventsService } from '../events/events.service';
 import { CollectionQueue, QueueResult } from './collection-queue';
@@ -59,10 +60,11 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
     landingjobs: LandingJobsAdapter,
     etcareers: EtcareersAdapter,
     hagerejobs: HagereJobsAdapter,
+    elelana: ElelanaJobsAdapter,
     @Inject(TELEGRAM_ADAPTERS) telegramAdapters: JobSourceAdapter[],
   ) {
     this.adapters = {};
-    for (const a of [reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs, jobicy, remoteok, landingjobs, etcareers, hagerejobs]) {
+    for (const a of [reliefweb, remotive, arbeitnow, ethiongojobs, geezjobs, ethiojobs, jobicy, remoteok, landingjobs, etcareers, hagerejobs, elelana]) {
       this.adapters[a.sourceId] = a;
     }
     // FR-008: register dynamically-configured Telegram channel adapters

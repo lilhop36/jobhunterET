@@ -16,6 +16,7 @@ import { RemoteOKAdapter } from './adapters/remoteok.adapter';
 import { LandingJobsAdapter } from './adapters/landingjobs.adapter';
 import { EtcareersAdapter } from './adapters/etcareers.adapter';
 import { HagereJobsAdapter } from './adapters/hagerejobs.adapter';
+import { ElelanaJobsAdapter } from './adapters/elelanajobs.adapter';
 import { TelegramChannelAdapter } from './adapters/telegram-channel.adapter';
 import { TELEGRAM_CHANNELS } from './adapters/telegram-channels.config';
 import { JobSourceAdapter } from './adapters/job-source.adapter';
@@ -37,6 +38,7 @@ import { TELEGRAM_ADAPTERS } from './adapters/telegram-tokens';
     LandingJobsAdapter,
     EtcareersAdapter,
     HagereJobsAdapter,
+    ElelanaJobsAdapter,
     // FR-008: Telegram channel adapters — parameterized, one per channel
     {
       provide: TELEGRAM_ADAPTERS,
