@@ -137,9 +137,11 @@ The matching engine (`docs/matching-engine-reference.md`) scores each job agains
 **Trigger points:**
 - Incremental: new unmatched jobs are scored against all users. The default cycle is **10 minutes** (`MATCH_CYCLE_INTERVAL`); the sample `.env.example` sets 35 minutes for development.
 - Full recalculation: on profile update or manual trigger.
-- Batch-optimized: profiles are loaded in 4 parallel queries, and the loop yields to the event loop every 50 users.
+- Batch-optimized: profiles are loaded in 9 parallel queries, and the loop yields to the event loop every 50 users.
 
-Matching applies **hard eligibility filters** before scoring: remote-only users do not receive on-site jobs, `excludeOnsite` removes international on-site roles, `excludeEntryLevel` removes ENTRY/INTERN postings, and a relevance gate rejects jobs with neither role alignment nor at least two skill signals. Ineligible jobs are returned with `score = 0`, `eligible = false`, and an `ineligibleReasons` list.
+Matching applies **hard eligibility filters** before scoring: remote-only users do not receive on-site jobs, `excludeOnsite` removes international on-site roles, `excludeEntryLevel` removes ENTRY/INTERN postings, expired/inactive vacancies are rejected, and a relevance gate rejects jobs with neither role alignment nor at least two skill signals. Ineligible jobs are returned with `score = 0`, `eligible = false`, and an `ineligibleReasons` list.
+
+**Explainable scoring (Phase 6).** The score stays deterministic — no model decides relevance. Each match returns per-factor evidence, a required/preferred requirement list with `MET` / `PARTIAL` / `MISSING` / `UNKNOWN` verdicts, and a vacancy risk (`OK`, `EXPIRED`, `STALE`, `UNVERIFIED`). Verified profile sections (education, experience, projects, certifications, languages) supply skill evidence alongside the skills list; a skill proven by a certification or project is matched and the source is named. Missing employer data is `UNKNOWN`, never satisfied. Stale postings lose 6 points and unverifiable links lose 4; expired postings are rejected outright. The explanation is persisted on `JobMatch` (`matcherVersion = v3.0-requirements`) and surfaced in the UI.
 
 ### Stage 5: Notification
 
@@ -248,7 +250,7 @@ Saved jobs are not a separate table: saving is represented by an `Application` r
 
 2. **Graceful degradation with hard constraints**: When Telegram is unavailable, notifications route to the Web Inbox. When a source fails, other sources continue. When a job has no extractable skills, the skill factor uses a conservative neutral of **0.4**, not a bonus; hard eligibility filters still prevent unrelated jobs from ranking. See the [matching reference](./matching-engine-reference.md).
 
-3. **Batch-optimized matching**: Profile loading uses 4 parallel Prisma queries instead of N+1. The scoring loop yields to the event loop every 50 users to prevent blocking SSE streams.
+3. **Batch-optimized matching**: Profile loading uses 9 parallel Prisma queries instead of N+1. The scoring loop yields to the event loop every 50 users to prevent blocking SSE streams.
 
 4. **Transition graph for applications**: Stage transitions are validated against a directed graph — illegal moves (e.g., INTERVIEW → SAVED) return HTTP 409.
 

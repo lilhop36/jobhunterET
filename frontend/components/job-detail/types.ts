@@ -1,5 +1,13 @@
 /** Shared types for the job detail page decomposition. */
 
+export interface RequirementVerdict {
+  name: string;
+  kind: 'SKILL' | 'EXPERIENCE';
+  importance: 'REQUIRED' | 'PREFERRED';
+  status: 'MET' | 'PARTIAL' | 'MISSING' | 'UNKNOWN';
+  evidence: string;
+}
+
 export interface JobDetail {
   id: string;
   title: string;
@@ -37,6 +45,13 @@ export interface JobDetail {
     missingSkills: string[];
     reasons: string[];
     summary: string;
+    requiredRequirements: RequirementVerdict[];
+    preferredRequirements: RequirementVerdict[];
+    missingRequirements: string[];
+    unknownRequirements: string[];
+    evidence: string[];
+    vacancyRisk: string;
+    matcherVersion: string | null;
     parts: {
       role: number;
       skill: number;

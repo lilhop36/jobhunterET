@@ -363,6 +363,40 @@ function matchRoleProfile(
 
 export type TierPriority = 'HIGH' | 'MEDIUM' | 'LOW' | '';
 
+/** Verified profile sections used as matching evidence (Phase 6). */
+export interface ProfileEducation {
+  institution: string;
+  degree?: string | null;
+  field?: string | null;
+  endYear?: number | null;
+}
+
+export interface ProfileExperience {
+  title: string;
+  company: string;
+  startYear?: number | null;
+  endYear?: number | null;
+  current?: boolean;
+  description?: string | null;
+}
+
+export interface ProfileProject {
+  name: string;
+  description?: string | null;
+  year?: number | null;
+}
+
+export interface ProfileCertification {
+  name: string;
+  issuer?: string | null;
+  year?: number | null;
+}
+
+export interface ProfileLanguage {
+  language: string;
+  proficiency?: string | null;
+}
+
 export interface ProfileInput {
   skills: string[];
   targetRoles: { role: string; priority: 'HIGH' | 'MEDIUM' | 'LOW' }[];
@@ -374,6 +408,12 @@ export interface ProfileInput {
   excludeOnsite: boolean;
   /** Hide ENTRY/INTERN postings for candidates who are past that stage. */
   excludeEntryLevel: boolean;
+  /** Phase 6: verified sections are optional so old callers keep working. */
+  education?: ProfileEducation[];
+  experience?: ProfileExperience[];
+  projects?: ProfileProject[];
+  certifications?: ProfileCertification[];
+  languages?: ProfileLanguage[];
 }
 
 export interface JobInput {
@@ -388,12 +428,32 @@ export interface JobInput {
   workPlace?: string;
   parseConfidence: number;
   postedAt: Date | number;
+  /** Phase 6 vacancy signals. Optional: unknown means "not supplied". */
+  status?: string;
+  deadline?: Date | number | null;
+  lastSeenAt?: Date | number | null;
+  urlStatus?: string | null;
 }
 
 export interface ScoreBreakdown {
   label: string;
   weight: number;
   fraction: number;
+  /** Phase 6: why this factor got this fraction. */
+  evidence: string;
+}
+
+export type RequirementStatus = 'MET' | 'PARTIAL' | 'MISSING' | 'UNKNOWN';
+export type RequirementKind = 'SKILL' | 'EXPERIENCE';
+export type VacancyRisk = 'OK' | 'EXPIRED' | 'STALE' | 'UNVERIFIED';
+
+export interface RequirementVerdict {
+  name: string;
+  kind: RequirementKind;
+  importance: 'REQUIRED' | 'PREFERRED';
+  status: RequirementStatus;
+  /** The verified profile evidence behind the verdict, or why it is unknown. */
+  evidence: string;
 }
 
 export interface MatchResult {
@@ -408,12 +468,249 @@ export interface MatchResult {
   missingSkills: string[];
   reasons: string[];
   summary: string;
+  /** Hard-gate result, kept separate from the relevance score. */
+  eligibility: { status: 'ELIGIBLE' | 'REJECTED'; reasons: string[] };
+  requiredRequirements: RequirementVerdict[];
+  preferredRequirements: RequirementVerdict[];
+  missingRequirements: string[];
+  unknownRequirements: string[];
+  vacancy: { risk: VacancyRisk; reasons: string[] };
+  /** One line per score factor — every point is traceable. */
+  evidence: string[];
 }
+
+export const MATCHER_VERSION = 'v3.0-requirements';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
 // Hoist regex to module-level constant
 const SENIORITY_RE = /\b(senior|lead|principal|head)\b/;
+
+const DAY = 86_400_000;
+/** A posting not re-seen for this long is treated as stale. */
+const STALE_AFTER_DAYS = 7;
+const STALE_PENALTY = 6;
+/** A link that could not be re-checked is weaker evidence, not a dead end. */
+const UNVERIFIED_PENALTY = 4;
+
+/**
+ * Canonical skill names plus aliases, used to find verified skill evidence
+ * inside the structured profile text (certifications, projects, education,
+ * experience). Short aliases ("ts", "js", "go", "r") are dropped: whole-word
+ * matching them in prose produces more false evidence than signal.
+ */
+const SKILL_PHRASES: { canonical: string; phrases: string[] }[] = Object.keys(SKILLS)
+  .map((canonical) => ({
+    canonical,
+    phrases: [canonical, ...(CANONICAL_TO_ALIASES.get(canonical) ?? [])]
+      .map((p) => p.toLowerCase())
+      .filter((p) => p.length >= 3),
+  }))
+  .filter((entry) => entry.phrases.length > 0);
+
+/**
+ * Map each verified skill to the profile sections that prove it. A skill
+ * listed directly is evidence; a skill named in a certification, project,
+ * degree or job title is also evidence, with its source recorded so the
+ * explanation can point at it.
+ */
+export function buildSkillEvidence(prof: ProfileInput): Map<string, string[]> {
+  const evidence = new Map<string, string[]>();
+
+  const add = (skill: string, source: string) => {
+    const canonical = normalizeSkill(skill);
+    if (!canonical) return;
+    const list = evidence.get(canonical) ?? [];
+    if (!list.includes(source)) list.push(source);
+    evidence.set(canonical, list);
+  };
+
+  const scan = (text: string | null | undefined, source: string) => {
+    if (!text) return;
+    const tokens = tokenize(text);
+    for (const { canonical, phrases } of SKILL_PHRASES) {
+      if (phrases.some((phrase) => containsPhrase(tokens, phrase))) add(canonical, source);
+    }
+  };
+
+  for (const skill of prof.skills ?? []) add(skill, 'your profile skills');
+  for (const cert of prof.certifications ?? []) {
+    scan([cert.name, cert.issuer].filter(Boolean).join(' '), `certification: ${cert.name}`);
+  }
+  for (const project of prof.projects ?? []) {
+    scan([project.name, project.description].filter(Boolean).join(' '), `project: ${project.name}`);
+  }
+  for (const edu of prof.education ?? []) {
+    scan([edu.degree, edu.field].filter(Boolean).join(' '), `education: ${edu.degree ?? edu.institution}`);
+  }
+  for (const exp of prof.experience ?? []) {
+    scan(
+      [exp.title, exp.description].filter(Boolean).join(' '),
+      `experience: ${exp.title} at ${exp.company}`,
+    );
+  }
+  for (const lang of prof.languages ?? []) {
+    add(lang.language, `language: ${lang.language}${lang.proficiency ? ` (${lang.proficiency})` : ''}`);
+  }
+
+  return evidence;
+}
+
+/**
+ * Years of experience the profile can actually support. Stated years win;
+ * otherwise the earliest verified role is used. Returns null when the profile
+ * has no experience data at all — that is unknown, not zero years.
+ */
+export function deriveVerifiedYears(prof: ProfileInput): number | null {
+  const stated = prof.years > 0 ? prof.years : null;
+  const entries = prof.experience ?? [];
+  if (!entries.length) return stated;
+
+  const starts = entries
+    .map((entry) => entry.startYear)
+    .filter((year): year is number => typeof year === 'number' && year > 1900);
+  if (!starts.length) return stated;
+
+  const derived = new Date().getFullYear() - Math.min(...starts);
+  const best = Math.max(stated ?? 0, derived);
+  return best > 0 ? best : null;
+}
+
+/** Expired, stale and unverifiable postings are penalised, never boosted. */
+function evaluateVacancy(job: JobInput): {
+  risk: VacancyRisk;
+  reasons: string[];
+  penalty: number;
+  blocked: string[];
+} {
+  const reasons: string[] = [];
+  const blocked: string[] = [];
+  const now = Date.now();
+  let risk: VacancyRisk = 'OK';
+  let penalty = 0;
+
+  if (job.status && job.status !== 'ACTIVE') {
+    blocked.push('Posting is no longer active');
+  }
+
+  if (job.deadline) {
+    const deadline = new Date(job.deadline).getTime();
+    if (Number.isFinite(deadline) && deadline < now) {
+      risk = 'EXPIRED';
+      blocked.push('Vacancy deadline has passed');
+    } else if (Number.isFinite(deadline) && deadline - now <= 3 * DAY) {
+      reasons.push('Deadline is within 3 days — apply soon');
+    }
+  }
+
+  if (!blocked.length && job.lastSeenAt) {
+    const lastSeen = new Date(job.lastSeenAt).getTime();
+    const days = (now - lastSeen) / DAY;
+    if (Number.isFinite(days) && days > STALE_AFTER_DAYS) {
+      risk = 'STALE';
+      penalty += STALE_PENALTY;
+      reasons.push(`Not re-listed for ${Math.floor(days)} days — may be stale (−${STALE_PENALTY})`);
+    }
+  }
+
+  // OK means the link was recently checked and worked. ERROR/other values
+  // mean "could not verify", which is a small confidence penalty, not proof
+  // that the job is gone.
+  if (!blocked.length && job.urlStatus && job.urlStatus !== 'OK') {
+    if (risk === 'OK') risk = 'UNVERIFIED';
+    penalty += UNVERIFIED_PENALTY;
+    reasons.push(`Posting could not be re-verified — apply link may be stale (−${UNVERIFIED_PENALTY})`);
+  }
+
+  return { risk, reasons, penalty, blocked };
+}
+
+/**
+ * Required qualifications are what the posting states (its extracted skills
+ * and experience level). Preferred qualifications come from the role profile
+ * for the job title: boards rarely label preferences structurally, so role
+ * expectations are the deterministic fallback.
+ */
+function buildRequirementVerdicts(
+  job: JobInput,
+  prof: ProfileInput,
+  skillEvidence: Map<string, string[]>,
+  match: { direct: string[]; transferable: string[]; related: string[] },
+  roleKey: string | null,
+): { required: RequirementVerdict[]; preferred: RequirementVerdict[] } {
+  const required: RequirementVerdict[] = [];
+  const jobSkills = [...new Set((job.skills ?? []).map(normalizeSkill))];
+  const has = (list: string[], skill: string) =>
+    list.some((value) => normalizeSkill(value) === skill);
+
+  for (const skill of jobSkills) {
+    const sources = skillEvidence.get(skill);
+    if (has(match.direct, skill)) {
+      required.push({
+        name: skill,
+        kind: 'SKILL',
+        importance: 'REQUIRED',
+        status: 'MET',
+        evidence: sources?.length
+          ? `Verified in ${sources.slice(0, 2).join('; ')}`
+          : 'Listed on your profile',
+      });
+    } else if (has(match.transferable, skill)) {
+      required.push({
+        name: skill,
+        kind: 'SKILL',
+        importance: 'REQUIRED',
+        status: 'PARTIAL',
+        evidence: 'Transferable from a related skill, not a direct match',
+      });
+    } else {
+      required.push({
+        name: skill,
+        kind: 'SKILL',
+        importance: 'REQUIRED',
+        status: 'MISSING',
+        evidence: has(match.related, skill)
+          ? 'Only a related skill is on your profile'
+          : 'Not found in your verified profile',
+      });
+    }
+  }
+
+  if (!jobSkills.length) {
+    required.push({
+      name: 'Skill requirements',
+      kind: 'SKILL',
+      importance: 'REQUIRED',
+      status: 'UNKNOWN',
+      evidence: 'The posting lists no structured skills; unknown is not treated as met.',
+    });
+  }
+
+  const preferred: RequirementVerdict[] = [];
+  const role = roleKey ? ROLE_PROFILES[roleKey] : null;
+  if (role) {
+    const requiredNames = new Set(jobSkills);
+    const candidates = [...new Set([...role.common, ...role.advanced])]
+      .map(normalizeSkill)
+      .filter((skill) => !requiredNames.has(skill))
+      .slice(0, 6);
+    for (const skill of candidates) {
+      const sources = skillEvidence.get(skill);
+      preferred.push({
+        name: skill,
+        kind: 'SKILL',
+        importance: 'PREFERRED',
+        status: sources?.length ? 'MET' : 'MISSING',
+        evidence: sources?.length
+          ? `Verified in ${sources[0]}`
+          : 'Not found in your verified profile',
+      });
+    }
+  }
+
+  return { required, preferred };
+}
+
 
 /**
  * Score a job against a candidate profile using v2 knowledge base.
@@ -433,6 +730,14 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
   let roleTarget: string | null = null;
   let rolePrio = '';
 
+  // Verified sections (certifications, projects, education, experience,
+  // languages) can prove a skill even when it is not in the skills list.
+  const skillEvidence = buildSkillEvidence(prof);
+  const effectiveSkills = [
+    ...new Set([...prof.skills.map(normalizeSkill), ...skillEvidence.keys()]),
+  ];
+  const verifiedYears = deriveVerifiedYears(prof);
+
   // ── 1. Role alignment (25%) ────────────────────────────────────────
   for (const tr of prof.targetRoles) {
     const w = tr.priority === 'HIGH' ? 1 : tr.priority === 'MEDIUM' ? 0.72 : 0.45;
@@ -445,7 +750,7 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
     }
   }
 
-  const { roleMatch: profileMatch } = matchRoleProfile(job.title, prof.skills);
+  const { roleMatch: profileMatch, roleProfile } = matchRoleProfile(job.title, effectiveSkills);
   if (profileMatch > 0.5) {
     roleBest = Math.max(roleBest, profileMatch * 0.8);
     reasons.push(`Strong role profile match (${Math.round(profileMatch * 100)}% of core skills)`);
@@ -458,7 +763,15 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
 
   const { direct, transferable, related, missing, skillFrac } = matchSkills(
     job.skills || [],
-    prof.skills,
+    effectiveSkills,
+  );
+
+  const { required, preferred } = buildRequirementVerdicts(
+    job,
+    prof,
+    skillEvidence,
+    { direct, transferable, related },
+    roleProfile,
   );
 
   if (direct.length) reasons.push(`${direct.length} direct skill matches`);
@@ -509,26 +822,61 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
     ineligibleReasons.push('No role or skill alignment with your target roles');
   }
 
+  // Expired or withdrawn postings are never recommendations. Stale and
+  // unverifiable ones stay eligible but carry a score penalty.
+  const vacancy = evaluateVacancy(job);
+  ineligibleReasons.push(...vacancy.blocked);
+  if (vacancy.reasons.length) reasons.push(...vacancy.reasons);
+
   const eligible = ineligibleReasons.length === 0;
   if (!eligible) {
     reasons.push(...ineligibleReasons);
   }
 
   // ── 3. Experience (15%) ───────────────────────────────────────────
-  const reqYears = EXP_YEARS[job.experienceLevel] ?? 2;
-  // Entry-level and intern roles give full credit — they are designed for
-  // people with little or no professional experience.  Only mid/senior/lead
-  // roles apply the experience ratio penalty.
+  // Unknown experience data is neutral (0.5), never full credit. Entry-level
+  // postings genuinely require no prior experience, so they stay MET.
+  const requirementYears = EXP_YEARS[job.experienceLevel];
+  const reqYears = requirementYears ?? 0;
   let expFrac: number;
+  let expStatus: RequirementStatus;
+  let expEvidence: string;
   if (job.experienceLevel === 'ENTRY' || job.experienceLevel === 'INTERN') {
     expFrac = 1;
-  } else if (reqYears === 0) {
+    expStatus = 'MET';
+    expEvidence = 'Entry-level role — no prior experience required';
+    if (verifiedYears !== null) reasons.push(`Experience fits (${verifiedYears} yrs vs ${reqYears}+ required)`);
+  } else if (requirementYears === undefined) {
+    expFrac = 0.5;
+    expStatus = 'UNKNOWN';
+    expEvidence = `Experience level "${job.experienceLevel || 'unspecified'}" is not specific enough to judge`;
+  } else if (verifiedYears === null) {
+    expFrac = 0.5;
+    expStatus = 'UNKNOWN';
+    expEvidence = 'Your profile has no verified experience yet';
+  } else if (verifiedYears >= requirementYears) {
     expFrac = 1;
+    expStatus = 'MET';
+    expEvidence = `You have ${verifiedYears} yrs vs ${requirementYears}+ required`;
+    reasons.push(`Experience fits (${verifiedYears} yrs vs ${requirementYears}+ required)`);
   } else {
-    expFrac = clamp(Math.max(0.3, prof.years / reqYears), 0, 1);
+    expFrac = clamp(Math.max(0.3, verifiedYears / requirementYears), 0, 1);
+    expStatus = 'MISSING';
+    expEvidence = `You have ${verifiedYears} of ${requirementYears}+ required years`;
+    if (requirementYears - verifiedYears >= 2) {
+      reasons.push(`Requires ${requirementYears}+ yrs — you have ${verifiedYears}`);
+    }
   }
-  if (prof.years >= reqYears) reasons.push(`Experience fits (${prof.years} yrs vs ${reqYears}+ required)`);
-  else if (reqYears - prof.years >= 2) reasons.push(`Requires ${reqYears}+ yrs — you have ${prof.years}`);
+  required.push({
+    name:
+      job.experienceLevel === 'ENTRY' || job.experienceLevel === 'INTERN'
+        ? 'Experience (entry level)'
+        : `Experience (${requirementYears ?? job.experienceLevel}+ years)`,
+    kind: 'EXPERIENCE',
+    importance: 'REQUIRED',
+    status: expStatus,
+    evidence: expEvidence,
+  });
 
   // ── 4. Location (15%) ─────────────────────────────────────────────
   const tierW: Record<string, number> = { HIGH: 1, MEDIUM: 0.62, LOW: 0.38 };
@@ -589,10 +937,21 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
   const hours = (Date.now() - new Date(job.postedAt).getTime()) / 3_600_000;
   const freshFrac = Math.max(0.05, Math.exp(-hours / 72));
   if (hours <= 12) reasons.push(`Very fresh — posted ${Math.round(hours)}h ago`);
+  const freshEvidence =
+    hours <= 12
+      ? `Posted ${Math.round(hours)}h ago`
+      : `Posted ${Math.round(hours)}h ago — freshness decays with a 72h half-life`;
 
   // ── 7. Salary (5%) ─────────────────────────────────────────────────
   let salFrac = 0.55;
-  if (job.salary) salFrac = job.salary >= prof.minSalary ? 1 : Math.max(0.2, job.salary / Math.max(1, prof.minSalary));
+  let salEvidence = 'No salary stated — neutral, not treated as a match';
+  if (job.salary) {
+    salFrac = job.salary >= prof.minSalary ? 1 : Math.max(0.2, job.salary / Math.max(1, prof.minSalary));
+    salEvidence =
+      job.salary >= prof.minSalary
+        ? `Salary ${job.salary} meets your minimum ${prof.minSalary}`
+        : `Salary ${job.salary} is below your minimum ${prof.minSalary}`;
+  }
 
   // ── Calculate base score ───────────────────────────────────────────
   let pts =
@@ -616,6 +975,7 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
   }
 
   // ── Additional penalties ───────────────────────────────────────────
+  pts -= vacancy.penalty;
   const titleL = job.title.toLowerCase();
   // Seniority penalty: only apply when the job is genuinely senior-level
   // (title contains senior keywords AND the role profile confirms it) AND
@@ -646,14 +1006,42 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
 
   // ── Build breakdown ────────────────────────────────────────────────
   const parts: ScoreBreakdown[] = [
-    { label: 'Role', weight: 25, fraction: roleBest },
-    { label: 'Skills', weight: 30, fraction: skillFrac },
-    { label: 'Experience', weight: 15, fraction: expFrac },
-    { label: 'Location', weight: 15, fraction: locFrac },
-    { label: 'Employment', weight: 5, fraction: empFrac },
-    { label: 'Freshness', weight: 5, fraction: freshFrac },
-    { label: 'Salary', weight: 5, fraction: salFrac },
+    {
+      label: 'Role',
+      weight: 25,
+      fraction: roleBest,
+      evidence: roleBest > 0
+        ? `"${job.title}" aligns with "${roleTarget}" at ${Math.round(roleBest * 100)}%`
+        : 'No alignment with your target roles',
+    },
+    {
+      label: 'Skills',
+      weight: 30,
+      fraction: skillFrac,
+      evidence: job.skills?.length
+        ? `${direct.length} required skill(s) met, ${transferable.length} transferable, ${missing.length} missing`
+        : 'No structured skills on the posting — unknown, neutral score',
+    },
+    { label: 'Experience', weight: 15, fraction: expFrac, evidence: expEvidence },
+    { label: 'Location', weight: 15, fraction: locFrac, evidence: locWhy },
+    {
+      label: 'Employment',
+      weight: 5,
+      fraction: empFrac,
+      evidence: prof.employmentTypes.includes(job.employmentType)
+        ? `${job.employmentType} is one of your accepted types`
+        : `${job.employmentType} is not in your accepted types`,
+    },
+    { label: 'Freshness', weight: 5, fraction: freshFrac, evidence: freshEvidence },
+    { label: 'Salary', weight: 5, fraction: salFrac, evidence: salEvidence },
   ];
+
+  const missingRequirements = required
+    .filter((requirement) => requirement.status === 'MISSING')
+    .map((requirement) => requirement.name);
+  const unknownRequirements = required
+    .filter((requirement) => requirement.status === 'UNKNOWN')
+    .map((requirement) => requirement.name);
 
   // ── Summary ────────────────────────────────────────────────────────
   let summary: string;
@@ -665,9 +1053,11 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
     const allMatched = direct.length + transferable.length;
     if (job.skills?.length) bits.push(`${allMatched} of ${job.skills.length} skills`);
     if (transferable.length) bits.push(`${transferable.length} transferable`);
+    if (missingRequirements.length) bits.push(`${missingRequirements.length} requirement(s) missing`);
     if (job.locationClass.includes('REMOTE')) bits.push('remote');
     else if (job.locationClass === 'ETHIOPIA_LOCAL') bits.push('local (Ethiopia)');
     if (job.experienceLevel === 'ENTRY') bits.push('junior level');
+    if (vacancy.risk !== 'OK') bits.push(vacancy.risk.toLowerCase().replace('unverified', 'unverifiable'));
     summary = 'Matches your profile — ' + bits.join(', ') + '.';
   }
 
@@ -683,6 +1073,16 @@ export function scoreJob(job: JobInput, prof: ProfileInput): MatchResult {
     missingSkills: missing,
     reasons,
     summary,
+    eligibility: {
+      status: eligible ? 'ELIGIBLE' : 'REJECTED',
+      reasons: ineligibleReasons,
+    },
+    requiredRequirements: required,
+    preferredRequirements: preferred,
+    missingRequirements,
+    unknownRequirements,
+    vacancy: { risk: vacancy.risk, reasons: vacancy.reasons },
+    evidence: parts.map((part) => `${part.label}: ${part.evidence}`),
   };
 }
 

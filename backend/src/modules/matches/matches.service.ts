@@ -79,6 +79,14 @@ export class MatchesService {
       missingSkills: this.parseJsonField(m.missingSkills),
       reasons: this.parseJsonField(m.reasons),
       summary: m.summary,
+      // Phase 6: deterministic, evidence-backed explanation
+      requiredRequirements: this.parseJsonField(m.requiredRequirements),
+      preferredRequirements: this.parseJsonField(m.preferredRequirements),
+      missingRequirements: this.parseJsonField(m.missingRequirements),
+      unknownRequirements: this.parseJsonField(m.unknownRequirements),
+      evidence: this.parseJsonField(m.evidence),
+      vacancyRisk: m.vacancyRisk ?? 'OK',
+      matcherVersion: m.matcherVersion ?? null,
       job: {
         id: m.job.id,
         title: m.job.title,

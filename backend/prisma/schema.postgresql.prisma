@@ -372,6 +372,12 @@ model JobMatch {
   missingSkills   String[]
   reasons         String[]
   summary         String?
+  requiredRequirements  String[] @default([])
+  preferredRequirements String[] @default([])
+  missingRequirements   String[] @default([])
+  unknownRequirements   String[] @default([])
+  evidence              String[] @default([])
+  vacancyRisk     String   @default("OK")
   matcherVersion  String   @default("v2.2-rules")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

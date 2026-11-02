@@ -33,6 +33,11 @@ function makeService(notifyResult: 'SENT' | 'WEB' | 'SKIPPED' = 'SENT') {
     candidateSkill: { findMany: jest.fn() },
     targetRole: { findMany: jest.fn() },
     locationPreference: { findMany: jest.fn() },
+    candidateEducation: { findMany: jest.fn().mockResolvedValue([]) },
+    candidateExperience: { findMany: jest.fn().mockResolvedValue([]) },
+    candidateProject: { findMany: jest.fn().mockResolvedValue([]) },
+    candidateCertification: { findMany: jest.fn().mockResolvedValue([]) },
+    candidateLanguage: { findMany: jest.fn().mockResolvedValue([]) },
     jobMatch: {
       findMany: jest.fn().mockResolvedValue([]),
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -142,5 +147,53 @@ describe('MatchingService.matchUnmatchedJobs — FR-018 incremental matching', (
     expect(notifications.notifyForMatch).not.toHaveBeenCalled();
     expect(prisma.job.updateMany).toHaveBeenCalled();
     expect(outcome.matchesCreated).toBe(0);
+  });
+});
+
+describe('MatchingService.recalculate — re-scoring keeps the stored score honest', () => {
+  function makeRecalcService() {
+    const { svc, prisma } = makeService();
+    prisma.candidateProfile.findUnique = jest.fn().mockResolvedValue({
+      userId: 'u1',
+      remote: false,
+      employmentTypes: ['FULL_TIME'],
+      years: 2,
+      minSalary: 0,
+      excludeOnsite: false,
+      excludeEntryLevel: false,
+    });
+    prisma.candidateSkill.findMany.mockResolvedValue([{ userId: 'u1', skill: { name: 'Node.js' } }]);
+    prisma.targetRole.findMany.mockResolvedValue([
+      { userId: 'u1', role: 'Backend Developer', priority: 'HIGH' },
+    ]);
+    prisma.locationPreference.findMany.mockResolvedValue([
+      { userId: 'u1', region: 'Ethiopia', tier: 'HIGH' },
+    ]);
+    prisma.jobMatch.update = jest.fn().mockResolvedValue({});
+    prisma.$transaction = jest.fn(async (ops: any[]) => Promise.all(ops));
+    return { svc, prisma };
+  }
+
+  it('updates the headline score, not just the explanation fields', async () => {
+    const { svc, prisma } = makeRecalcService();
+    // Stale posting: the score must drop by the −6 vacancy penalty. Before the
+    // fix the update payload omitted `score`, so the stored value never moved.
+    prisma.job.findMany.mockResolvedValue([
+      job({ lastSeenAt: new Date(Date.now() - 30 * 24 * 3_600_000) }),
+    ]);
+    prisma.jobMatch.findMany.mockResolvedValue([{ jobId: 'j1' }]); // row already exists
+
+    await svc.recalculate('u1');
+
+    expect(prisma.jobMatch.update).toHaveBeenCalledTimes(1);
+    const data = prisma.jobMatch.update.mock.calls[0][0].data;
+    expect(typeof data.score).toBe('number');
+    expect(data.vacancyRisk).toBe('STALE');
+    // score === round(sum of the seven weighted factors) − penalties: the
+    // reason lines are only consistent with the headline if this holds.
+    const summed =
+      data.roleScore + data.skillScore + data.experienceScore + data.locationScore +
+      data.employmentScore + data.freshnessScore + data.salaryScore;
+    expect(data.score).toBe(Math.round(summed) - 6); // 6 = stale vacancy penalty
   });
 });

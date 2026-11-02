@@ -10,6 +10,10 @@ interface Match {
   score: number;
   matchedSkills: string[];
   missingSkills: string[];
+  missingRequirements?: string[];
+  unknownRequirements?: string[];
+  preferredRequirements?: { name: string; status: string }[];
+  vacancyRisk?: string;
   reasons: string[];
   summary: string;
   job: {
@@ -124,6 +128,25 @@ export default function MatchesPage() {
                 {m.reasons.slice(0, 3).map((r, i) => (
                   <li key={`${m.jobId}-reason-${i}`}>{r}</li>
                 ))}
+                {m.missingRequirements?.length ? (
+                  <li key={`${m.jobId}-missing`}>
+                    Missing requirements: {m.missingRequirements.join(', ')}
+                  </li>
+                ) : null}
+                {m.preferredRequirements?.some((r) => r.status === 'MET') ? (
+                  <li key={`${m.jobId}-preferred`}>
+                    Preferred you have:{' '}
+                    {m.preferredRequirements!
+                      .filter((r) => r.status === 'MET')
+                      .map((r) => r.name)
+                      .join(', ')}
+                  </li>
+                ) : null}
+                {m.vacancyRisk && m.vacancyRisk !== 'OK' ? (
+                  <li key={`${m.jobId}-vacancy`}>
+                    Vacancy risk: {m.vacancyRisk.toLowerCase()} — verify before applying
+                  </li>
+                ) : null}
               </ul>
             </div>
           </Link>

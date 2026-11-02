@@ -380,3 +380,116 @@ describe('scoreJob — overall math (FR-019 weights)', () => {
     expect(r.summary).toContain('Matches your profile');
   });
 });
+
+describe('scoreJob — verified profile evidence (Phase 6)', () => {
+  it('counts a certification as skill evidence and names the source', () => {
+    const prof = makeProfile({
+      skills: ['Node.js'],
+      certifications: [{ name: 'AWS Certified Cloud Practitioner', issuer: 'Amazon', year: 2022 }],
+    });
+    const r = scoreJob(makeJob({ skills: ['AWS'] }), prof);
+    expect(r.matchedSkills).toContain('AWS');
+    const verdict = r.requiredRequirements.find((v) => v.name === 'AWS')!;
+    expect(verdict.status).toBe('MET');
+    expect(verdict.evidence).toContain('certification');
+  });
+
+  it('counts a verified language as evidence', () => {
+    const prof = makeProfile({ languages: [{ language: 'Amharic', proficiency: 'NATIVE' }] });
+    const r = scoreJob(makeJob({ skills: ['Amharic'] }), prof);
+    const verdict = r.requiredRequirements.find((v) => v.name === 'Amharic')!;
+    expect(verdict.status).toBe('MET');
+    expect(verdict.evidence).toContain('language');
+  });
+
+  it('derives experience years from the dated experience section', () => {
+    const prof = makeProfile({
+      years: 0,
+      experience: [{ title: 'Developer', company: 'Acme', startYear: new Date().getFullYear() - 6, current: true }],
+    });
+    const r = scoreJob(makeJob({ experienceLevel: 'SENIOR' }), prof);
+    expect(r.requiredRequirements.find((v) => v.kind === 'EXPERIENCE')!.status).toBe('MET');
+  });
+
+  it('explains every score factor with evidence', () => {
+    const r = scoreJob(makeJob(), makeProfile());
+    expect(r.evidence).toHaveLength(r.parts.length);
+    for (const part of r.parts) expect(part.evidence.length).toBeGreaterThan(0);
+    expect(r.evidence.join(' ')).toContain('Skills:');
+  });
+});
+
+describe('scoreJob — unknown requirements stay unknown (Phase 6)', () => {
+  it('does not treat a posting with no skills as satisfied', () => {
+    const r = scoreJob(makeJob({ skills: [] }), makeProfile());
+    const verdict = r.requiredRequirements.find((v) => v.name === 'Skill requirements')!;
+    expect(verdict.status).toBe('UNKNOWN');
+    expect(r.matchedSkills).toHaveLength(0);
+    expect(findPart(r, 'Skills').fraction).toBe(0.4);
+  });
+
+  it('does not treat missing experience data as meeting a senior requirement', () => {
+    const r = scoreJob(
+      makeJob({ experienceLevel: 'SENIOR' }),
+      makeProfile({ years: 0, experience: [] }),
+    );
+    const verdict = r.requiredRequirements.find((v) => v.kind === 'EXPERIENCE')!;
+    expect(verdict.status).toBe('UNKNOWN');
+    expect(findPart(r, 'Experience').fraction).toBe(0.5);
+  });
+
+  it('reports missing required skills separately from preferred ones', () => {
+    const r = scoreJob(
+      makeJob({ skills: ['Node.js', 'Kubernetes'] }),
+      makeProfile({ skills: ['Node.js'] }),
+    );
+    expect(r.missingRequirements).toContain('Kubernetes');
+    expect(r.preferredRequirements.length).toBeGreaterThan(0);
+    expect(r.preferredRequirements.every((v) => v.importance === 'PREFERRED')).toBe(true);
+  });
+});
+
+describe('scoreJob — vacancy risk (Phase 6)', () => {
+  it('rejects an expired posting even when the profile matches strongly', () => {
+    const r = scoreJob(makeJob({ deadline: Date.now() - 24 * HOUR }), makeProfile());
+    expect(r.eligible).toBe(false);
+    expect(r.score).toBe(0);
+    expect(r.vacancy.risk).toBe('EXPIRED');
+    expect(r.eligibility.status).toBe('REJECTED');
+  });
+
+  it('penalizes stale and unverifiable postings without hiding them', () => {
+    const base = scoreJob(makeJob(), makeProfile());
+    const stale = scoreJob(makeJob({ lastSeenAt: Date.now() - 30 * 24 * HOUR }), makeProfile());
+    const unverified = scoreJob(makeJob({ urlStatus: 'ERROR' }), makeProfile());
+
+    expect(stale.vacancy.risk).toBe('STALE');
+    expect(base.score - stale.score).toBeGreaterThanOrEqual(5);
+    expect(stale.eligible).toBe(true);
+
+    expect(unverified.vacancy.risk).toBe('UNVERIFIED');
+    expect(base.score - unverified.score).toBeGreaterThanOrEqual(3);
+    expect(unverified.eligible).toBe(true);
+  });
+});
+
+describe('scoreJob — false positive / false negative guards (Phase 6)', () => {
+  it('rejects an unrelated posting (false positive guard)', () => {
+    const r = scoreJob(
+      makeJob({ title: 'Social Worker', skills: [] }),
+      makeProfile({
+        skills: ['Node.js', 'TypeScript'],
+        targetRoles: [{ role: 'Software Engineer', priority: 'HIGH' }],
+      }),
+    );
+    expect(r.eligible).toBe(false);
+    expect(r.score).toBe(0);
+  });
+
+  it('keeps a genuine local match eligible (false negative guard)', () => {
+    const r = scoreJob(makeJob(), makeProfile());
+    expect(r.eligible).toBe(true);
+    expect(r.score).toBeGreaterThanOrEqual(80);
+  });
+});
+

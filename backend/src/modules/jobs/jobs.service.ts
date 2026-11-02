@@ -193,6 +193,13 @@ export class JobsService {
             missingSkills: this.prisma.jsonArray(match.missingSkills),
             reasons: this.prisma.jsonArray(match.reasons),
             summary: match.summary,
+            requiredRequirements: this.prisma.jsonArray(match.requiredRequirements),
+            preferredRequirements: this.prisma.jsonArray(match.preferredRequirements),
+            missingRequirements: this.prisma.jsonArray(match.missingRequirements),
+            unknownRequirements: this.prisma.jsonArray(match.unknownRequirements),
+            evidence: this.prisma.jsonArray(match.evidence),
+            vacancyRisk: match.vacancyRisk ?? 'OK',
+            matcherVersion: match.matcherVersion ?? null,
             parts: {
               role: match.roleScore,
               skill: match.skillScore,

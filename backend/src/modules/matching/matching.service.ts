@@ -8,6 +8,7 @@ import {
   ProfileInput,
   JobInput,
   TierPriority,
+  MATCHER_VERSION,
 } from './matching-engine';
 
 type JobWithSkills = {
@@ -22,6 +23,10 @@ type JobWithSkills = {
   workPlace: string;
   parseConfidence: number;
   postedDate: Date;
+  status: string;
+  deadline: Date | null;
+  lastSeenAt: Date | null;
+  urlStatus: string | null;
   skills: { skill: { name: string } }[];
 };
 
@@ -49,14 +54,20 @@ export class MatchingService {
     const profile = await this.prisma.candidateProfile.findUnique({
       where: { userId },
     });
-    const [skills, roles, locations] = await Promise.all([
-      this.prisma.candidateSkill.findMany({
-        where: { userId },
-        include: { skill: true },
-      }),
-      this.prisma.targetRole.findMany({ where: { userId } }),
-      this.prisma.locationPreference.findMany({ where: { userId } }),
-    ]);
+    const [skills, roles, locations, education, experience, projects, certifications, languages] =
+      await Promise.all([
+        this.prisma.candidateSkill.findMany({
+          where: { userId },
+          include: { skill: true },
+        }),
+        this.prisma.targetRole.findMany({ where: { userId } }),
+        this.prisma.locationPreference.findMany({ where: { userId } }),
+        this.prisma.candidateEducation.findMany({ where: { userId } }),
+        this.prisma.candidateExperience.findMany({ where: { userId } }),
+        this.prisma.candidateProject.findMany({ where: { userId } }),
+        this.prisma.candidateCertification.findMany({ where: { userId } }),
+        this.prisma.candidateLanguage.findMany({ where: { userId } }),
+      ]);
 
     const locationTiers: Record<string, TierPriority> = {};
     for (const l of locations) locationTiers[l.region] = l.tier as TierPriority;
@@ -71,6 +82,23 @@ export class MatchingService {
       minSalary: profile?.minSalary ?? 0,
       excludeOnsite: !!profile?.excludeOnsite,
       excludeEntryLevel: !!profile?.excludeEntryLevel,
+      education: education.map((e) => ({
+        institution: e.institution,
+        degree: e.degree,
+        field: e.field,
+        endYear: e.endYear,
+      })),
+      experience: experience.map((e) => ({
+        title: e.title,
+        company: e.company,
+        startYear: e.startYear,
+        endYear: e.endYear,
+        current: !!e.current,
+        description: e.description,
+      })),
+      projects: projects.map((p) => ({ name: p.name, description: p.description, year: p.year })),
+      certifications: certifications.map((c) => ({ name: c.name, issuer: c.issuer, year: c.year })),
+      languages: languages.map((l) => ({ language: l.language, proficiency: l.proficiency })),
     };
   }
 
@@ -87,6 +115,10 @@ export class MatchingService {
       workPlace: job.workPlace,
       parseConfidence: job.parseConfidence,
       postedAt: job.postedDate,
+      status: job.status,
+      deadline: job.deadline,
+      lastSeenAt: job.lastSeenAt,
+      urlStatus: job.urlStatus,
     };
   }
 
@@ -165,7 +197,6 @@ export class MatchingService {
           rows.push({
             userId: user.id,
             jobId: job.id,
-            score: result.score,
             ...this.toMatchData(result),
           });
           if (result.score >= (thresholds.get(user.id) ?? 65)) {
@@ -211,46 +242,96 @@ export class MatchingService {
     };
   }
 
-  /** Load profiles for many users with 4 batched queries (FR-018 prefilter pass). */
+  /** Load profiles for many users with batched queries (FR-018 prefilter pass). */
   private async buildProfilesForUsers(userIds: string[]): Promise<Map<string, ProfileInput>> {
-    const [profiles, skills, roles, locations] = await Promise.all([
+    const [
+      profiles,
+      skills,
+      roles,
+      locations,
+      education,
+      experience,
+      projects,
+      certifications,
+      languages,
+    ] = await Promise.all([
       this.prisma.candidateProfile.findMany({ where: { userId: { in: userIds } } }),
       this.prisma.candidateSkill.findMany({ where: { userId: { in: userIds } }, include: { skill: true } }),
       this.prisma.targetRole.findMany({ where: { userId: { in: userIds } } }),
       this.prisma.locationPreference.findMany({ where: { userId: { in: userIds } } }),
+      this.prisma.candidateEducation.findMany({ where: { userId: { in: userIds } } }),
+      this.prisma.candidateExperience.findMany({ where: { userId: { in: userIds } } }),
+      this.prisma.candidateProject.findMany({ where: { userId: { in: userIds } } }),
+      this.prisma.candidateCertification.findMany({ where: { userId: { in: userIds } } }),
+      this.prisma.candidateLanguage.findMany({ where: { userId: { in: userIds } } }),
     ]);
 
-    const skillsByUser = new Map<string, string[]>();
-    for (const s of skills) {
-      const list = skillsByUser.get(s.userId) ?? [];
-      list.push(s.skill.name);
-      skillsByUser.set(s.userId, list);
-    }
-    const rolesByUser = new Map<string, { role: string; priority: 'HIGH' | 'MEDIUM' | 'LOW' }[]>();
-    for (const r of roles) {
-      const list = rolesByUser.get(r.userId) ?? [];
-      list.push({ role: r.role, priority: r.priority as 'HIGH' | 'MEDIUM' | 'LOW' });
-      rolesByUser.set(r.userId, list);
-    }
-    const locationsByUser = new Map<string, Record<string, TierPriority>>();
-    for (const l of locations) {
-      const map = locationsByUser.get(l.userId) ?? {};
-      map[l.region] = l.tier as TierPriority;
-      locationsByUser.set(l.userId, map);
-    }
+    const groupByUser = <T extends { userId: string }>(rows: T[]): Map<string, T[]> => {
+      const map = new Map<string, T[]>();
+      for (const row of rows) {
+        const list = map.get(row.userId) ?? [];
+        list.push(row);
+        map.set(row.userId, list);
+      }
+      return map;
+    };
+
+    const skillsByUser = groupByUser(skills);
+    const rolesByUser = groupByUser(roles);
+    const locationsByUser = groupByUser(locations);
+    const educationByUser = groupByUser(education);
+    const experienceByUser = groupByUser(experience);
+    const projectsByUser = groupByUser(projects);
+    const certificationsByUser = groupByUser(certifications);
+    const languagesByUser = groupByUser(languages);
 
     const out = new Map<string, ProfileInput>();
     for (const p of profiles) {
+      const locationTiers: Record<string, TierPriority> = {};
+      for (const l of locationsByUser.get(p.userId) ?? []) {
+        locationTiers[l.region] = l.tier as TierPriority;
+      }
       out.set(p.userId, {
-        skills: skillsByUser.get(p.userId) ?? [],
-        targetRoles: rolesByUser.get(p.userId) ?? [],
-        locationTiers: locationsByUser.get(p.userId) ?? {},
+        skills: (skillsByUser.get(p.userId) ?? []).map((s) => s.skill.name),
+        targetRoles: (rolesByUser.get(p.userId) ?? []).map((r) => ({
+          role: r.role,
+          priority: r.priority as 'HIGH' | 'MEDIUM' | 'LOW',
+        })),
+        locationTiers,
         remote: !!p.remote,
         employmentTypes: (this.prisma.jsonArray(p.employmentTypes) as string[]).filter(Boolean),
         years: p.years,
         minSalary: p.minSalary,
         excludeOnsite: !!p.excludeOnsite,
         excludeEntryLevel: !!p.excludeEntryLevel,
+        education: (educationByUser.get(p.userId) ?? []).map((e) => ({
+          institution: e.institution,
+          degree: e.degree,
+          field: e.field,
+          endYear: e.endYear,
+        })),
+        experience: (experienceByUser.get(p.userId) ?? []).map((e) => ({
+          title: e.title,
+          company: e.company,
+          startYear: e.startYear,
+          endYear: e.endYear,
+          current: !!e.current,
+          description: e.description,
+        })),
+        projects: (projectsByUser.get(p.userId) ?? []).map((x) => ({
+          name: x.name,
+          description: x.description,
+          year: x.year,
+        })),
+        certifications: (certificationsByUser.get(p.userId) ?? []).map((c) => ({
+          name: c.name,
+          issuer: c.issuer,
+          year: c.year,
+        })),
+        languages: (languagesByUser.get(p.userId) ?? []).map((l) => ({
+          language: l.language,
+          proficiency: l.proficiency,
+        })),
       });
     }
     return out;
@@ -305,7 +386,7 @@ export class MatchingService {
       if (existingIds.has(jobId)) {
         updateOps.push({ jobId, data });
       } else {
-        newRows.push({ userId, jobId, score: result.score, ...data });
+        newRows.push({ userId, jobId, ...data });
       }
     }
 
@@ -353,6 +434,9 @@ export class MatchingService {
   }
 
   private toMatchData(r: MatchResult) {
+    // `score` belongs here, not only on the insert path: recalculate reuses this
+    // payload for updates, and an update without it leaves the stored headline
+    // score stale while the reasons/penalties beneath it change.
     const find = (l: string) => r.parts.find((p) => p.label === l)!;
     const role = find('Role');
     const skill = find('Skills');
@@ -362,6 +446,7 @@ export class MatchingService {
     const fresh = find('Freshness');
     const sal = find('Salary');
     return {
+      score: r.score,
       roleScore: role.weight * role.fraction,
       skillScore: skill.weight * skill.fraction,
       experienceScore: exp.weight * exp.fraction,
@@ -374,6 +459,13 @@ export class MatchingService {
       missingSkills: this.prisma.json(r.missingSkills),
       reasons: this.prisma.json(r.reasons),
       summary: r.summary,
+      requiredRequirements: this.prisma.json(r.requiredRequirements),
+      preferredRequirements: this.prisma.json(r.preferredRequirements),
+      missingRequirements: this.prisma.json(r.missingRequirements),
+      unknownRequirements: this.prisma.json(r.unknownRequirements),
+      evidence: this.prisma.json(r.evidence),
+      vacancyRisk: r.vacancy.risk,
+      matcherVersion: MATCHER_VERSION,
     };
   }
 }
