@@ -12,6 +12,7 @@ import {
   type JobDetail,
 } from '../../../components/job-detail';
 import { JobActions } from '../../../components/job-actions';
+import { ApplicationPackageCard } from '../../../components/application-package';
 
 export default function JobDetailPage() {
   const params = useParams<{ id: string }>();
@@ -47,6 +48,9 @@ export default function JobDetailPage() {
 
           {/* ── Why this match ────────────────────────────────────── */}
           <WhyThisMatch job={data} />
+
+          {/* ── Phase 7: tailored application package ─────────────── */}
+          <ApplicationPackageCard jobId={data.id} />
 
           {/* ── Salary benchmark ──────────────────────────────────── */}
           <SalaryBenchmarkCard

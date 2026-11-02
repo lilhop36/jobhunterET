@@ -36,6 +36,7 @@ model User {
   cvFiles             CvFile[]
   digests             Digest[]
   matches             JobMatch[]
+  applicationPackages ApplicationPackage[]
   locations           LocationPreference[]
   notifications       Notification[]
   searches            SearchProfile[]
@@ -346,6 +347,7 @@ model Job {
   skills               JobSkill[]
   notifications        Notification[]
   listings             JobSourceListing[]
+  applicationPackages  ApplicationPackage[]
 
   @@unique([sourceId, sourceJobId])
   @@index([status])
@@ -402,6 +404,21 @@ model JobMatch {
   @@unique([userId, jobId])
   @@index([userId])
   @@index([userId, score])
+}
+
+model ApplicationPackage {
+  id        String   @id @default(cuid())
+  userId    String
+  jobId     String
+  version   Int
+  // SQLite: the generated package is stored as a JSON string
+  content   String
+  createdAt DateTime @default(now())
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId, version])
+  @@index([userId, jobId])
 }
 
 model Application {

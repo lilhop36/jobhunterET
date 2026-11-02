@@ -17,8 +17,8 @@ JobHunter is an automated job-matching agent for the Ethiopian tech market. It c
 |---|---|
 | Stack | Next.js 15.5, React 19.2, NestJS 10.4, Prisma 5.20, TypeScript 5.5 |
 | Production database | SQLite (Prisma provider: sqlite; Docker URL: `file:/app/data/prod.db`) |
-| Prisma models | 28 — User, CandidateProfile, CandidateEducation, CandidateExperience, CandidateProject, CandidateCertification, CandidateLanguage, CvFile, TelegramLink, Skill, CandidateSkill, TargetRole, LocationPreference, JobSource, JobSourceListing, SourceRun, SourceRunCategory, Job, JobSkill, JobMatch, Application, ApplicationTransition, Notification, SearchProfile, Digest, MatchCycle, SystemLog, BotState |
-| NestJS feature modules | 18 — account, admin, applications, auth, dashboard, digest, events, jobs, lifecycle, matches, matching, notifications, profile, salary, saved-jobs, searches, sources, telegram |
+| Prisma models | 29 — User, CandidateProfile, CandidateEducation, CandidateExperience, CandidateProject, CandidateCertification, CandidateLanguage, CvFile, TelegramLink, Skill, CandidateSkill, TargetRole, LocationPreference, JobSource, JobSourceListing, SourceRun, SourceRunCategory, Job, JobSkill, JobMatch, ApplicationPackage, Application, ApplicationTransition, Notification, SearchProfile, Digest, MatchCycle, SystemLog, BotState |
+| NestJS feature modules | 19 — account, admin, application-docs, applications, auth, dashboard, digest, events, jobs, lifecycle, matches, matching, notifications, profile, salary, saved-jobs, searches, sources, telegram |
 | Frontend page routes | 18 |
 | Web job sources | 12 — ReliefWeb (Ethiopia), Remotive, Arbeitnow, EthioJobs, Ethio NGO Jobs, GeezJobs, ET Careers, Jobicy, RemoteOK, Landing.jobs, Hagere Jobs, ElelanaJobs |
 | Telegram channels | 3 — ElelanaJobs (Telegram), ShegerJobs (Telegram), EthioJobVacancy (Telegram) |
@@ -66,12 +66,13 @@ JobHunter is an automated job-matching agent for the Ethiopian tech market. It c
                            │ Prisma
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                          SQLite                                 │
-│                 22 Prisma models (single node)                  │
+│                 29 Prisma models (single node)                  │
 │  User · CandidateProfile · CvFile · TelegramLink · Skill        │
 │  CandidateSkill · TargetRole · LocationPreference · JobSource   │
 │  SourceRun · SourceRunCategory · Job · JobSkill · JobMatch      │
-│  Application · ApplicationTransition · Notification             │
-│  SearchProfile · Digest · MatchCycle · SystemLog · BotState     │
+│  ApplicationPackage · Application · ApplicationTransition       │
+│  Notification · SearchProfile · Digest · MatchCycle             │
+│  SystemLog · BotState                                           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -166,6 +167,7 @@ Notifications are deduplicated per `(user, job)` pair and rate-limited per chat.
 | `notifications` | Channel routing, dedup, Web Inbox, keyset pagination, SSE | `notifications.service.ts` |
 | `lifecycle` | Expiration sweep, ghost detection, dormancy, backup, retention | `lifecycle.tasks.ts` |
 | `applications` | Transition graph enforcement, stage history, follow-up dates | `applications.service.ts` |
+| `application-docs` | Deterministic, versioned application packages (CV, cover letter, screening answers) from verified profile data | `generator.ts`, `application-docs.service.ts` |
 | `saved-jobs` | Toggle save/unsave per user | `saved-jobs.service.ts` |
 | `searches` | Saved search profiles (manual run) | `searches.service.ts` |
 | `digest` | Daily digest generation, per-user top matches | `digest.service.ts` |
@@ -298,6 +300,7 @@ SQLite is a single-writer database. Do not run multiple backend replicas against
 
 - [Architecture Facts](./architecture-facts.md) — generated inventories (models, modules, sources, routes, tests)
 - [Matching Engine Reference](./matching-engine-reference.md) — scoring algorithm details
+- [Application Documents](./application-documents.md) — deterministic, versioned CV / cover letter generation
 - [Operations Runbook](./ops-runbook.md) — deployment, backup/restore, monitoring, troubleshooting
 - [Traceability Matrix](./traceability.md) — requirement → test mapping
 - [Category-Aware Collection](./plans/category-aware-collection.md) — implemented FAST/DEEP collection design
