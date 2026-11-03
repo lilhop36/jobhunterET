@@ -14,6 +14,28 @@ interface DraftSummary {
   job: { id: string; title: string; company: string };
 }
 
+type SubmissionStatus = 'AWAITING_MANUAL' | 'SUBMITTED' | 'FAILED' | 'BLOCKED';
+
+interface SubmissionSummary {
+  id: string;
+  draftId: string;
+  status: SubmissionStatus;
+  mode: 'AUTOMATED' | 'MANUAL';
+  channel: { type: string; url: string | null; email: string | null };
+  receipt: any;
+  confirmedAt: string | null;
+  submittedAt: string | null;
+  updatedAt: string;
+  job?: { id: string; title: string; company: string };
+}
+
+const SUBMISSION_STATUS: Record<SubmissionStatus, { label: string; chip: string }> = {
+  AWAITING_MANUAL: { label: 'Awaiting your send', chip: 'chip' },
+  SUBMITTED: { label: 'Submitted', chip: 'chip match' },
+  FAILED: { label: 'Automated attempt failed', chip: 'chip miss' },
+  BLOCKED: { label: 'Blocked', chip: 'chip miss' },
+};
+
 const DRAFT_STATUS: Record<DraftSummary['status'], { label: string; chip: string }> = {
   NEEDS_ATTENTION: { label: 'Needs attention', chip: 'chip miss' },
   READY_FOR_APPROVAL: { label: 'Ready for approval', chip: 'chip' },
@@ -43,6 +65,7 @@ export default function ApplicationsPage() {
   const [showTerminal, setShowTerminal] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<DraftSummary[] | null>(null);
+  const [submissions, setSubmissions] = useState<SubmissionSummary[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +75,13 @@ export default function ApplicationsPage() {
       })
       .catch(() => {
         if (!cancelled) setDrafts([]);
+      });
+    api('/api/submissions')
+      .then((rows: SubmissionSummary[]) => {
+        if (!cancelled) setSubmissions(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setSubmissions([]);
       });
     return () => {
       cancelled = true;
@@ -158,6 +188,52 @@ export default function ApplicationsPage() {
                   </div>
                 </div>
                 <Link href={`/application-drafts/${d.id}`} className="btn ghost small">
+                  Open draft
+                </Link>
+              </div>
+            ))}
+        </div>
+      )}
+
+      {data && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <h2 style={{ marginTop: 0 }}>Submissions</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            JobPilot only ever sends the exact revision you approved, through the official channel
+            recorded on the vacancy. When automation is unavailable, you send it yourself and confirm.
+          </p>
+          {!submissions && <Loading />}
+          {submissions && submissions.length === 0 && (
+            <p className="muted">No submissions yet. Approve a draft, then submit it from its page.</p>
+          )}
+          {submissions &&
+            submissions.map((s) => (
+              <div
+                key={s.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  padding: '10px 0',
+                  borderBottom: '1px solid hsl(var(--border))',
+                  fontSize: 13.5,
+                }}
+              >
+                <div>
+                  <strong>{s.job?.title ?? 'Application'}</strong>{' '}
+                  <span className={SUBMISSION_STATUS[s.status].chip}>
+                    {SUBMISSION_STATUS[s.status].label}
+                  </span>
+                  <div className="muted">
+                    {s.job?.company} · {s.channel.type.toLowerCase()} ·{' '}
+                    {s.mode === 'AUTOMATED' ? 'automated' : 'manual'} · updated{' '}
+                    {new Date(s.updatedAt).toLocaleDateString()}
+                  </div>
+                  {s.receipt?.reference && <div className="muted">Reference: {s.receipt.reference}</div>}
+                </div>
+                <Link href={`/application-drafts/${s.draftId}`} className="btn ghost small">
                   Open draft
                 </Link>
               </div>

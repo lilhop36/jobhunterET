@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Loader2, Save, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../../lib/auth';
 import { RequireAuth, ErrorBox, Loading } from '../../../lib/ui';
+import { SubmissionPanel } from '../../../components/submission-panel';
 
 interface ScreeningAnswer {
   question: string;
@@ -584,7 +585,7 @@ export default function ApplicationDraftPage() {
           </p>
         )}
         <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
-          Approval never submits anything. Submitting applications is a separate, later step.
+          Approval never submits anything. Sending the approved version is a separate step below.
         </p>
 
         <label htmlFor="approval-note">Approval note (optional)</label>
@@ -595,6 +596,9 @@ export default function ApplicationDraftPage() {
           placeholder="e.g. reviewed wording with a mentor"
         />
       </div>
+
+      {/* ── Submission (controlled, approved-revision only) ────── */}
+      <SubmissionPanel draftId={draft.id} contentHash={draft.contentHash} approved={draft.approval.approved} />
 
       {/* ── Requirement evidence ───────────────────────────────── */}
       <div className="card" style={{ marginBottom: 16 }}>
