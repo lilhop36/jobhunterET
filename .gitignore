@@ -44,3 +44,6 @@ backend/.migration-work/
 
 # TypeScript incremental build artifacts
 *.tsbuildinfo
+
+# One-off debugging scripts (tmp-*)
+backend/scripts/tmp-*
