@@ -10,6 +10,7 @@ import { MatchesModule } from './modules/matches/matches.module';
 import { SavedJobsModule } from './modules/saved-jobs/saved-jobs.module';
 import { ApplicationsModule } from './modules/applications/applications.module';
 import { ApplicationDocsModule } from './modules/application-docs/application-docs.module';
+import { ApplicationDraftsModule } from './modules/application-drafts/application-drafts.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SearchesModule } from './modules/searches/searches.module';
 import { SourcesModule } from './modules/sources/sources.module';
@@ -37,6 +38,7 @@ import { HealthController } from './modules/health/health.controller';
     SavedJobsModule,
     ApplicationsModule,
     ApplicationDocsModule,
+    ApplicationDraftsModule,
     NotificationsModule,
     SearchesModule,
     SourcesModule,

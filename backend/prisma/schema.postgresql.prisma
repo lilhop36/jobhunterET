@@ -29,6 +29,9 @@ model User {
   digests             Digest[]
   matches             JobMatch[]
   applicationPackages ApplicationPackage[]
+  applicationDrafts   ApplicationDraft[]
+  applicationApprovals ApplicationApproval[]
+  applicationAuditLogs ApplicationAuditLog[]
   locations           LocationPreference[]
   notifications       Notification[]
   searches            SearchProfile[]
@@ -144,6 +147,7 @@ model CvFile {
   kind         String   @default("CV")
   label        String?
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationArtifacts ApplicationArtifact[]
 
   @@index([userId])
   @@index([userId, kind])
@@ -335,6 +339,7 @@ model Job {
   notifications        Notification[]
   listings             JobSourceListing[]
   applicationPackages  ApplicationPackage[]
+  applicationDrafts    ApplicationDraft[]
 
   @@unique([sourceId, sourceJobId])
   @@index([status])
@@ -400,9 +405,92 @@ model ApplicationPackage {
   createdAt DateTime @default(now())
   job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drafts    ApplicationDraft[]
 
   @@unique([userId, jobId, version])
   @@index([userId, jobId])
+}
+
+// A candidate's working copy of one generated package. The package itself is
+// immutable; edits live here as revisions so the original stays retrievable.
+model ApplicationDraft {
+  id           String    @id @default(cuid())
+  userId       String
+  jobId        String
+  packageId    String
+  // Candidate attestation over an exact revision hash: edits are only
+  // approvable once the candidate confirms they are accurate.
+  attestedHash String?
+  attestedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job          Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  package      ApplicationPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  revisions    ApplicationDraftRevision[]
+  approvals    ApplicationApproval[]
+  artifacts    ApplicationArtifact[]
+  audit        ApplicationAuditLog[]
+
+  @@unique([userId, jobId])
+  @@index([userId])
+}
+
+// One immutable edit of a draft. Approval binds to a revision id, so a later
+// edit automatically invalidates an earlier approval.
+model ApplicationDraftRevision {
+  id          String   @id @default(cuid())
+  draftId     String
+  version     Int
+  content     String
+  contentHash String
+  createdAt   DateTime @default(now())
+  draft       ApplicationDraft      @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  approvals   ApplicationApproval[]
+
+  @@unique([draftId, version])
+  @@index([draftId])
+}
+
+model ApplicationApproval {
+  id          String   @id @default(cuid())
+  draftId     String
+  revisionId  String
+  userId      String
+  contentHash String
+  note        String?
+  createdAt   DateTime @default(now())
+  draft       ApplicationDraft         @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  revision    ApplicationDraftRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([draftId, createdAt])
+}
+
+model ApplicationArtifact {
+  id      String  @id @default(cuid())
+  draftId String
+  fileId  String
+  kind    String  @default("CV")
+  label   String?
+  draft   ApplicationDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  file    CvFile           @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([draftId, fileId])
+  @@index([draftId])
+}
+
+model ApplicationAuditLog {
+  id        String   @id @default(cuid())
+  draftId   String
+  userId    String
+  action    String
+  detail    String   @default("{}")
+  createdAt DateTime @default(now())
+  draft     ApplicationDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([draftId, createdAt])
 }
 
 model Application {

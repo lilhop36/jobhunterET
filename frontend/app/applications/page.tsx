@@ -1,9 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '../../lib/auth';
 import { RequireAuth, useApi, ErrorBox, Loading } from '../../lib/ui';
 import { ChevronDown } from 'lucide-react';
+
+interface DraftSummary {
+  id: string;
+  status: 'NEEDS_ATTENTION' | 'READY_FOR_APPROVAL' | 'APPROVED';
+  revision: number;
+  updatedAt: string;
+  job: { id: string; title: string; company: string };
+}
+
+const DRAFT_STATUS: Record<DraftSummary['status'], { label: string; chip: string }> = {
+  NEEDS_ATTENTION: { label: 'Needs attention', chip: 'chip miss' },
+  READY_FOR_APPROVAL: { label: 'Ready for approval', chip: 'chip' },
+  APPROVED: { label: 'Approved', chip: 'chip match' },
+};
 
 interface Board {
   applications: {
@@ -27,6 +42,21 @@ export default function ApplicationsPage() {
   const { data, err, loading, reload } = useApi<Board>('/api/applications');
   const [showTerminal, setShowTerminal] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<DraftSummary[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api('/api/application-drafts')
+      .then((rows: DraftSummary[]) => {
+        if (!cancelled) setDrafts(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setDrafts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
 
   const setStage = async (jobId: string, stage: string) => {
     setBusyId(jobId);
@@ -90,6 +120,51 @@ export default function ApplicationsPage() {
       )}
 
       
+      {data && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <h2 style={{ marginTop: 0 }}>Application drafts</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Editable copies of your generated packages. Nothing is submitted — a draft only becomes
+            approved when you confirm its exact content.
+          </p>
+          {!drafts && <Loading />}
+          {drafts && drafts.length === 0 && (
+            <p className="muted">
+              No drafts yet. Generate a package on a vacancy page, then choose “Prepare application
+              draft”.
+            </p>
+          )}
+          {drafts &&
+            drafts.map((d) => (
+              <div
+                key={d.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  padding: '10px 0',
+                  borderBottom: '1px solid hsl(var(--border))',
+                  fontSize: 13.5,
+                }}
+              >
+                <div>
+                  <strong>{d.job.title}</strong>{' '}
+                  <span className={DRAFT_STATUS[d.status].chip}>{DRAFT_STATUS[d.status].label}</span>
+                  <div className="muted">
+                    {d.job.company} · revision {d.revision} · updated{' '}
+                    {new Date(d.updatedAt).toLocaleDateString()}
+                  </div>
+                </div>
+                <Link href={`/application-drafts/${d.id}`} className="btn ghost small">
+                  Open draft
+                </Link>
+              </div>
+            ))}
+        </div>
+      )}
+
       {data && (
         <div className="card" style={{ marginTop: 14 }}>
           <button

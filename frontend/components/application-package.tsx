@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { FileText, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { FileText, Loader2, PencilLine } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 
@@ -64,10 +66,13 @@ const documentStyle = {
  */
 export function ApplicationPackageCard({ jobId }: { jobId: string }) {
   const { api } = useAuth();
+  const router = useRouter();
   const [history, setHistory] = useState<PackageSummary[]>([]);
   const [selected, setSelected] = useState<PackageView | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [draft, setDraft] = useState<{ id: string; status: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const loadVersion = useCallback(
@@ -86,6 +91,13 @@ export function ApplicationPackageCard({ jobId }: { jobId: string }) {
         if (cancelled) return;
         setHistory(rows);
         if (rows.length) await loadVersion(rows[0].version);
+        const drafts = (await api('/api/application-drafts')) as {
+          id: string;
+          status: string;
+          job: { id: string };
+        }[];
+        const mine = drafts.find((d) => d.job.id === jobId);
+        if (!cancelled && mine) setDraft({ id: mine.id, status: mine.status });
       } catch (e: any) {
         if (!cancelled) setErr(e?.message ?? 'Could not load application packages');
       } finally {
@@ -109,6 +121,25 @@ export function ApplicationPackageCard({ jobId }: { jobId: string }) {
       setErr(e?.message ?? 'Could not generate the package');
     } finally {
       setBusy(false);
+    }
+  };
+
+  /** Start the editable draft for the version currently shown. */
+  const prepareDraft = async () => {
+    if (!selected) return;
+    setDraftBusy(true);
+    setErr(null);
+    try {
+      const created = (await api('/api/application-drafts', {
+        method: 'POST',
+        body: JSON.stringify({ jobId, packageVersion: selected.version }),
+      })) as { id: string; status: string };
+      setDraft({ id: created.id, status: created.status });
+      router.push(`/application-drafts/${created.id}`);
+    } catch (e: any) {
+      setErr(e?.message ?? 'Could not prepare an application draft');
+    } finally {
+      setDraftBusy(false);
     }
   };
 
@@ -175,6 +206,28 @@ export function ApplicationPackageCard({ jobId }: { jobId: string }) {
             Version {selected.version} · {selected.generatorVersion} ·{' '}
             {new Date(selected.createdAt).toLocaleString()}
           </p>
+
+          {draft ? (
+            <div className="notice">
+              <strong>Application draft in progress.</strong>{' '}
+              <Link href={`/application-drafts/${draft.id}`}>Open the draft</Link> to edit, check
+              and approve exactly what will be sent.
+            </div>
+          ) : (
+            <div style={{ margin: '12px 0' }}>
+              <Button onClick={prepareDraft} disabled={draftBusy || busy}>
+                {draftBusy ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <PencilLine size={16} />
+                )}
+                {draftBusy ? 'Preparing...' : `Prepare application draft from v${selected.version}`}
+              </Button>
+              <p className="muted" style={{ margin: '6px 0 0' }}>
+                Creates an editable copy. The generated package above is never modified.
+              </p>
+            </div>
+          )}
 
           {selected.warnings.length > 0 && (
             <div className="notice-amber">
