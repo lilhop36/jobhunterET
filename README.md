@@ -13,7 +13,12 @@
 [![Prisma](https://img.shields.io/badge/Prisma-5-2D3748?logo=prisma)](https://www.prisma.io/)
 [![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?logo=telegram)](https://core.telegram.org/bots)
 
-### [🟢 Live Demo →](https://jobhunter-e0oasuykh-abdigaboma-1924s-projects.vercel.app/login)
+### 🟡 Live demo — coming soon
+
+The frontend is deployed, but the backend needs a long-running host (Railway)
+for its background workers and persistent SQLite — deployment configs
+(`railway.json`, `Dockerfile`) are in the repo. A stale preview URL was
+removed from here rather than left pointing at a 404.
 
 </div>
 
