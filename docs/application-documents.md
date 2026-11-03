@@ -82,3 +82,9 @@ between stored generations, and "Generate new version" appends to the history.
 - It does not fabricate achievements to improve a match.
 - It does not run when the profile is missing; `GET /profile` behaviour applies
   (`404 Profile not found`).
+
+## Next step: editing and approval
+
+A stored package is immutable. To edit one, attach documents, validate it and
+record human approval, see [Application Drafts](./application-drafts.md)
+(Phase 8).
