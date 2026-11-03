@@ -59,6 +59,8 @@ const DEFERRED = {
 const PARTIAL = {
   'FR-030':
     'the rejection is recorded per user and is terminal in the transition graph; the clause "feeds future ranking" is not implemented — the matcher never reads Application.stage',
+  'NFR-006':
+    'payload, page-weight and no-autoplay budgets pass on every route sampled, and LCP passes on / /login /dashboard /matches — measured by frontend/e2e/low-bandwidth.spec.ts on a production build over CDP network emulation at Lighthouse\'s simulated-3G profile. Two shortfalls: LCP on /jobs measures 3.0-3.4s against the 3s budget because the list paints only after a gzipped 57 KB first page of 50 jobs crosses the link, and the skeleton-loader/no-layout-shift, next/image and statically-rendered-job-list clauses are measured by nothing.',
 };
 
 /**
@@ -71,7 +73,6 @@ const OPERATIONAL = {
   'NFR-001': 'Measured against the running stack by backend/scripts/nfr-test.ts (npm run nfr:check), which samples p95 per endpoint, login latency, and dashboard latency during five concurrent logins, plus the single-user recalculation. A unit-test title cannot prove a millisecond budget. Every sampled request including login is inside 500ms on the current stack; the login figure depends on PASSWORD_COST, which the security spec test pins at or above the OWASP bcrypt floor.',
   'NFR-002': 'No automated evidence. The claim is structural — a source is added by registering an adapter, and keyset pagination bounds each cycle — reviewed in docs/architecture-overview.md rather than measured.',
   'NFR-003': 'No automated evidence. The MVP serves while the host runs; continuous availability is the cloud phase the SRS defers.',
-  'NFR-006': 'No automated evidence. JS payload and LCP budgets need a browser/perf harness this repo does not run yet.',
   'NFR-007': 'No automated evidence. Controls are driven by accessible name in the e2e suite, but contrast, touch-target and i18n clauses are unmeasured.',
 };
 

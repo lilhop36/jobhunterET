@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -28,10 +26,12 @@
     --input: 220 15% 90%;
     --ring: 184 60% 26%;
     --radius: 0.625rem;
-    /* Typography tokens */
-    --font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
-    --font-body: 'Inter', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    /* Typography tokens. --loaded-* comes from next/font on <html> (layout.tsx); the literals are
+       the fallback if a font never arrives. These used to be a Google Fonts @import here, which
+       put two third-party round trips in front of the first paint (3.4s LCP on simulated 3G). */
+    --font-display: var(--loaded-display), 'Plus Jakarta Sans', system-ui, sans-serif;
+    --font-body: var(--loaded-body), 'Inter', system-ui, sans-serif;
+    --font-mono: var(--loaded-mono), 'JetBrains Mono', monospace;
   }
 
   .dark {

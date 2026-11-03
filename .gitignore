@@ -41,3 +41,6 @@ backend/.migration-work/
 
 # dev.sh service logs (watchdog output; regenerated on every launch)
 .dev-logs/
+
+# TypeScript incremental build artifacts
+*.tsbuildinfo

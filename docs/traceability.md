@@ -47,13 +47,13 @@ that its code paths are exhaustively asserted.
 | Notification System (routed per user) | 11 | 11 | 0 | 100% |
 | Saved Jobs, Rejections, Applications, Search Profiles | 6 | 6 | 0 | 100% |
 | Background Processing & Scheduling | 10 | 10 | 0 | 100% |
-| Non-Functional Requirements | 9 | 4 | 0 | 44% |
-| **Total** | **85** | **76** | **4** | **94%** |
+| Non-Functional Requirements | 9 | 5 | 0 | 56% |
+| **Total** | **85** | **77** | **4** | **95%** |
 
-Derived from 85 requirement headings in `JobHunter_SRS_v2.3.md` and 508 test titles across 39 spec files (backend + frontend e2e).
-**42** are cited by a `describe`/`it` title that names the ID; the remaining **34** are credited through the audited mapping in `scripts/generate-traceability.js`, whose clauses are re-resolved against real test titles on every run — a clause that matches nothing fails the check.
-Coverage = 76 tested ÷ 81 in-scope = 94%. Deferred items are excluded from the denominator and each carries a quoted SRS line; if that line changes the generator fails.
-Of those, **1** counted toward coverage are marked **Tested (partial)**: their tests are real but one SRS clause is unimplemented — each shortfall is named in the matrix and in the gaps list.
+Derived from 85 requirement headings in `JobHunter_SRS_v2.3.md` and 534 test titles across 41 spec files (backend + frontend e2e).
+**43** are cited by a `describe`/`it` title that names the ID; the remaining **34** are credited through the audited mapping in `scripts/generate-traceability.js`, whose clauses are re-resolved against real test titles on every run — a clause that matches nothing fails the check.
+Coverage = 77 tested ÷ 81 in-scope = 95%. Deferred items are excluded from the denominator and each carries a quoted SRS line; if that line changes the generator fails.
+Of those, **2** counted toward coverage are marked **Tested (partial)**: their tests are real but one SRS clause is unimplemented — each shortfall is named in the matrix and in the gaps list.
 
 <!-- END GENERATED COVERAGE -->
 
@@ -64,7 +64,7 @@ Of those, **1** counted toward coverage are marked **Tested (partial)**: their t
 
 Every in-scope requirement is either cited by a test or explained below.
 
-### No citing test — reason stated (5)
+### No citing test — reason stated (4)
 
 These stay in the gap list: an explanation is not coverage. The note says what measures them
 today, or says plainly that nothing does. A note goes stale the moment the requirement gains a
@@ -73,15 +73,15 @@ test, which fails the check.
 - **NFR-001** — Performance *(SRS line 1320)*: Measured against the running stack by backend/scripts/nfr-test.ts (npm run nfr:check), which samples p95 per endpoint, login latency, and dashboard latency during five concurrent logins, plus the single-user recalculation. A unit-test title cannot prove a millisecond budget. Every sampled request including login is inside 500ms on the current stack; the login figure depends on PASSWORD_COST, which the security spec test pins at or above the OWASP bcrypt floor.
 - **NFR-002** — Scalability *(SRS line 1323)*: No automated evidence. The claim is structural — a source is added by registering an adapter, and keyset pagination bounds each cycle — reviewed in docs/architecture-overview.md rather than measured.
 - **NFR-003** — Availability *(SRS line 1326)*: No automated evidence. The MVP serves while the host runs; continuous availability is the cloud phase the SRS defers.
-- **NFR-006** — Performance Budget — Low-Bandwidth *(SRS line 1342)*: No automated evidence. JS payload and LCP budgets need a browser/perf harness this repo does not run yet.
 - **NFR-007** — Accessibility & Localization *(SRS line 1350)*: No automated evidence. Controls are driven by accessible name in the e2e suite, but contrast, touch-target and i18n clauses are unmeasured.
 
-### Partially implemented (1)
+### Partially implemented (2)
 
 These count toward coverage because the tests and the code are real; the shortfall is the SRS
 clause still unimplemented, so it is stated here rather than hidden inside a percentage.
 
 - **FR-030** — Reject Job *(SRS line 1064)*: the rejection is recorded per user and is terminal in the transition graph; the clause "feeds future ranking" is not implemented — the matcher never reads Application.stage
+- **NFR-006** — Performance Budget — Low-Bandwidth *(SRS line 1342)*: payload, page-weight and no-autoplay budgets pass on every route sampled, and LCP passes on / /login /dashboard /matches — measured by frontend/e2e/low-bandwidth.spec.ts on a production build over CDP network emulation at Lighthouse's simulated-3G profile. Two shortfalls: LCP on /jobs measures 3.0-3.4s against the 3s budget because the list paints only after a gzipped 57 KB first page of 50 jobs crosses the link, and the skeleton-loader/no-layout-shift, next/image and statically-rendered-job-list clauses are measured by nothing.
 
 <!-- END GENERATED GAPS -->
 
@@ -268,7 +268,7 @@ places it outside the MVP.
 | NFR-003 | Availability | No test evidence | — |
 | NFR-004 | Reliability | Tested (mapping) | sources/sources.service.spec.ts · `fails cleanly for sources without a registered adapter (no demo templates)` (+1 more) |
 | NFR-005 | Security | Tested (mapping) | common/security/security.spec.ts, common/utils/url-safety.spec.ts · `SEC-003 — magic-byte validation` (+1 more) |
-| NFR-006 | Performance Budget — Low-Bandwidth | No test evidence | — |
+| NFR-006 | Performance Budget — Low-Bandwidth | Tested (partial) | frontend/e2e/low-bandwidth.spec.ts · `${route.path} stays inside the low-bandwidth budget (NFR-006)` (+1 more) — partial: payload, page-weight and no-autoplay budgets pass on every route sampled, and LCP passes on / /login /dashboard /matches — measured by frontend/e2e/low-bandwidth.spec.ts on a production build over CDP network emulation at Lighthouse's simulated-3G profile. Two shortfalls: LCP on /jobs measures 3.0-3.4s against the 3s budget because the list paints only after a gzipped 57 KB first page of 50 jobs crosses the link, and the skeleton-loader/no-layout-shift, next/image and statically-rendered-job-list clauses are measured by nothing. |
 | NFR-007 | Accessibility & Localization | No test evidence | — |
 | NFR-008 | Backup & Restore | Tested | lifecycle/backup.service.spec.ts · `LifecycleService.runBackup — NFR-008 nightly backup` |
 | NFR-009 | CORS | Tested | common/security/security.spec.ts · `NFR-009 — CORS origin policy (SEC-002)` |
@@ -290,6 +290,7 @@ places it outside the MVP.
 | auth.service.spec.ts | 9 |
 | backup.service.spec.ts | 5 |
 | category-mapper.spec.ts | 9 |
+| cv-parser.spec.ts | 9 |
 | digest.service.spec.ts | 8 |
 | elelanajobs.adapter.spec.ts | 7 |
 | ethiopia-eligibility.spec.ts | 13 |
@@ -307,7 +308,8 @@ places it outside the MVP.
 | notifications.service.spec.ts | 7 |
 | parse-port.spec.ts | 3 |
 | prisma.service.spec.ts | 6 |
-| profile.service.spec.ts | 4 |
+| profile-import.spec.ts | 4 |
+| profile.service.spec.ts | 11 |
 | rate-limiter.spec.ts | 5 |
 | security.spec.ts | 14 |
 | sources.controller.spec.ts | 4 |
@@ -315,7 +317,7 @@ places it outside the MVP.
 | telegram-channel.spec.ts | 11 |
 | telegram.service.spec.ts | 16 |
 | url-safety.spec.ts | 11 |
-| **Total** | **381** |
+| **Total** | **401** |
 
 <!-- END GENERATED TEST INDEX -->
 
