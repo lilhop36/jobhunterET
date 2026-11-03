@@ -165,16 +165,83 @@ describe('ApplicationDraftsService.update', () => {
     expect(tx.applicationAuditLog.create.mock.calls[0][0].data.action).toBe('DRAFT_EDITED');
   });
 
-  it('records attestation for the new revision hash', async () => {
+  it('records attestation for the current revision as a separate request', async () => {
+    const { service, prisma } = makeService({ draft: draftRow() });
+
+    await service.update('u1', 'draft-1', { attestation: true });
+
+    expect(prisma.applicationDraftRevision.create).not.toHaveBeenCalled();
+    expect(prisma.applicationDraft.update).toHaveBeenCalledWith({
+      where: { id: 'draft-1' },
+      data: { attestedHash: draftRow().revisions[0].contentHash, attestedAt: expect.any(Date) },
+    });
+    expect(prisma.applicationAuditLog.create.mock.calls[0][0].data.action).toBe('ATTESTED');
+  });
+
+  it('refuses to attest in the same request that edits the prose', async () => {
     const { service, tx } = makeService({ draft: draftRow() });
 
-    await service.update('u1', 'draft-1', { cv: 'CV body v2', attestation: true });
+    await expect(
+      service.update('u1', 'draft-1', { cv: 'CV body v2', attestation: true }),
+    ).rejects.toBeInstanceOf(BadRequestException);
 
-    const revision = tx.applicationDraftRevision.create.mock.calls[0][0].data;
+    expect(tx.applicationDraftRevision.create).not.toHaveBeenCalled();
+    expect(tx.applicationDraft.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses to attest in the same request that changes the attached documents', async () => {
+    const { service, tx, prisma } = makeService({ draft: draftRow() });
+    prisma.cvFile.findMany.mockResolvedValue([
+      { id: 'file-2', kind: 'CERTIFICATE', label: null, originalName: 'cert.pdf', sizeBytes: 5, uploadedAt: new Date() },
+    ]);
+
+    await expect(
+      service.update('u1', 'draft-1', { documentIds: ['file-2'], attestation: true }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(tx.applicationDraftRevision.create).not.toHaveBeenCalled();
+  });
+
+  it('clears an existing attestation on every later edit', async () => {
+    const row = draftRow({ attestedHash: draftRow().revisions[0].contentHash });
+    const { service, tx } = makeService({ draft: row });
+
+    await service.update('u1', 'draft-1', { cv: 'CV body v3' });
+
+    expect(tx.applicationDraftRevision.create.mock.calls[0][0].data.version).toBe(2);
     expect(tx.applicationDraft.update).toHaveBeenCalledWith({
       where: { id: 'draft-1' },
-      data: { attestedHash: revision.contentHash, attestedAt: expect.any(Date) },
+      data: { attestedHash: null, attestedAt: null },
     });
+  });
+
+  it('lets the candidate withdraw a confirmation without changing content', async () => {
+    const row = draftRow({ attestedHash: draftRow().revisions[0].contentHash });
+    const { service, prisma } = makeService({ draft: row });
+
+    await service.update('u1', 'draft-1', { attestation: false });
+
+    expect(prisma.applicationDraftRevision.create).not.toHaveBeenCalled();
+    expect(prisma.applicationDraft.update).toHaveBeenCalledWith({
+      where: { id: 'draft-1' },
+      data: { attestedHash: null, attestedAt: null },
+    });
+    expect(prisma.applicationAuditLog.create.mock.calls[0][0].data.action).toBe(
+      'ATTESTATION_CLEARED',
+    );
+  });
+
+  it('refuses to withdraw a confirmation on an already-approved revision', async () => {
+    const row = draftRow({
+      attestedHash: draftRow().revisions[0].contentHash,
+      approvals: [{ id: 'ap-1', revisionId: 'rev-1', contentHash: 'h', createdAt: new Date(), note: null }],
+    });
+    const { service, prisma } = makeService({ draft: row });
+
+    await expect(
+      service.update('u1', 'draft-1', { attestation: false }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.applicationDraft.update).not.toHaveBeenCalled();
   });
 
   it('invalidates an existing approval when content changes', async () => {
@@ -195,19 +262,6 @@ describe('ApplicationDraftsService.update', () => {
 
     expect(tx.applicationDraftRevision.create).not.toHaveBeenCalled();
     expect(tx.applicationAuditLog.create).not.toHaveBeenCalled();
-  });
-
-  it('records attestation of the current revision without a new revision', async () => {
-    const { service, prisma } = makeService({ draft: draftRow() });
-
-    await service.update('u1', 'draft-1', { attestation: true });
-
-    expect(prisma.applicationDraftRevision.create).not.toHaveBeenCalled();
-    expect(prisma.applicationDraft.update).toHaveBeenCalledWith({
-      where: { id: 'draft-1' },
-      data: { attestedHash: draftRow().revisions[0].contentHash, attestedAt: expect.any(Date) },
-    });
-    expect(prisma.applicationAuditLog.create.mock.calls[0][0].data.action).toBe('ATTESTED');
   });
 
   it('rejects documents that do not belong to the user', async () => {

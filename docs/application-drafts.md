@@ -17,7 +17,7 @@ later phase.
 | `ApplicationDraftRevision` | One immutable edit: full content JSON + the `contentHash` it hashes to |
 | `ApplicationApproval` | A human approval bound to `revisionId` and `contentHash` |
 | `ApplicationArtifact` | Which uploaded document (`CvFile`) is attached to the draft |
-| `ApplicationAuditLog` | Append-only record of created / edited / attested / validated / approved / invalidated events |
+| `ApplicationAuditLog` | Append-only record of created / edited / attested / cleared / validated / approved / invalidated events |
 
 `ApplicationPackage` is never modified by this module. The draft references a
 specific package version (`packageId`), so a later regeneration leaves an
@@ -43,16 +43,27 @@ revision (the edit was a no-op).
 ## Candidate attestation
 
 Because a candidate may rewrite generated text, edits are only approvable after
-the candidate explicitly confirms them. Confirmation stores `attestedHash` on
-the draft:
+the candidate explicitly confirms them. Confirmation stores `attestedHash` on the
+draft.
 
-- An edit clears any previous attestation (the hash moved).
-- Confirming the current revision stores `attestedHash = contentHash` without
-  creating an empty revision.
-- Validation fails while the draft is edited and `attestedHash !== contentHash`.
+Saving and confirming are **separate requests by design**:
+
+1. The candidate edits the text or the attached documents and saves.
+2. A new immutable revision is created and any previous attestation is cleared.
+3. The candidate reviews the saved revision.
+4. A second request records the confirmation for that revision
+   (`attestedHash = contentHash`).
+5. Only then can the revision be approved.
+
+The backend enforces this. A request that changes the prose **or** the attached
+documents and also asks to attest is rejected with `400`; it cannot attest the
+revision it creates. An attestation-only request creates no revision. A
+candidate can also withdraw a confirmation (`attestation: false`), which is
+recorded in the audit log. Validation fails while the draft is edited and
+`attestedHash !== contentHash`.
 
 The system cannot know whether an edit is truthful; it can only require that a
-human took responsibility for it and record which exact revision that was.
+human took responsibility for one exact revision and record which one that was.
 
 ## Pre-approval validation
 
@@ -113,7 +124,7 @@ All routes require authentication and are scoped to the caller.
 | `POST /api/application-drafts` | Create the draft for a job from a package version (default: latest) |
 | `GET /api/application-drafts` | The caller's drafts, newest first |
 | `GET /api/application-drafts/:id` | Full view: content, generated original, validation, approval, documents |
-| `PATCH /api/application-drafts/:id` | Apply an edit as a new revision; optionally set documents and attest |
+| `PATCH /api/application-drafts/:id` | Apply an edit as a new revision (clears any attestation), **or** set/withdraw the attestation for the current revision — never both in one request |
 | `POST /api/application-drafts/:id/validate` | Run the checks and record a `VALIDATED` audit entry |
 | `POST /api/application-drafts/:id/approve` | Record human approval bound to a content hash |
 | `GET /api/application-drafts/:id/audit` | The audit trail for this draft |

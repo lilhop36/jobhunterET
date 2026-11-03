@@ -31,7 +31,9 @@ export class UpdateDraftDto {
   @IsString({ each: true })
   documentIds?: string[];
 
-  /** Candidate confirms edited content is accurate. */
+  /** Candidate confirms (or withdraws confirmation of) the current revision.
+   *  Attestation is a separate act from saving: a request that changes the
+   *  content or the attached documents must not also attest the result. */
   @IsOptional()
   @IsBoolean()
   attestation?: boolean;

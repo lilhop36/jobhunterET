@@ -164,16 +164,24 @@ export default function ApplicationDraftPage() {
     };
   }, [api, params.id, apply]);
 
-  const dirty = useMemo(() => {
+  const contentDirty = useMemo(() => {
     if (!draft) return false;
     return (
       cv !== draft.content.cv ||
       coverLetter !== draft.content.coverLetter ||
       !sameAnswers(answers, draft.content.screeningAnswers) ||
-      !sameDocs(documentIds, draft.artifacts.map((a) => a.fileId)) ||
-      attestation !== draft.attestation.current
+      !sameDocs(documentIds, draft.artifacts.map((a) => a.fileId))
     );
-  }, [draft, cv, coverLetter, answers, documentIds, attestation]);
+  }, [draft, cv, coverLetter, answers, documentIds]);
+
+  const attestationDirty = useMemo(
+    () => !!draft && attestation !== draft.attestation.current,
+    [draft, attestation],
+  );
+
+  // Saving an edit and confirming it are separate acts, so "dirty" means any
+  // unsaved local change at all (text, document selection, or confirmation).
+  const dirty = contentDirty || attestationDirty;
 
   const run = async (kind: 'save' | 'validate' | 'approve') => {
     setBusy(kind);
@@ -181,21 +189,22 @@ export default function ApplicationDraftPage() {
     setFlash(null);
     try {
       if (kind === 'save') {
+        // Never attest in the same request that changes the content or the
+        // attached documents; the server rejects that combination anyway.
+        const payload: Record<string, unknown> = contentDirty
+          ? { cv, coverLetter, screeningAnswers: answers, documentIds }
+          : { attestation };
         const d = (await api(`/api/application-drafts/${params.id}`, {
           method: 'PATCH',
-          body: JSON.stringify({
-            cv,
-            coverLetter,
-            screeningAnswers: answers,
-            documentIds,
-            attestation,
-          }),
+          body: JSON.stringify(payload),
         })) as DraftView;
         apply(d);
         setFlash(
-          d.revision === draft?.revision
-            ? 'Saved. Nothing changed in the generated content.'
-            : `Saved as revision ${d.revision}. The previous revision is still stored.`,
+          contentDirty
+            ? `Saved as revision ${d.revision}. Review it, then confirm the saved version.`
+            : attestation
+              ? 'Confirmed. Your approval now binds to this exact revision.'
+              : 'Confirmation withdrawn.',
         );
       } else if (kind === 'validate') {
         const result = (await api(`/api/application-drafts/${params.id}/validate`, {
@@ -522,7 +531,13 @@ export default function ApplicationDraftPage() {
         ))}
         {!hasCv && <p className="notice-amber">No CV document is selected.</p>}
 
-        {draft.edited && (
+        {draft.edited && contentDirty && (
+          <p className="notice-amber" style={{ marginTop: 18 }}>
+            You changed this application. Save first, review the saved revision, then confirm it.
+          </p>
+        )}
+
+        {draft.edited && !contentDirty && !draft.approval.approved && (
           <div style={{ marginTop: 18 }}>
             <label className="checkbox-line" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <input
@@ -532,13 +547,18 @@ export default function ApplicationDraftPage() {
                 style={{ width: 'auto', minHeight: 'auto' }}
               />
               <span>
-                I confirm these edits are accurate and that I did not add experience, skills,
+                I confirm this saved revision is accurate and that I did not add experience, skills,
                 qualifications or achievements I cannot support.
               </span>
             </label>
-            {!draft.attestation.current && (
+            {attestation ? (
+              <p className="muted" style={{ marginTop: 8 }}>
+                New confirmation ready. Choose “Save confirmation” to record it against this revision.
+              </p>
+            ) : (
               <p className="notice-amber" style={{ marginTop: 8 }}>
-                Your edits are not confirmed yet. Approval stays blocked until you confirm them.
+                Your edits are not confirmed yet. Approval stays blocked until you confirm the saved
+                revision.
               </p>
             )}
           </div>
@@ -547,7 +567,7 @@ export default function ApplicationDraftPage() {
         <div style={{ display: 'flex', gap: 8, marginTop: 18, flexWrap: 'wrap' }}>
           <button className="btn" onClick={() => run('save')} disabled={!dirty || busy !== null}>
             {busy === 'save' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            Save changes
+            {contentDirty ? 'Save changes' : 'Save confirmation'}
           </button>
           <button className="btn" onClick={() => run('approve')} disabled={!canApprove || busy !== null}>
             {busy === 'approve' ? (

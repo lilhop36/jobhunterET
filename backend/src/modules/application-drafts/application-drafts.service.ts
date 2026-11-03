@@ -140,7 +140,13 @@ export class ApplicationDraftsService {
     return this.buildView(draft);
   }
 
-  /** Apply an edit as a new immutable revision. Previous revisions stay put. */
+  /**
+   * Apply an edit as a new immutable revision. Previous revisions stay put.
+   *
+   * Saving and attesting are separate requests by design: any change to the
+   * prose or the attached documents creates a revision and clears the previous
+   * attestation, and such a request may not also attest the new revision.
+   */
   async update(userId: string, draftId: string, dto: UpdateDraftDto): Promise<DraftView> {
     const draft = await this.load(userId, draftId);
     const latest = draft.revisions[0];
@@ -170,9 +176,9 @@ export class ApplicationDraftsService {
 
     const hash = draftHash({ packageId: draft.packageId, content, documentIds });
     if (hash === latest.contentHash) {
-      // Nothing changed byte-for-byte: no new revision, no approval churn. A
-      // candidate may still confirm the exact revision they already have, so
-      // attestation is recorded without inventing an empty revision.
+      // Nothing changed byte-for-byte: no new revision and no approval churn.
+      // The only thing this request may do is attach or withdraw the
+      // candidate's confirmation of the revision that already exists.
       if (dto.attestation === true && draft.attestedHash !== hash) {
         await this.prisma.$transaction([
           this.prisma.applicationDraft.update({
@@ -190,12 +196,47 @@ export class ApplicationDraftsService {
         ]);
         return this.get(userId, draft.id);
       }
+      if (dto.attestation === false && draft.attestedHash) {
+        // Withdrawing a confirmation cannot stand next to an approval: the
+        // approval is the human decision for this exact revision, so the only
+        // way to change anything now is to edit it.
+        if ((draft.approvals[0]?.revisionId ?? null) === latest.id) {
+          throw new ConflictException(
+            'This revision is already approved; edit it to change anything.',
+          );
+        }
+        await this.prisma.$transaction([
+          this.prisma.applicationDraft.update({
+            where: { id: draft.id },
+            data: { attestedHash: null, attestedAt: null },
+          }),
+          this.prisma.applicationAuditLog.create({
+            data: {
+              draftId: draft.id,
+              userId,
+              action: 'ATTESTATION_CLEARED',
+              detail: JSON.stringify({ revision: latest.version }),
+            },
+          }),
+        ]);
+        return this.get(userId, draft.id);
+      }
       return this.buildView(draft);
+    }
+
+    // The prose or the attached documents changed. Saving an edit and
+    // confirming it are deliberately separate acts: an edit always creates a
+    // new revision and always clears the previous attestation, so a request
+    // that changes content can never carry a confirmation for the revision it
+    // creates. The candidate must review what was saved and then confirm it.
+    if (dto.attestation === true) {
+      throw new BadRequestException(
+        'Save your edits first, then confirm the saved version.',
+      );
     }
 
     const approvedRevisionId = draft.approvals[0]?.revisionId ?? null;
     const wasApproved = approvedRevisionId === latest.id;
-    const attestationHash = dto.attestation === true ? hash : null;
     const revisionVersion = latest.version + 1;
 
     await this.prisma.$transaction(async (tx) => {
@@ -217,10 +258,7 @@ export class ApplicationDraftsService {
       }
       await tx.applicationDraft.update({
         where: { id: draft.id },
-        data: {
-          attestedHash: attestationHash,
-          attestedAt: attestationHash ? new Date() : null,
-        },
+        data: { attestedHash: null, attestedAt: null },
       });
       await tx.applicationAuditLog.create({
         data: {
@@ -230,7 +268,7 @@ export class ApplicationDraftsService {
           detail: JSON.stringify({
             revision: revisionVersion,
             hash,
-            attested: attestationHash !== null,
+            attested: false,
             invalidatedApproval: wasApproved,
           }),
         },
